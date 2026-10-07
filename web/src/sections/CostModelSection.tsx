@@ -29,7 +29,7 @@ export function CostModelSection(props: {
         <tbody>
           {inputs.costs.map((c) => {
             const lineIssues = issueByLine.get(c.id) || [];
-            return (
+            return [
               <tr key={c.id} data-line={c.id} data-kind="cost">
                 <td>
                   <input data-field="name" value={c.name} onChange={(e) => updateCost(c.id, { name: e.target.value })} />
@@ -56,13 +56,13 @@ export function CostModelSection(props: {
                 <td>
                   <button data-action="remove-cost" onClick={() => removeCost(c.id)}>Remove</button>
                 </td>
-                {lineIssues.length > 0 && (
-                  <tr data-testid="line-issues" data-line={c.id}>
-                    <td colSpan={8} className="warning">{lineIssues.join(" ")}</td>
-                  </tr>
-                )}
-              </tr>
-            );
+              </tr>,
+              lineIssues.length > 0 && (
+                <tr key={c.id + "-issues"} data-testid="line-issues" data-kind="issues" data-line={c.id}>
+                  <td colSpan={8} className="warning">{lineIssues.join(" ")}</td>
+                </tr>
+              ),
+            ];
           })}
         </tbody>
       </table>
