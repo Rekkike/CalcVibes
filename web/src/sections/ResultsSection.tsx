@@ -3,14 +3,13 @@ import { roundForDisplay } from "../engine.js";
 
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string }) {
   const { result, targetIrr, currency } = props;
-  const goalMet = result.achievedIrr !== null && Math.abs(result.achievedIrr - targetIrr / 100) < 1e-9;
   return (
     <section data-testid="results">
       <h2>Results</h2>
       <p data-testid="goal-check">
         Goal check: the solved structure achieves an IRR of{" "}
         {result.achievedIrr === null ? "—" : roundForDisplay(result.achievedIrr * 100, 2) + "%"} against a target of{" "}
-        {roundForDisplay(targetIrr, 2)}% — {goalMet ? "target achieved" : "target not achieved"}.
+        {roundForDisplay(targetIrr, 2)}% — {result.goalMet ? "target achieved" : "target not achieved"}.
         {result.irrAmbiguous && (
           <span data-testid="irr-ambiguity-warning" className="warning">
             {" "}Warning: the net flow has {result.signChanges} sign changes; the IRR may not be unique.

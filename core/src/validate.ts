@@ -48,5 +48,15 @@ export function validateInputs(inp: ModelInputs): string[] {
   if (!(inp.targetIrr > -100)) {
     issues.push("Target IRR must be greater than -100.");
   }
+  if (inp.appraisal) {
+    const a = inp.appraisal;
+    if (!(a.wacc > -100)) issues.push("WACC must be greater than -100.");
+    if (!(a.financeRate > -100)) issues.push("Finance rate must be greater than -100.");
+    if (!(a.reinvestmentRate > -100)) issues.push("Reinvestment rate must be greater than -100.");
+    if (!(a.residual.amount >= 0)) issues.push("Residual amount must be at least 0.");
+    if (a.residual.amount > 0 && (!Number.isInteger(a.residual.year) || a.residual.year < 1)) {
+      issues.push("Residual year must be an integer of at least 1 when the residual amount is positive.");
+    }
+  }
   return issues;
 }

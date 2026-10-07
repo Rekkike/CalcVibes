@@ -13,6 +13,12 @@ function fromFile(file: typeof templateFile): ModelInputs {
       category: c.category as CostLine["category"],
     })),
     repayment: file.repayment,
+    appraisal: {
+      wacc: file.appraisal.wacc,
+      financeRate: file.appraisal.financeRate,
+      reinvestmentRate: file.appraisal.reinvestmentRate,
+      residual: { amount: file.appraisal.residual.amount, year: file.appraisal.residual.year },
+    },
   };
 }
 
@@ -29,6 +35,7 @@ const inlineBaseline: ModelInputs = {
     { id: "c3", name: "Initial CAPEX", category: "capex", amount: 450000, startYear: 1, durationYears: 0, escalation: 0 },
   ],
   repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0 },
+  appraisal: { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } },
 };
 
 describe("Chunk 0.5: template project golden fixture", () => {
@@ -94,6 +101,14 @@ describe("Chunk 0.5: template project golden fixture", () => {
     expect(m[36].inflow).toBe(0);
     expect(m[119].inflow).toBe(0);
     expect(Math.abs(m[119].cumulative - 5458795.75409)).toBeLessThan(0.01);
+  });
+
+  it("appraisal pins on the template file (schema v2)", () => {
+    expect(Math.abs(result.npvAtWacc - 1252822.99465)).toBeLessThan(0.01);
+    expect(Math.abs((result.profitabilityIndex as number) - 1.17913)).toBeLessThan(1e-4);
+    expect(Math.abs((result.mirr as number) - 0.08756864)).toBeLessThan(1e-6);
+    expect(Math.abs((result.discountedPaybackYears as number) - 8.47094)).toBeLessThan(1e-4);
+    expect(result.goalMet).toBe(true);
   });
 
   it("file-model identity: the file and the inline anchor are the same model", () => {

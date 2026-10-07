@@ -8,14 +8,18 @@ import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
 import { OverviewSection } from "./sections/OverviewSection.js";
 import { ResultsSection } from "./sections/ResultsSection.js";
+import { AppraisalSection } from "./sections/AppraisalSection.js";
+import { ScenariosSection } from "./sections/ScenariosSection.js";
 import { Presentation } from "./presentation/Presentation.js";
 
-type View = "overview" | "costs" | "repayment" | "results";
+type View = "overview" | "costs" | "repayment" | "appraisal" | "results" | "scenarios";
 
 export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
   const [view, setView] = useState<View>("overview");
   const [presOpen, setPresOpen] = useState(false);
+  const [mode, setMode] = useState<"A" | "B" | "C">("A");
+  const [modePayment, setModePayment] = useState(400000);
 
   const issues = useMemo(() => validateInputs(inputs), [inputs]);
   const result: ModelResult | null = useMemo(() => {
@@ -28,6 +32,8 @@ export function App() {
   const setTargetIrr = (v: string) => setInputs((p) => ({ ...p, targetIrr: parseFloat(v) || 0 }));
   const setRepayment = (patch: Partial<ModelInputs["repayment"]>) =>
     setInputs((p) => ({ ...p, repayment: { ...p.repayment, ...patch } }));
+  const setAppraisal = (patch: Partial<NonNullable<ModelInputs["appraisal"]>>) =>
+    setInputs((p) => ({ ...p, appraisal: { ...(p.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } }), ...patch } }));
   const addCost = () => setInputs((p) => ({ ...p, costs: [...p.costs, blankCostLine(nextCostId(p.costs))] }));
   const removeCost = (id: string) => setInputs((p) => ({ ...p, costs: p.costs.filter((c) => c.id !== id) }));
   const updateCost = (id: string, patch: Partial<CostLine>) =>
@@ -56,9 +62,9 @@ export function App() {
       <header>
         <h1>{inputs.projectName || "Untitled project"}</h1>
         <nav>
-          {(["overview", "costs", "repayment", "results"] as View[]).map((v) => (
+          {(["overview", "costs", "repayment", "appraisal", "results", "scenarios"] as View[]).map((v) => (
             <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
-              {v === "costs" ? "Cost model" : v === "repayment" ? "Repayment" : v[0].toUpperCase() + v.slice(1)}
+              {v === "costs" ? "Cost model" : v[0].toUpperCase() + v.slice(1)}
             </button>
           ))}
         </nav>
@@ -89,9 +95,13 @@ export function App() {
           />
         )}
         {view === "repayment" && (
-          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} />
+          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} />
+        )}
+        {view === "appraisal" && (
+          <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} />
         )}
         {view === "results" && result !== null && <ResultsSection result={result} targetIrr={inputs.targetIrr} currency={inputs.currency} />}
+        {view === "scenarios" && <ScenariosSection inputs={inputs} />}
         {view === "results" && result === null && <p>Resolve the input issues to see results.</p>}
       </main>
       <footer>CalcVibes — every figure is computed by the core engine; the UI performs no financial arithmetic.</footer>

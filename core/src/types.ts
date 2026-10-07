@@ -16,12 +16,25 @@ export interface RepaymentParams {
   balloon: number;
 }
 
+export interface ResidualParams {
+  amount: number;
+  year: number;
+}
+
+export interface AppraisalParams {
+  wacc: number;
+  financeRate: number;
+  reinvestmentRate: number;
+  residual: ResidualParams;
+}
+
 export interface ModelInputs {
   projectName: string;
   currency: string;
   targetIrr: number;
   costs: CostLine[];
   repayment: RepaymentParams;
+  appraisal?: AppraisalParams;
 }
 
 export interface MonthlyRow {
@@ -64,4 +77,12 @@ export interface ModelResult {
   lineTotals: LineTotal[];
   signChanges: number;
   irrAmbiguous: boolean;
+  npvAtTarget: number;
+  npvAtWacc: number;
+  npvCollectionsAtWacc: number;
+  npvCostsAtWacc: number;
+  profitabilityIndex: number | null;
+  discountedPaybackYears: number | null;
+  mirr: number | null;
+  goalMet: boolean;
 }
