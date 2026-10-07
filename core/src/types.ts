@@ -14,11 +14,35 @@ export interface RepaymentParams {
   paymentsPerYear: number;
   paymentEscalation: number;
   balloon: number;
+  firstCollectionYear?: number | null;
 }
 
 export interface ResidualParams {
   amount: number;
   year: number;
+}
+
+export interface OperatingLine {
+  id: string;
+  label: string;
+  amount: number;
+  startYear: number;
+  yearCount: number;
+  escalation: number;
+}
+
+export interface MaintenanceConfig {
+  mode: "off" | "percent" | "fixed";
+  percentPerYear?: number;
+  fixedAnnualAmount?: number;
+}
+
+export interface OperatingLineInfo {
+  id: string;
+  label: string;
+  nominalSpan: [number, number];
+  effectiveWindow: [number, number];
+  total: number;
 }
 
 export interface AppraisalParams {
@@ -35,6 +59,8 @@ export interface ModelInputs {
   costs: CostLine[];
   repayment: RepaymentParams;
   appraisal?: AppraisalParams;
+  operatingLines?: OperatingLine[];
+  maintenance?: MaintenanceConfig;
 }
 
 export interface MonthlyRow {
@@ -85,4 +111,8 @@ export interface ModelResult {
   discountedPaybackYears: number | null;
   mirr: number | null;
   goalMet: boolean;
+  firstPaymentMonth: number;
+  lastPaymentMonth: number;
+  operatingLines: OperatingLineInfo[];
+  operatingTotal: number;
 }

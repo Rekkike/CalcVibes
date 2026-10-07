@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "projectName": "Project Alpha",
   "currency": "EUR",
   "targetIrr": 12,
@@ -37,7 +37,8 @@
     "termYears": 7,
     "paymentsPerYear": 4,
     "paymentEscalation": 0,
-    "balloon": 0
+    "balloon": 0,
+    "firstCollectionYear": null
   },
   "appraisal": {
     "wacc": 8,
@@ -47,5 +48,12 @@
       "amount": 0,
       "year": 10
     }
+  },
+  "operatingLines": [],
+  "maintenance": {
+    "mode": "off"
+  },
+  "settings": {
+    "startYear": null
   }
 }

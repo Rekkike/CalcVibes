@@ -1,14 +1,15 @@
 import type { ModelResult } from "../../../core/src/types.js";
-import { roundForDisplay } from "../engine.js";
+import { percentForDisplay, roundForDisplay } from "../engine.js";
+import { yearHeader } from "../state.js";
 
-export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string }) {
-  const { result, targetIrr, currency } = props;
+export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null }) {
+  const { result, targetIrr, currency, startYear = null } = props;
   return (
     <section data-testid="results">
       <h2>Results</h2>
       <p data-testid="goal-check">
         Goal check: the solved structure achieves an IRR of{" "}
-        {result.achievedIrr === null ? "—" : roundForDisplay(result.achievedIrr * 100, 2) + "%"} against a target of{" "}
+        {percentForDisplay(result.achievedIrr, 2)} against a target of{" "}
         {roundForDisplay(targetIrr, 2)}% — {result.goalMet ? "target achieved" : "target not achieved"}.
         {result.irrAmbiguous && (
           <span data-testid="irr-ambiguity-warning" className="warning">
@@ -24,7 +25,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         <tbody>
           {result.yearly.map((y) => (
             <tr key={y.year}>
-              <td>{y.name}</td>
+              <td>{yearHeader(y.year, startYear)}</td>
               <td>{roundForDisplay(y.cost)}</td>
               <td>{roundForDisplay(y.inflow)}</td>
               <td>{roundForDisplay(y.net)}</td>

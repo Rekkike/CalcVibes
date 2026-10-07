@@ -48,6 +48,30 @@ export function validateInputs(inp: ModelInputs): string[] {
   if (!(inp.targetIrr > -100)) {
     issues.push("Target IRR must be greater than -100.");
   }
+  if (inp.repayment.firstCollectionYear !== null && inp.repayment.firstCollectionYear !== undefined) {
+    if (!Number.isInteger(inp.repayment.firstCollectionYear) || (inp.repayment.firstCollectionYear as number) < 1) {
+      issues.push("First collection year must be an integer of at least 1.");
+    } else if (inp.repayment.graceYears > 0) {
+      issues.push("The first-collection-year override replaces the derived start; grace must be zero when the override is set.");
+    }
+  }
+  if (inp.operatingLines) {
+    inp.operatingLines.forEach((o) => {
+      if (!o.label || o.label.trim() === "") issues.push(`Operating line ${o.id} has an empty label.`);
+      if (!(o.amount > 0)) issues.push(`Operating line ${o.id} (${o.label}) has a non-positive amount.`);
+      if (!Number.isInteger(o.startYear) || o.startYear < 1) issues.push(`Operating line ${o.id} (${o.label}) has a start year that is not an integer of at least 1.`);
+      if (!Number.isInteger(o.yearCount) || o.yearCount < 1) issues.push(`Operating line ${o.id} (${o.label}) has a year count that is not an integer of at least 1.`);
+      if (!Number.isFinite(o.escalation)) issues.push(`Operating line ${o.id} (${o.label}) has a non-finite escalation.`);
+    });
+  }
+  if (inp.maintenance && inp.maintenance.mode !== "off") {
+    const m = inp.maintenance;
+    if (m.mode === "percent" && (m.percentPerYear ?? 0) < 0) issues.push("Maintenance percent per year must be at least 0.");
+    if (m.mode === "fixed" && (m.fixedAnnualAmount ?? 0) < 0) issues.push("Maintenance fixed annual amount must be at least 0.");
+    if (m.mode !== "percent" && m.mode !== "fixed") {
+      issues.push("Maintenance must have exactly one active mode: percent or fixed.");
+    }
+  }
   if (inp.appraisal) {
     const a = inp.appraisal;
     if (!(a.wacc > -100)) issues.push("WACC must be greater than -100.");

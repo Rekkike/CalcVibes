@@ -27,6 +27,10 @@ export function RepaymentSection(props: {
       {mode !== "A" && (
         <label>Payment per period <input data-field="modePayment" type="number" value={modePayment} onChange={(e) => setModePayment(parseFloat(e.target.value) || 0)} /></label>
       )}
+      <label>First collection year (override; blank means derived){" "}
+        <input data-field="firstCollectionYear" type="number" value={inputs.repayment.firstCollectionYear ?? ""} onChange={(e) =>
+          setRepayment({ firstCollectionYear: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })} />
+      </label>
       <label>Term (years) <input data-field="termYears" type="number" value={r.termYears} onChange={num("termYears")} /></label>
       <label>Payments per year{" "}
         <select data-field="paymentsPerYear" value={r.paymentsPerYear} onChange={(e) => setRepayment({ paymentsPerYear: parseInt(e.target.value, 10) })}>
@@ -36,8 +40,8 @@ export function RepaymentSection(props: {
           <option value={12}>Monthly</option>
         </select>
       </label>
-      <label>Grace (years) <input data-field="graceYears" type="number" value={r.graceYears} onChange={num("graceYears")} /></label>
-      <label>Payment escalation (%/yr) <input data-field="paymentEscalation" type="number" value={r.paymentEscalation} onChange={num("paymentEscalation")} /></label>
+      <label>Grace (years) <input data-field="graceYears" type="number" value={r.graceYears} disabled={inputs.repayment.firstCollectionYear !== null && inputs.repayment.firstCollectionYear !== undefined} onChange={num("graceYears")} /></label>
+      <label>Indexation (CPI) % per year (rule of thumb: 2%) <input data-field="paymentEscalation" type="number" value={r.paymentEscalation} onChange={num("paymentEscalation")} /></label>
       <label>Balloon <input data-field="balloon" type="number" value={r.balloon} onChange={num("balloon")} /></label>
       {result !== null && (
         <dl data-testid="repayment-summary">

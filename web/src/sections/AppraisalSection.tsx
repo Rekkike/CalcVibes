@@ -1,5 +1,5 @@
 import type { AppraisalParams, ModelInputs } from "../../../core/src/types.js";
-import { roundForDisplay } from "../engine.js";
+import { percentForDisplay, roundForDisplay } from "../engine.js";
 
 export function AppraisalSection(props: {
   inputs: ModelInputs;
@@ -30,7 +30,7 @@ export function AppraisalSection(props: {
           <dt>Payback, nominal (years)</dt><dd data-stat="paybackYears">{result.paybackYears === null ? "—" : roundForDisplay(result.paybackYears, 5)}</dd>
           <dt>Payback, discounted at WACC (years)</dt>
           <dd data-stat="discountedPaybackYears">{result.discountedPaybackYears === null ? "—" : roundForDisplay(result.discountedPaybackYears, 5)}</dd>
-          <dt>MIRR (finance 6, reinvest 6 shown as configured)</dt><dd data-stat="mirr">{result.mirr === null ? "—" : roundForDisplay(result.mirr * 100, 5) + "%"}</dd>
+          <dt>MIRR (finance 6, reinvest 6 shown as configured)</dt><dd data-stat="mirr">{percentForDisplay(result.mirr)}</dd>
           <dt>Goal check (engine)</dt><dd data-stat="goalMet">{result.goalMet ? "Target achieved" : "Target not achieved"}</dd>
         </dl>
       )}

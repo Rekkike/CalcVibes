@@ -12,7 +12,7 @@ function fromFile(file: typeof templateFile): ModelInputs {
       ...c,
       category: c.category as CostLine["category"],
     })),
-    repayment: file.repayment,
+    repayment: { ...file.repayment, firstCollectionYear: file.repayment.firstCollectionYear ?? null },
     appraisal: {
       wacc: file.appraisal.wacc,
       financeRate: file.appraisal.financeRate,
@@ -34,8 +34,10 @@ const inlineBaseline: ModelInputs = {
     { id: "c2", name: "Infrastructure & licences", category: "recurring", amount: 600000, startYear: 1, durationYears: 3, escalation: 2 },
     { id: "c3", name: "Initial CAPEX", category: "capex", amount: 450000, startYear: 1, durationYears: 0, escalation: 0 },
   ],
-  repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0 },
+  repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0, firstCollectionYear: null },
   appraisal: { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } },
+  operatingLines: [],
+  maintenance: { mode: "off" },
 };
 
 describe("Chunk 0.5: template project golden fixture", () => {
@@ -109,6 +111,18 @@ describe("Chunk 0.5: template project golden fixture", () => {
     expect(Math.abs((result.mirr as number) - 0.08756864)).toBeLessThan(1e-6);
     expect(Math.abs((result.discountedPaybackYears as number) - 8.47094)).toBeLessThan(1e-4);
     expect(result.goalMet).toBe(true);
+  });
+
+  it("operating variant (schema v3 fields exercised): maintenance percent 0.5 pins the CP-1 MAINT figures", () => {
+    const operatingVariant = { ...fileInputs, maintenance: { mode: "percent" as const, percentPerYear: 0.5 } };
+    const r = computeModel(operatingVariant);
+    expect(Math.abs(r.paymentAmount - 475857.58728)).toBeLessThan(0.01);
+    expect(r.signChanges).toBe(55);
+    expect(r.irrAmbiguous).toBe(true);
+    expect(r.firstPaymentMonth).toBe(36);
+    expect(r.operatingTotal).toBe(15375);
+    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(r.goalMet).toBe(true);
   });
 
   it("file-model identity: the file and the inline anchor are the same model", () => {
