@@ -1,6 +1,6 @@
 # Project IRR Analyzer — Specification
 
-Living specification. This file is the authority of record for what the application is and does. The changelog at the end grades every change. Current version: **v0.1.2** (2026-10-07).
+Living specification. This file is the authority of record for what the application is and does. The changelog at the end grades every change. Current version: **v0.2.0** (2026-10-07).
 
 ## 1. Purpose and user
 
@@ -78,6 +78,13 @@ All computation on a monthly-resolution cash-flow vector; annual aggregation for
 - Solver bounds: the IRR search never evaluates the NPV outside monthly rates [-0.9, 6.0].
 - Determinism: identical inputs produce identical outputs; the engine contains no randomness, clock, or I/O.
 - Directional claims of record (script-verified 2026-10-07): a longer grace strictly raises the solved payment at positive target rates (deferral discounts every collection; at a zero target rate the payment is invariant to grace); a larger balloon strictly lowers the payment; a higher target IRR strictly lowers the cost NPV; a longer term strictly lowers the payment.
+- Ambiguity reachability, limitation of record (v0.2.0): under the current input model the ambiguity flag is unreachable — collections begin at or after the last cost month, so the net vector crosses zero at most once. The UI warning is therefore verified against a stubbed result; the limitation is documented, not hidden.
+
+### 4.8 Regression anchor and template project (of record, 2026-10-07)
+
+- data/template-project.json (Project Alpha, schema version 1) is the canonical regression anchor and the demo source: one file, one source of truth, consumed by the golden fixture and by the UI demo load alike.
+- core/test/template.golden.test.ts pins the template's complete golden output profile: twelve scalars, exact line totals, the ten-row yearly table, eight monthly checkpoints, and file-model identity with the inline anchor.
+- Standing rule: every pass keeps the golden fixture green. A change to any golden value is a change to model behavior and requires an explicit, spec-graded decision before implementation — never a silent pin update.
 
 ## 5. Application architecture
 
@@ -94,14 +101,14 @@ All computation on a monthly-resolution cash-flow vector; annual aggregation for
 - web/test — UI tests.
 - docs/ — this specification, the environment discipline, research, sources.
 - prototype/ — the standalone reference prototype (behavioral reference of record for the v0.1 engine).
-- data/ — project-file JSON schema and examples.
+- data/ — project-file JSON schema and examples. First artifact: template-project.json (Project Alpha, schema version 1), the regression anchor of record (section 4.8).
 
 ## 7. Versioning contract and roadmap
 
 - v0.1 — Engine core: cost model, Mode-A solver, IRR/payback, checkpoint tests.
 - v0.1.1 — Verification hardening: invariant tests, validation contract, numerical policy enforced.
-- v0.2 — UI parity with the prototype (four sections).
-- v0.3 — Appraisal suite: MIRR, WACC NPV, PI, discounted payback, scenarios, sensitivity tables, Modes B and C.
+- v0.2 — UI parity with the prototype (four sections). Delivered at v0.2.0.
+- v0.3 — Appraisal suite: MIRR, WACC NPV, PI, discounted payback, scenarios, sensitivity tables, Modes B and C; the engine emits goalMet, carried from v0.2.0.
 - v0.4 — Financing layer: debt/equity, drawdown, IDC, DSCR, equity IRR.
 - v0.5 — Presentation and exports: deck polish, PDF print, XLSX schedule.
 - v1.0 — Desktop packaging (Tauri), project file save/load, installer.
@@ -118,3 +125,4 @@ All computation on a monthly-resolution cash-flow vector; annual aggregation for
 - v0.1.0 (2026-10-07) — Initial specification: design brief of record, engine specification, architecture, repository plan, versioning contract. Grade: initial seeding.
 - v0.1.1 (2026-10-07) — Engine core pass (directive v0.1) delivered at commit aeaa7c8: engine ported to core/src, DEFECT-001 repaired per contract, 26 pinned checkpoint tests green with red proofs captured per pin. Specification amended: section 4.4 IRR method corrected to the repaired bracketing contract; section 4.7 added (numerical and validation policy of record); quality bar added to decisions of record; roadmap gains the v0.1.1 hardening gate. Grade: delivered — roadmap item v0.1 (cost model, Mode-A solver, IRR/payback, checkpoint tests) complete.
 - v0.1.2 (2026-10-07) — Verification hardening pass (directive v0.1.1, amended mid-pass at 9af524d after a correct builder halt on the INV-7 grace contradiction) delivered at merge 4c038b5 (squash 0de75a2): validation contract in force (eleven rules, EngineInputError carrying human-readable issues, silent filtering removed), 144-case deterministic invariant suite (solver identity, achieved-IRR identity, scaling, determinism, finiteness, aggregation, monotonicity with the corrected grace direction, slot grid), sign-change counting with the ambiguity flag, mutation red proofs including the corrected INV-6 proof. Ledger: 54 tests green; original 26 pins unmodified. Directional claims of record added to section 4.7. One carried notice: the amended directive's term pins (903,142.19709 at term 3 and 318,490.43128 at term 15) are asserted only as an inequality in INV-7; adding the two pins is the mandatory opening chunk of the next pass. Grade: delivered with one carried notice — roadmap item v0.1.1 complete.
+- v0.2.0 (2026-10-07) — UI parity pass (directive v0.2, amended mid-pass at 1f2cdcc; follow-up directive 7b4a043 issued when the first delivery ac2d3e6 predated the amendment) delivered at merges ac2d3e6 and 38d06cb: React web UI at structural parity with the prototype — four sections, five-slide presentation mode with keyboard navigation — with engine-only arithmetic in the UI (the display helper is the sole numeric transformation; input decoding excepted), blank start with the demo loading the template file, live validation surfacing with input retention, and the IRR ambiguity warning. Template battery of record: data/template-project.json (Project Alpha, schema version 1) committed at 4106c1c as the canonical regression anchor and demo source; core/test/template.golden.test.ts pins its full script-verified profile (twelve scalars, exact line totals, the ten-row yearly table, eight monthly checkpoints, file-model identity with the inline anchor) under the standing rule of section 4.8. Ledger of record: 59 core plus 15 web = 74 green; the directive's superseded figures 56 and 61 are corrected at 7b4a043 (the chunk-0 term pins live as assertions inside INV-7). Section 4.7 gains the ambiguity-reachability limitation of record. One carried notice: the goal-check comparison remains in the UI layer until the engine emits goalMet (v0.3). Grade: delivered with one carried notice — roadmap item v0.2 complete.
