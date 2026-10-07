@@ -62,4 +62,6 @@ export interface ModelResult {
   monthly: MonthlyRow[];
   yearly: YearlyRow[];
   lineTotals: LineTotal[];
+  signChanges: number;
+  irrAmbiguous: boolean;
 }

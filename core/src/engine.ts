@@ -1,3 +1,15 @@
+export function countSignChanges(flows: number[]): number {
+  let changes = 0;
+  let prevSign = 0;
+  for (const f of flows) {
+    if (f === 0) continue;
+    const sign = f > 0 ? 1 : -1;
+    if (prevSign !== 0 && sign !== prevSign) changes++;
+    prevSign = sign;
+  }
+  return changes;
+}
+
 export function npvMonthly(rateM: number, flows: number[]): number {
   let acc = 0;
   for (let i = 0; i < flows.length; i++) acc += flows[i] / Math.pow(1 + rateM, i + 1);
@@ -44,9 +56,11 @@ interface PaymentSlot {
 }
 
 export function computeModel(inp: ModelInputsLike): import("./types.js").ModelResult {
-  const target = Math.max(-99, inp.targetIrr);
+  const issues = validateInputs(inp);
+  if (issues.length > 0) throw new EngineInputError(issues);
+  const target = inp.targetIrr;
   const rM = Math.pow(1 + target / 100, 1 / 12) - 1;
-  const costs = inp.costs.filter((c) => c.name && c.amount > 0 && c.startYear >= 1);
+  const costs = inp.costs;
   let lastCostYear = 0;
   costs.forEach((c) => {
     const end = c.category === "capex" ? c.startYear : c.startYear + Math.max(1, c.durationYears) - 1;
@@ -135,6 +149,7 @@ export function computeModel(inp: ModelInputsLike): import("./types.js").ModelRe
   let totalCollected = 0;
   slots.forEach((s) => { totalCollected += payment * s.escFactor; });
   if (inp.repayment.balloon > 0) totalCollected += inp.repayment.balloon;
+  const signChanges = countSignChanges(monthly.map((mm2) => mm2.net));
   return {
     totalCost: totalCost, costNpv: costNpv, paymentAmount: payment,
     paymentCount: slots.length, totalCollected: totalCollected,
@@ -142,7 +157,10 @@ export function computeModel(inp: ModelInputsLike): import("./types.js").ModelRe
     paybackYears: paybackMonths === null ? null : paybackMonths / 12,
     lastCostYear: lastCostYear, repaymentStartYear: repaymentStartYear,
     monthly: monthly, yearly: yearly, lineTotals: lineTotals,
+    signChanges: signChanges, irrAmbiguous: signChanges > 1,
   };
 }
+
+import { EngineInputError, validateInputs } from "./validate.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;
