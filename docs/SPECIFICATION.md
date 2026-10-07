@@ -1,6 +1,6 @@
 # Project IRR Analyzer — Specification
 
-Living specification. This file is the authority of record for what the application is and does. The changelog at the end grades every change. Current version: **v0.1.1** (2026-10-07).
+Living specification. This file is the authority of record for what the application is and does. The changelog at the end grades every change. Current version: **v0.1.2** (2026-10-07).
 
 ## 1. Purpose and user
 
@@ -73,10 +73,11 @@ All computation on a monthly-resolution cash-flow vector; annual aggregation for
 
 - Precision: all computation in IEEE-754 double precision with no intermediate rounding. Rounding occurs only at the display and export boundary.
 - Display: values are rounded to the currency's minor unit for presentation; a displayed total is computed from unrounded values, so displayed component rows may differ from a displayed total by at most one minor unit.
-- Validation: input errors surface; no silent filtering. A cost line with an empty name, a non-positive amount, or a start year below one is an error to be reported, not a line to be quietly dropped. (Deviation of record: the prototype silently dropped invalid lines; the tool of record reports them.)
+- Validation: input errors surface; no silent filtering. A cost line with an empty name, a non-positive amount, or a start year below one is an error to be reported, not a line to be quietly dropped. (Deviation of record: the prototype silently dropped invalid lines; the tool of record reports them. Enforced since the v0.1.1 hardening pass.)
 - IRR non-uniqueness: for net-flow vectors with more than one sign change, the IRR may not be unique. The engine counts sign changes across non-zero flows and reports an ambiguity flag alongside the achieved IRR; the UI must warn when the flag is set. The solver returns the first bracket found from the left of the scan grid; this limitation is documented, not hidden.
 - Solver bounds: the IRR search never evaluates the NPV outside monthly rates [-0.9, 6.0].
 - Determinism: identical inputs produce identical outputs; the engine contains no randomness, clock, or I/O.
+- Directional claims of record (script-verified 2026-10-07): a longer grace strictly raises the solved payment at positive target rates (deferral discounts every collection; at a zero target rate the payment is invariant to grace); a larger balloon strictly lowers the payment; a higher target IRR strictly lowers the cost NPV; a longer term strictly lowers the payment.
 
 ## 5. Application architecture
 
@@ -116,3 +117,4 @@ All computation on a monthly-resolution cash-flow vector; annual aggregation for
 
 - v0.1.0 (2026-10-07) — Initial specification: design brief of record, engine specification, architecture, repository plan, versioning contract. Grade: initial seeding.
 - v0.1.1 (2026-10-07) — Engine core pass (directive v0.1) delivered at commit aeaa7c8: engine ported to core/src, DEFECT-001 repaired per contract, 26 pinned checkpoint tests green with red proofs captured per pin. Specification amended: section 4.4 IRR method corrected to the repaired bracketing contract; section 4.7 added (numerical and validation policy of record); quality bar added to decisions of record; roadmap gains the v0.1.1 hardening gate. Grade: delivered — roadmap item v0.1 (cost model, Mode-A solver, IRR/payback, checkpoint tests) complete.
+- v0.1.2 (2026-10-07) — Verification hardening pass (directive v0.1.1, amended mid-pass at 9af524d after a correct builder halt on the INV-7 grace contradiction) delivered at merge 4c038b5 (squash 0de75a2): validation contract in force (eleven rules, EngineInputError carrying human-readable issues, silent filtering removed), 144-case deterministic invariant suite (solver identity, achieved-IRR identity, scaling, determinism, finiteness, aggregation, monotonicity with the corrected grace direction, slot grid), sign-change counting with the ambiguity flag, mutation red proofs including the corrected INV-6 proof. Ledger: 54 tests green; original 26 pins unmodified. Directional claims of record added to section 4.7. One carried notice: the amended directive's term pins (903,142.19709 at term 3 and 318,490.43128 at term 15) are asserted only as an inequality in INV-7; adding the two pins is the mandatory opening chunk of the next pass. Grade: delivered with one carried notice — roadmap item v0.1.1 complete.
