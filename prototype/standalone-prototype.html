@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Cost &amp; IRR Analyzer — Standalone Prototype</title>
+<style>
+  :root { --ink:#0f172a; --mut:#64748b; --bg:#f8fafc; --line:#e2e8f0; --indigo:#6366f1; --green:#10b981; --red:#f43f5e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  .topbar { position:sticky; top:0; z-index:20; background:rgba(255,255,255,0.94); backdrop-filter:blur(6px); border-bottom:1px solid var(--line); }
+  .topbar-inner { max-width:1180px; margin:0 auto; padding:12px 24px; display:flex; flex-wrap:wrap; align-items:center; gap:14px; }
+  .brand { font-weight:700; letter-spacing:-0.01em; font-size:15px; }
+  .badge { background:#f1f5f9; border:1px solid var(--line); border-radius:999px; padding:3px 12px; font-size:12px; color:var(--mut); }
+  .nav { display:flex; gap:2px; background:#f1f5f9; border-radius:10px; padding:3px; margin-left:auto; }
+  .nav button { border:0; background:transparent; padding:6px 14px; font-size:13px; border-radius:8px; color:var(--mut); cursor:pointer; font-family:inherit; }
+  .nav button.active { background:#fff; color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,0.06); font-weight:600; }
+  .btn { border:0; border-radius:9px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .btn-primary { background:#4f46e5; color:#fff; }
+  .btn-primary:hover { background:#4338ca; }
+  .btn-ghost { background:transparent; color:var(--mut); }
+  .btn-ghost:hover { color:var(--ink); }
+  .btn-outline { background:#fff; border:1px solid var(--line); color:var(--ink); }
+  .btn-danger { background:transparent; color:#e11d48; font-weight:500; }
+  .container { max-width:1180px; margin:0 auto; padding:28px 24px 60px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:18px; box-shadow:0 1px 2px rgba(15,23,42,0.04); }
+  .card h3 { margin:0 0 4px; font-size:14px; }
+  .statgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:18px; }
+  .stat { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; box-shadow:0 1px 2px rgba(15,23,42,0.04); }
+  .stat .k { font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--mut); font-weight:600; }
+  .stat .v { font-size:21px; font-weight:700; margin-top:6px; font-variant-numeric:tabular-nums; }
+  .stat .s { font-size:12px; color:var(--mut); margin-top:4px; }
+  .good { color:#059669; } .bad { color:#e11d48; }
+  .grid-in { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; }
+  .field label { display:block; font-size:12px; font-weight:600; color:var(--mut); margin-bottom:5px; }
+  .field input, .field select { width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:9px; font-size:14px; font-family:inherit; background:#fff; }
+  .field input:focus, .field select:focus { outline:2px solid #c7d2fe; border-color:#a5b4fc; }
+  .legend { display:flex; gap:18px; font-size:12px; color:var(--mut); margin:2px 0 6px; }
+  .legend .dot { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:6px; vertical-align:baseline; }
+  .note { font-size:12px; color:#94a3b8; line-height:1.6; max-width:900px; }
+  h2.sec { font-size:17px; margin:4px 0 2px; }
+  p.lead { font-size:13px; color:var(--mut); margin:4px 0 16px; max-width:760px; line-height:1.55; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--mut); padding:8px 10px; border-bottom:1px solid var(--line); }
+  td { padding:8px 10px; border-bottom:1px solid #f1f5f9; font-variant-numeric:tabular-nums; }
+  th.r, td.r { text-align:right; }
+  .scroll { max-height:400px; overflow:auto; border:1px solid var(--line); border-radius:10px; }
+  .scroll table { margin:0; } .scroll th { position:sticky; top:0; background:#f8fafc; z-index:1; }
+  .costline { display:grid; grid-template-columns: 2fr 1fr 1.1fr 0.7fr 0.7fr 0.7fr auto; gap:10px; align-items:end; margin-bottom:14px; padding:16px; }
+  .costline .field { min-width:0; }
+  .linefoot { display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+  .two-col { display:grid; grid-template-columns: 3fr 2fr; gap:18px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns:1fr; } .costline { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); } }
+  /* Presentation mode */
+  #pres { position:fixed; inset:0; background:#020617; z-index:50; display:none; }
+  #pres.open { display:block; }
+  #pres .glow { position:absolute; inset:0; background:radial-gradient(ellipse 80% 60% at 70% -10%, rgba(99,102,241,0.18), transparent), radial-gradient(ellipse 60% 50% at 10% 110%, rgba(16,185,129,0.10), transparent); }
+  #pres .top { position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; padding:18px 24px; }
+  #pres .top .proj { font-size:11px; text-transform:uppercase; letter-spacing:0.2em; color:#475569; font-weight:600; }
+  #pres .stage { position:absolute; top:56px; bottom:76px; left:24px; right:24px; display:flex; }
+  .slide { width:100%; height:100%; animation: fadein .35s ease-out; }
+  @keyframes fadein { from { opacity:0; transform:translateY(16px);} to { opacity:1; transform:none;} }
+  .slide .inner { margin:auto; width:100%; max-width:1020px; padding:0 40px; }
+  .kicker { font-size:13px; text-transform:uppercase; letter-spacing:0.3em; color:#a5b4fc; font-weight:600; }
+  .slide h1 { color:#fff; font-size:52px; margin:20px 0 0; letter-spacing:-0.02em; }
+  .slide h2 { color:#fff; font-size:30px; margin:16px 0 8px; letter-spacing:-0.01em; }
+  .slide p.sub { color:#94a3b8; font-size:15px; max-width:680px; line-height:1.6; }
+  .titlegrid { display:grid; grid-template-columns:repeat(3, 1fr); gap:44px; margin-top:44px; max-width:760px; }
+  .titlegrid .k { font-size:11px; text-transform:uppercase; letter-spacing:0.16em; color:#64748b; }
+  .titlegrid .v { font-size:24px; font-weight:700; color:#fff; margin-top:8px; font-variant-numeric:tabular-nums; }
+  .divider { height:1px; width:96px; margin:48px auto 0; background:linear-gradient(90deg, transparent, #818cf8, transparent); }
+  .center { text-align:center; }
+  .statrow { display:grid; grid-template-columns:repeat(3,1fr); gap:26px; margin-top:28px; }
+  .statrow .k { font-size:11px; text-transform:uppercase; letter-spacing:0.16em; color:#64748b; }
+  .statrow .v { font-size:20px; font-weight:700; color:#fff; margin-top:6px; font-variant-numeric:tabular-nums; }
+  .toplines { display:grid; gap:12px; align-self:center; }
+  .topline { display:flex; justify-content:space-between; align-items:center; background:rgba(30,41,59,0.6); border:1px solid rgba(51,65,85,0.7); border-radius:12px; padding:12px 16px; color:#cbd5e1; font-size:14px; }
+  .topline .share { color:#fff; font-weight:600; font-variant-numeric:tabular-nums; }
+  .sumitem { display:flex; gap:16px; align-items:flex-start; background:rgba(30,41,59,0.55); border:1px solid rgba(51,65,85,0.7); border-radius:14px; padding:18px 22px; margin-bottom:14px; }
+  .sumitem .n { flex:0 0 28px; height:28px; border-radius:999px; background:rgba(99,102,241,0.2); color:#a5b4fc; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .sumitem p { margin:2px 0 0; color:#e2e8f0; font-size:16px; line-height:1.6; }
+  #pres .bottom { position:absolute; bottom:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; padding:18px 24px; }
+  #pres .btn-dark { background:rgba(30,41,59,0.7); border:1px solid #334155; color:#e2e8f0; border-radius:9px; padding:8px 16px; font-size:13px; cursor:pointer; font-family:inherit; }
+  #pres .btn-dark:disabled { opacity:0.35; cursor:default; }
+  #pres .btn-dark.next { background:#4f46e5; border-color:#4f46e5; color:#fff; font-weight:600; }
+  .dots { display:flex; gap:8px; }
+  .dots button { height:8px; width:8px; border-radius:999px; border:0; background:#475569; cursor:pointer; padding:0; }
+  .dots button.on { width:24px; background:#818cf8; }
+  .hidden { display:none !important; }
+  .foot { color:#94a3b8; font-size:11px; margin-top:26px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">Project Cost &amp; IRR Analyzer</span>
+    <span class="badge" id="projBadge"></span>
+    <nav class="nav" id="nav">
+      <button data-v="overview" class="active">Overview</button>
+      <button data-v="costs">Cost model</button>
+      <button data-v="repayment">Repayment</button>
+      <button data-v="results">Results</button>
+    </nav>
+    <button class="btn btn-primary" onclick="openPresentation()">&#9654; Present results</button>
+  </div>
+</div>
+
+<div class="container">
+  <section id="sec-overview"></section>
+  <section id="sec-costs" class="hidden"></section>
+  <section id="sec-repayment" class="hidden"></section>
+  <section id="sec-results" class="hidden"></section>
+  <p class="foot">Standalone prototype v0.1 — same engine as the canvas prototype. Payments are solved so the NPV of collections equals the NPV of costs at the target IRR (monthly compounding); achieved IRR verified numerically. Offline single-file build: download from Drive and open in any browser.</p>
+</div>
+
+<div id="pres">
+  <div class="glow"></div>
+  <div class="top">
+    <span class="proj" id="presProj"></span>
+    <button class="btn-dark" style="background:transparent;border:0;color:#64748b;cursor:pointer;font-family:inherit;font-size:12px" onclick="closePresentation()">Exit presentation (Esc)</button>
+  </div>
+  <div class="stage" id="presStage"></div>
+  <div class="bottom">
+    <button class="btn-dark" id="presPrev" onclick="prevSlide()">&larr; Previous</button>
+    <div class="dots" id="presDots"></div>
+    <button class="btn-dark next" id="presNext" onclick="nextSlide()">Next &rarr;</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ================= ENGINE =================
+function npvMonthly(rateM, flows) {
+  var acc = 0;
+  for (var i = 0; i < flows.length; i++) acc += flows[i] / Math.pow(1 + rateM, i + 1);
+  return acc;
+}
+function irrAnnual(flows) {
+  var lo = -0.9999, hi = 10;
+  var fLo = npvMonthly(lo, flows), fHi = npvMonthly(hi, flows);
+  if (fLo * fHi > 0) return null;
+  var rM = 0;
+  for (var i = 0; i < 300; i++) {
+    var mid = (lo + hi) / 2;
+    var fMid = npvMonthly(mid, flows);
+    rM = mid;
+    if (Math.abs(fMid) < 1e-7) break;
+    if (fLo * fMid < 0) { hi = mid; } else { lo = mid; fLo = fMid; }
+  }
+  return Math.pow(1 + rM, 12) - 1;
+}
+function computeModel(inp) {
+  var target = Math.max(-99, inp.targetIrr);
+  var rM = Math.pow(1 + target / 100, 1 / 12) - 1;
+  var costs = inp.costs.filter(function (c) { return c.name && c.amount > 0 && c.startYear >= 1; });
+  var lastCostYear = 0;
+  costs.forEach(function (c) {
+    var end = c.category === "capex" ? c.startYear : c.startYear + Math.max(1, c.durationYears) - 1;
+    lastCostYear = Math.max(lastCostYear, end);
+  });
+  if (lastCostYear === 0) lastCostYear = 1;
+  var repaymentStartYear = lastCostYear + inp.repayment.graceYears;
+  var termMonths = Math.round(Math.max(0, inp.repayment.termYears) * 12);
+  var totalMonths = Math.max(Math.ceil(lastCostYear * 12), repaymentStartYear * 12 + termMonths);
+
+  var costM = new Array(totalMonths).fill(0);
+  costs.forEach(function (c) {
+    if (c.category === "capex") {
+      var m = Math.min(totalMonths, c.startYear * 12);
+      if (m >= 1) costM[m - 1] += c.amount;
+    } else {
+      var dur = Math.max(1, c.durationYears);
+      for (var y = c.startYear; y < c.startYear + dur; y++) {
+        var esc = Math.pow(1 + c.escalation / 100, y - c.startYear);
+        var monthly = (c.amount * esc) / 12;
+        for (var mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= totalMonths; mm++) costM[mm - 1] += monthly;
+      }
+    }
+  });
+
+  var costNpv = 0;
+  for (var i = 0; i < totalMonths; i++) costNpv += costM[i] / Math.pow(1 + rM, i + 1);
+
+  var ppy = [1, 2, 4, 12].indexOf(inp.repayment.paymentsPerYear) >= 0 ? inp.repayment.paymentsPerYear : 1;
+  var spacing = 12 / ppy;
+  var paymentCount = Math.max(0, Math.round((termMonths / 12) * ppy));
+  var slots = [];
+  for (var k = 0; k < paymentCount; k++) {
+    var monthIndex = repaymentStartYear * 12 + k * spacing;
+    if (monthIndex > totalMonths) break;
+    var yearsIn = Math.floor(k / ppy);
+    slots.push({ monthIndex: monthIndex, escFactor: Math.pow(1 + inp.repayment.paymentEscalation / 100, yearsIn) });
+  }
+  var balloonMonth = repaymentStartYear * 12 + termMonths;
+  var df = function (m) { return 1 / Math.pow(1 + rM, m); };
+  var balloonDf = balloonMonth <= totalMonths ? df(balloonMonth) : 0;
+  var dfSumEsc = 0;
+  slots.forEach(function (s) { dfSumEsc += s.escFactor * df(s.monthIndex); });
+  var payment = dfSumEsc > 0 ? (costNpv - inp.repayment.balloon * balloonDf) / dfSumEsc : 0;
+
+  var inflowByMonth = {};
+  slots.forEach(function (s) {
+    inflowByMonth[s.monthIndex] = (inflowByMonth[s.monthIndex] || 0) + payment * s.escFactor;
+  });
+  if (inp.repayment.balloon > 0 && balloonMonth <= totalMonths) {
+    inflowByMonth[balloonMonth] = (inflowByMonth[balloonMonth] || 0) + inp.repayment.balloon;
+  }
+
+  var monthly = [];
+  var cumulative = 0;
+  var paybackMonths = null;
+  for (var m2 = 1; m2 <= totalMonths; m2++) {
+    var inflow = inflowByMonth[m2] || 0;
+    var cost = costM[m2 - 1];
+    var net = inflow - cost;
+    var prevCum = cumulative;
+    cumulative += net;
+    if (paybackMonths === null && cumulative >= 0 && prevCum < 0 && net > 0) {
+      paybackMonths = (m2 - 1) + (0 - prevCum) / net;
+    }
+    monthly.push({ period: m2, year: Math.ceil(m2 / 12), cost: cost, inflow: inflow, net: net, cumulative: cumulative });
+  }
+
+  var achieved = irrAnnual(monthly.map(function (mm2) { return mm2.net; }));
+
+  var totalYears = Math.ceil(totalMonths / 12);
+  var yearly = [];
+  for (var yy = 1; yy <= totalYears; yy++) {
+    var inYear = monthly.filter(function (row) { return row.year === yy; });
+    if (inYear.length === 0) continue;
+    var costSum = 0, inflowSum = 0;
+    inYear.forEach(function (row) { costSum += row.cost; inflowSum += row.inflow; });
+    yearly.push({
+      name: "Y" + yy, year: yy, cost: costSum, inflow: inflowSum,
+      net: inflowSum - costSum, cumulative: inYear[inYear.length - 1].cumulative
+    });
+  }
+
+  var lineTotals = costs.map(function (c) {
+    var total = 0;
+    if (c.category === "capex") total = c.amount;
+    else {
+      var dur2 = Math.max(1, c.durationYears);
+      for (var j = 0; j < dur2; j++) total += c.amount * Math.pow(1 + c.escalation / 100, j);
+    }
+    return { id: c.id, name: c.name, total: total };
+  });
+
+  var totalCost = lineTotals.reduce(function (a, l) { return a + l.total; }, 0);
+  var totalCollected = 0;
+  slots.forEach(function (s) { totalCollected += payment * s.escFactor; });
+  if (inp.repayment.balloon > 0) totalCollected += inp.repayment.balloon;
+
+  return {
+    totalCost: totalCost, costNpv: costNpv, paymentAmount: payment,
+    paymentCount: slots.length, totalCollected: totalCollected,
+    netGain: totalCollected - totalCost, achievedIrr: achieved,
+    paybackYears: paybackMonths === null ? null : paybackMonths / 12,
+    lastCostYear: lastCostYear, repaymentStartYear: repaymentStartYear,
+    monthly: monthly, yearly: yearly, lineTotals: lineTotals
+  };
+}
+
+// ================= STATE =================
+var uid = 0;
+function nid() { uid += 1; return "c" + uid + "_" + Math.floor(Math.random() * 1e6); }
+var state = {
+  projectName: "Project Alpha",
+  currency: "EUR",
+  targetIrr: 12,
+  costs: [
+    { id: "c1", name: "Development team", category: "recurring", amount: 1800000, startYear: 1, durationYears: 3, escalation: 3 },
+    { id: "c2", name: "Infrastructure & licences", category: "recurring", amount: 600000, startYear: 1, durationYears: 3, escalation: 2 },
+    { id: "c3", name: "Initial CAPEX", category: "capex", amount: 450000, startYear: 1, durationYears: 0, escalation: 0 }
+  ],
+  repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0 }
+};
+var view = "overview";
+var presOpen = false;
+var slideIndex = 0;
+var TOTAL_SLIDES = 5;
+
+// ================= HELPERS =================
+var CURRENCIES = ["EUR", "USD", "GBP", "SEK", "NOK", "DKK"];
+var PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#f43f5e", "#0ea5e9", "#a855f7", "#64748b"];
+var FREQ = { 1: "Annual", 2: "Semi-annual", 4: "Quarterly", 12: "Monthly" };
+function fmtMoney(v, digits) {
+  if (!isFinite(v)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency", currency: state.currency,
+    maximumFractionDigits: digits || 0, minimumFractionDigits: digits || 0
+  }).format(v);
+}
+function fmtPct(v, d) { return (v === null || !isFinite(v)) ? "—" : (v * 100).toFixed(d || 1) + "%"; }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function fmtAxis(v) {
+  var a = Math.abs(v);
+  if (a >= 1e6) return (v / 1e6).toFixed(1) + "M";
+  if (a >= 1e3) return Math.round(v / 1e3) + "k";
+  return String(Math.round(v));
+}
+
+// ================= CHARTS (SVG) =================
+function chartSvg(yearly, series, opts) {
+  opts = opts || {};
+  var dark = !!opts.dark;
+  var w = 780, h = opts.height || 270;
+  var padL = 74, padR = 16, padT = 14, padB = 32;
+  var gridC = dark ? "rgba(148,163,184,0.16)" : "#e2e8f0";
+  var textC = dark ? "#8ea0b8" : "#64748b";
+  var zeroC = dark ? "rgba(148,163,184,0.45)" : "#94a3b8";
+  var n = yearly.length;
+  if (!n) return '<div style="color:#94a3b8;font-size:13px;padding:24px">No data — add cost lines and a term.</div>';
+  var max = 0, min = 0;
+  yearly.forEach(function (y) {
+    series.forEach(function (sd) { var v = y[sd.key] || 0; if (v > max) max = v; if (v < min) min = v; });
+  });
+  if (max === min) max = min + 1;
+  var range = max - min;
+  var x0 = padL, x1 = w - padR, y0 = h - padB, y1 = padT;
+  function yFor(v) { return y0 - ((v - min) / range) * (y0 - y1); }
+  var bandW = (x1 - x0) / n;
+  var s = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;display:block">';
+  var ticks = 5;
+  for (var t = 0; t <= ticks; t++) {
+    var v = min + (range * t) / ticks;
+    var gy = yFor(v);
+    s += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + gy.toFixed(1) + '" stroke="' + gridC + '" stroke-dasharray="3 3"/>';
+    s += '<text x="' + (padL - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="' + textC + '">' + fmtAxis(v) + '</text>';
+  }
+  if (min < 0 && max > 0) s += '<line x1="' + padL + '" y1="' + yFor(0).toFixed(1) + '" x2="' + (w - padR) + '" y2="' + yFor(0).toFixed(1) + '" stroke="' + zeroC + '"/>';
+  var bars = series.filter(function (sd) { return sd.type === "bar"; });
+  var barW = Math.min(20, (bandW - 6) / Math.max(1, bars.length));
+  yearly.forEach(function (y, i) {
+    var cx = x0 + bandW * i + bandW / 2;
+    var bi = 0;
+    bars.forEach(function (sd) {
+      var v = y[sd.key] || 0;
+      if (v !== 0) {
+        var yTop = yFor(Math.max(v, 0));
+        var yBot = yFor(Math.min(v, 0));
+        var bx = cx - (bars.length * barW) / 2 + bi * barW + 1;
+        s += '<rect x="' + bx.toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + (barW - 2).toFixed(1) + '" height="' + Math.max(0.5, yBot - yTop).toFixed(1) + '" fill="' + sd.color + '" rx="3"/>';
+      }
+      bi++;
+    });
+    s += '<text x="' + cx.toFixed(1) + '" y="' + (h - 9) + '" text-anchor="middle" font-size="11" fill="' + textC + '">' + y.name + '</text>';
+  });
+  series.forEach(function (sd) {
+    if (sd.type !== "line") return;
+    var pts = yearly.map(function (y, i) {
+      return (x0 + bandW * i + bandW / 2).toFixed(1) + "," + yFor(y[sd.key] || 0).toFixed(1);
+    }).join(" ");
+    s += '<polyline points="' + pts + '" fill="none" stroke="' + sd.color + '" stroke-width="2.5" stroke-linejoin="round"/>';
+  });
+  s += "</svg>";
+  return s;
+}
+function donutSvg(parts) {
+  var total = 0;
+  parts.forEach(function (p) { total += p.value; });
+  if (total <= 0) return "";
+  var r = 58, C = 2 * Math.PI * r, acc = 0;
+  var s = '<svg viewBox="0 0 160 160" width="200" height="200" style="display:block;margin:0 auto">';
+  s += '<g transform="rotate(-90 80 80)">';
+  parts.forEach(function (p) {
+    var seg = (p.value / total) * C;
+    s += '<circle cx="80" cy="80" r="' + r + '" fill="none" stroke="' + p.color + '" stroke-width="24" stroke-dasharray="' + seg + ' ' + (C - seg) + '" stroke-dashoffset="' + (-acc) + '"/>';
+    acc += seg;
+  });
+  s += "</g></svg>";
+  return s;
+}
+
+// ================= STATE SETTERS =================
+function setField(fn) { return function (el) { fn(el.value); renderAll(); }; }
+function setProjectName(v) { state.projectName = v || "Untitled project"; }
+function setCurrency(v) { state.currency = v; }
+function setTargetIrr(v) { state.targetIrr = parseFloat(v) || 0; }
+function setRep(k, v) { state.repayment[k] = (k === "paymentsPerYear") ? parseInt(v, 10) : (parseFloat(v) || 0); }
+function setCost(id, k, v) {
+  var c = state.costs.find(function (x) { return x.id === id; });
+  if (!c) return;
+  if (k === "name") c.name = v;
+  else if (k === "category") c.category = v;
+  else c[k] = parseFloat(v) || 0;
+}
+function addCost() {
+  state.costs.push({ id: nid(), name: "New cost line", category: "recurring", amount: 500000, startYear: 1, durationYears: 3, escalation: 0 });
+}
+function removeCost(id) { state.costs = state.costs.filter(function (c) { return c.id !== id; }); }
+
+// ================= RENDER =================
+function statCard(k, v, sub, tone) {
+  return '<div class="stat"><div class="k">' + k + '</div><div class="v ' + (tone || "") + '">' + v + "</div>" + (sub ? '<div class="s">' + sub + "</div>" : "") + "</div>";
+}
+function field(label, inner) { return '<div class="field"><label>' + label + "</label>" + inner + "</div>"; }
+function numInput(val, handler, step) {
+  return '<input type="number" value="' + val + '" step="' + (step || 1) + '" onchange="' + handler + '">';
+}
+function selInput(options, val, handler) {
+  var s = '<select onchange="' + handler + '">';
+  options.forEach(function (o) {
+    s += '<option value="' + o.v + '"' + (String(o.v) === String(val) ? " selected" : "") + ">" + o.t + "</option>";
+  });
+  return s + "</select>";
+}
+
+function renderOverview(R) {
+  var irrOk = R.achievedIrr !== null && Math.abs(R.achievedIrr * 100 - state.targetIrr) < 0.1;
+  var html = "";
+  html += "<h2 class=\"sec\">Model overview</h2>";
+  html += '<p class="lead">Define the cost plan, set the repayment structure and target IRR, and the engine solves the required payment stream. Present everything with one click.</p>';
+  html += '<div class="card"><div class="grid-in">';
+  html += field("Project name", '<input type="text" value="' + esc(state.projectName) + '" onchange="setProjectName(this.value);renderAll()">');
+  html += field("Target IRR", numInput(state.targetIrr, "setTargetIrr(this.value);renderAll()", 0.5));
+  html += field("Currency", selInput(CURRENCIES.map(function (c) { return { v: c, t: c }; }), state.currency, "setCurrency(this.value);renderAll()"));
+  html += field("Repayment term (yrs)", numInput(state.repayment.termYears, "setRep('termYears',this.value);renderAll()", 0.5));
+  html += "</div></div>";
+  html += '<div class="statgrid">';
+  html += statCard("Total project cost", fmtMoney(R.totalCost), state.costs.length + " cost lines");
+  html += statCard("Required payment", fmtMoney(R.paymentAmount), FREQ[state.repayment.paymentsPerYear].toLowerCase() + " &times; " + R.paymentCount, "good");
+  html += statCard("Achieved IRR", fmtPct(R.achievedIrr), "Goal: " + state.targetIrr.toFixed(1) + "%", irrOk ? "good" : "bad");
+  html += statCard("Payback", R.paybackYears !== null ? R.paybackYears.toFixed(1) + " yrs" : "Not reached", "From first cash outflow");
+  html += "</div>";
+  html += '<div class="card"><h3>Full cash-flow picture</h3>';
+  html += '<div class="legend"><span><span class="dot" style="background:#f43f5e"></span>Costs</span><span><span class="dot" style="background:#10b981"></span>Collections</span><span><span class="dot" style="background:#6366f1"></span>Cumulative net</span></div>';
+  html += chartSvg(R.yearly, [
+    { key: "cost", type: "bar", color: "#f43f5e" },
+    { key: "inflow", type: "bar", color: "#10b981" },
+    { key: "cumulative", type: "line", color: "#6366f1" }
+  ]) + "</div>";
+  html += '<p class="note">Method: payments are solved so the NPV of collections equals the NPV of costs at the target IRR (monthly compounding). Achieved IRR is verified numerically by bisection on the monthly cash-flow vector. Break-even is the first month the cumulative nominal position turns positive.</p>';
+  document.getElementById("sec-overview").innerHTML = html;
+}
+
+function renderCosts(R) {
+  var html = "";
+  html += "<h2 class=\"sec\">Cost model</h2>";
+  html += '<p class="lead">Combine recurring burn (with annual escalation) and one-time capital expenditure. Each line has its own start year and duration. Costs are modelled at monthly resolution.</p>';
+  html += '<div class="card">';
+  state.costs.forEach(function (c) {
+    var total = R.lineTotals.find(function (l) { return l.id === c.id; });
+    html += '<div class="costline">';
+    html += field("Name", '<input type="text" value="' + esc(c.name) + '" onchange="setCost(\'' + c.id + '\',\'name\',this.value);renderAll()">');
+    html += field("Type", selInput([{ v: "recurring", t: "Recurring / yr" }, { v: "capex", t: "One-time (CAPEX)" }], c.category, "setCost('" + c.id + "','category',this.value);renderAll()"));
+    html += field(c.category === "recurring" ? "Annual amount" : "One-time amount", numInput(c.amount, "setCost('" + c.id + "','amount',this.value);renderAll()", 100000));
+    html += field("Start year", numInput(c.startYear, "setCost('" + c.id + "','startYear',this.value);renderAll()"));
+    if (c.category === "recurring") {
+      html += field("Duration (yrs)", numInput(c.durationYears, "setCost('" + c.id + "','durationYears',this.value);renderAll()"));
+    } else {
+      html += '<div class="field"><label>Duration</label><input value="—" disabled></div>';
+    }
+    html += field("Escalation %/yr", numInput(c.escalation, "setCost('" + c.id + "','escalation',this.value);renderAll()", 0.5));
+    html += '<div><button class="btn btn-danger" onclick="removeCost(\'' + c.id + '\');renderAll()">Remove</button></div>';
+    html += "</div>";
+    html += '<div class="linefoot"><span class="badge">Nominal total: ' + fmtMoney(total ? total.total : 0) + "</span></div>";
+  });
+  if (state.costs.length === 0) {
+    html += '<div style="text-align:center;color:#64748b;font-size:13px;padding:20px">No cost lines defined. Add one to begin.</div>';
+  }
+  html += '<div style="margin-top:14px"><button class="btn btn-outline" onclick="addCost();renderAll()">+ Add cost line</button></div>';
+  html += "</div>";
+  html += '<div class="statgrid">';
+  html += statCard("Total project cost", fmtMoney(R.totalCost), "Nominal, all lines");
+  html += statCard("NPV of costs at target IRR", fmtMoney(R.costNpv));
+  html += statCard("Cost completion", "Year " + R.lastCostYear, "Repayment begins year " + R.repaymentStartYear);
+  html += "</div>";
+  document.getElementById("sec-costs").innerHTML = html;
+}
+
+function renderRepayment(R) {
+  var rp = state.repayment;
+  var irrOk = R.achievedIrr !== null && Math.abs(R.achievedIrr * 100 - state.targetIrr) < 0.1;
+  var html = "";
+  html += "<h2 class=\"sec\">Repayment engine</h2>";
+  html += '<p class="lead">The payment amount is solved so that the NPV of all collections exactly equals the NPV of all costs at your target IRR. Adjust structure freely: the solver adapts.</p>';
+  html += '<div class="card"><div class="grid-in">';
+  html += field("Grace after costs (yrs)", numInput(rp.graceYears, "setRep('graceYears',this.value);renderAll()", 0.5));
+  html += field("Repayment term (yrs)", numInput(rp.termYears, "setRep('termYears',this.value);renderAll()", 0.5));
+  html += field("Frequency", selInput([1, 2, 4, 12].map(function (n) { return { v: n, t: FREQ[n] }; }), rp.paymentsPerYear, "setRep('paymentsPerYear',this.value);renderAll()"));
+  html += field("Payment escalation %/yr", numInput(rp.paymentEscalation, "setRep('paymentEscalation',this.value);renderAll()", 0.5));
+  html += field("Balloon at term end", numInput(rp.balloon, "setRep('balloon',this.value);renderAll()", 100000));
+  html += "</div></div>";
+  html += '<div class="statgrid">';
+  html += statCard("Required " + FREQ[rp.paymentsPerYear].toLowerCase() + " payment", fmtMoney(R.paymentAmount), "First payment in year " + R.repaymentStartYear, "good");
+  html += statCard("Payment count", String(R.paymentCount));
+  html += statCard("Total collected", fmtMoney(R.totalCollected), "Nominal gain: " + fmtMoney(R.netGain));
+  html += statCard("Achieved IRR", fmtPct(R.achievedIrr), "Goal: " + state.targetIrr.toFixed(1) + "%", irrOk ? "good" : "bad");
+  html += "</div>";
+  html += '<div class="card"><h3>Collection profile (by year)</h3>';
+  html += '<div class="legend"><span><span class="dot" style="background:#10b981"></span>Collections</span></div>';
+  html += chartSvg(R.yearly, [{ key: "inflow", type: "bar", color: "#10b981" }]) + "</div>";
+  document.getElementById("sec-repayment").innerHTML = html;
+}
+
+function renderResults(R) {
+  var irrOk = R.achievedIrr !== null && Math.abs(R.achievedIrr * 100 - state.targetIrr) < 0.1;
+  var html = "";
+  html += "<h2 class=\"sec\">Results</h2>";
+  html += '<div class="statgrid">';
+  html += statCard("Total project cost", fmtMoney(R.totalCost));
+  html += statCard("Total collected", fmtMoney(R.totalCollected));
+  html += statCard("Achieved IRR", fmtPct(R.achievedIrr), "Goal: " + state.targetIrr.toFixed(1) + "%", irrOk ? "good" : "bad");
+  html += statCard("Payback", R.paybackYears !== null ? R.paybackYears.toFixed(1) + " yrs" : "Not reached", "From first cash outflow");
+  html += "</div>";
+  html += '<div class="two-col">';
+  html += '<div class="card"><h3>Costs, collections &amp; break-even</h3>';
+  html += '<div class="legend"><span><span class="dot" style="background:#f43f5e"></span>Costs</span><span><span class="dot" style="background:#10b981"></span>Collections</span><span><span class="dot" style="background:#6366f1"></span>Cumulative net</span></div>';
+  html += chartSvg(R.yearly, [
+    { key: "cost", type: "bar", color: "#f43f5e" },
+    { key: "inflow", type: "bar", color: "#10b981" },
+    { key: "cumulative", type: "line", color: "#6366f1" }
+  ], { height: 290 }) + "</div>";
+  var parts = R.lineTotals.map(function (l, i) { return { name: l.name, value: l.total, color: PALETTE[i % PALETTE.length] }; })
+    .sort(function (a, b) { return b.value - a.value; });
+  html += '<div class="card"><h3>Cost composition</h3><div style="margin-top:10px">' + donutSvg(parts) + "</div>";
+  html += '<div style="margin-top:12px;display:grid;gap:6px">';
+  parts.forEach(function (p) {
+    var share = R.totalCost > 0 ? (p.value / R.totalCost) : 0;
+    html += '<div style="display:flex;justify-content:space-between;font-size:12px;color:#475569"><span><span class="dot" style="background:' + p.color + '"></span>' + esc(p.name) + "</span><span>" + Math.round(share * 100) + "%</span></div>";
+  });
+  html += "</div></div></div>";
+  html += '<div class="card"><h3>Yearly schedule</h3><div style="font-size:12px;color:#64748b;margin-bottom:8px">The model runs at monthly resolution.</div>';
+  html += '<div class="scroll"><table><thead><tr><th>Year</th><th class="r">Costs</th><th class="r">Collections</th><th class="r">Net</th><th class="r">Cumulative</th></tr></thead><tbody>';
+  R.yearly.forEach(function (y) {
+    html += "<tr><td><b>" + y.name + "</b></td>";
+    html += '<td class="r" style="color:#e11d48">' + (y.cost ? fmtMoney(y.cost) : "—") + "</td>";
+    html += '<td class="r" style="color:#059669">' + (y.inflow ? fmtMoney(y.inflow) : "—") + "</td>";
+    html += '<td class="r">' + fmtMoney(y.net) + "</td>";
+    html += '<td class="r" style="font-weight:600;color:' + (y.cumulative >= 0 ? "#059669" : "#e11d48") + '">' + fmtMoney(y.cumulative) + "</td></tr>";
+  });
+  html += "</tbody></table></div></div>";
+  document.getElementById("sec-results").innerHTML = html;
+}
+
+// ================= PRESENTATION =================
+function topLines(R, n) {
+  var arr = R.lineTotals.map(function (l) { return { name: l.name, share: R.totalCost > 0 ? l.total / R.totalCost : 0 }; })
+    .sort(function (a, b) { return b.share - a.share; });
+  return arr.slice(0, n || 5);
+}
+function renderSlide(R) {
+  var rp = state.repayment;
+  var freqL = FREQ[rp.paymentsPerYear].toLowerCase();
+  var s = "";
+  if (slideIndex === 0) {
+    s += '<div class="slide"><div class="inner center">';
+    s += '<div class="kicker">Investment &amp; Repayment Case</div>';
+    s += '<h1>' + esc(state.projectName) + "</h1>";
+    s += '<div class="titlegrid" style="text-align:left">';
+    s += '<div><div class="k">Project cost</div><div class="v">' + fmtMoney(R.totalCost) + "</div></div>";
+    s += '<div><div class="k">Target IRR</div><div class="v">' + state.targetIrr.toFixed(1) + "%</div></div>";
+    s += '<div><div class="k">Repayment term</div><div class="v">' + rp.termYears + " yrs</div></div>";
+    s += "</div><div class=\"divider\"></div></div></div>";
+  } else if (slideIndex === 1) {
+    s += '<div class="slide"><div class="inner">';
+    s += '<div class="kicker">01 — The investment</div>';
+    s += '<h2>' + fmtMoney(R.totalCost) + " deployed over " + R.lastCostYear + " years</h2>";
+    s += '<p class="sub">The cost plan combines recurring burn with one-time expenditures, escalating as specified.</p>';
+    s += '<div class="two-col" style="margin-top:26px">';
+    s += '<div style="background:rgba(30,41,59,0.5);border:1px solid rgba(51,65,85,0.7);border-radius:14px;padding:14px">';
+    s += chartSvg(R.yearly, [{ key: "cost", type: "bar", color: "#fb7185" }], { dark: true, height: 260 });
+    s += "</div><div class=\"toplines\">";
+    topLines(R, 5).forEach(function (l, i) {
+      s += '<div class="topline"><span><span class="dot" style="background:' + PALETTE[i % PALETTE.length] + ';margin-right:10px"></span>' + esc(l.name) + '</span><span class="share">' + Math.round(l.share * 100) + "%</span></div>";
+    });
+    s += "</div></div></div></div>";
+  } else if (slideIndex === 2) {
+    s += '<div class="slide"><div class="inner">';
+    s += '<div class="kicker">02 — The repayment plan</div>';
+    s += '<h2>' + R.paymentCount + " " + freqL + " payments of " + fmtMoney(R.paymentAmount) + "</h2>";
+    var narrative = "Collections begin in year " + R.repaymentStartYear;
+    if (rp.graceYears > 0) narrative += " (after a " + rp.graceYears + "-year grace period)";
+    narrative += " and run for " + rp.termYears + " years";
+    if (rp.paymentEscalation !== 0) narrative += ", escalating " + rp.paymentEscalation + "% per year";
+    if (rp.balloon > 0) narrative += ", closing with a " + fmtMoney(rp.balloon) + " balloon";
+    narrative += ".";
+    s += '<p class="sub">' + narrative + "</p>";
+    s += '<div style="margin-top:22px;background:rgba(30,41,59,0.5);border:1px solid rgba(51,65,85,0.7);border-radius:14px;padding:14px">';
+    s += chartSvg(R.yearly, [{ key: "inflow", type: "bar", color: "#34d399" }], { dark: true, height: 250 });
+    s += "</div>";
+    s += '<div class="statrow">';
+    s += '<div><div class="k">Total collected</div><div class="v">' + fmtMoney(R.totalCollected) + "</div></div>";
+    s += '<div><div class="k">Nominal gain</div><div class="v" style="color:#34d399">' + fmtMoney(R.netGain) + "</div></div>";
+    s += '<div><div class="k">Collection / cost</div><div class="v">' + (R.totalCost > 0 ? (R.totalCollected / R.totalCost).toFixed(2) + "&times;" : "—") + "</div></div>";
+    s += "</div></div></div>";
+  } else if (slideIndex === 3) {
+    var headline = fmtPct(R.achievedIrr) + " IRR — target " + state.targetIrr.toFixed(1) + "%";
+    if (R.paybackYears !== null) headline += ", break-even in " + R.paybackYears.toFixed(1) + " years";
+    s += '<div class="slide"><div class="inner">';
+    s += '<div class="kicker">03 — Returns &amp; break-even</div>';
+    s += "<h2>" + headline + "</h2>";
+    s += '<div style="margin-top:26px;background:rgba(30,41,59,0.5);border:1px solid rgba(51,65,85,0.7);border-radius:14px;padding:14px">';
+    s += chartSvg(R.yearly, [
+      { key: "net", type: "bar", color: "rgba(129,140,248,0.7)" },
+      { key: "cumulative", type: "line", color: "#fbbf24" }
+    ], { dark: true, height: 280 });
+    s += "</div>";
+    s += '<p class="sub" style="margin-top:16px">The gold line marks the cumulative net position. Where it crosses zero, the project has returned every invested unit of currency on a nominal basis.</p>';
+    s += "</div></div>";
+  } else {
+    var t1 = "Invest " + fmtMoney(R.totalCost) + " over " + R.lastCostYear + (R.lastCostYear === 1 ? " year" : " years") + " of project activity.";
+    var t2 = "Recover the investment through " + R.paymentCount + " " + freqL + " payments of " + fmtMoney(R.paymentAmount) + " over " + rp.termYears + " years, totalling " + fmtMoney(R.totalCollected) + ".";
+    var t3 = "This structure delivers a " + fmtPct(R.achievedIrr) + " internal rate of return";
+    if (R.paybackYears !== null) t3 += " with nominal break-even at " + R.paybackYears.toFixed(1) + " years";
+    t3 += ".";
+    s += '<div class="slide"><div class="inner">';
+    s += '<div class="kicker">04 — Summary</div>';
+    s += "<h2>" + esc(state.projectName) + " in brief</h2>";
+    s += '<div style="margin-top:26px">';
+    [t1, t2, t3].forEach(function (txt, i) {
+      s += '<div class="sumitem"><span class="n">' + (i + 1) + "</span><p>" + txt + "</p></div>";
+    });
+    s += "</div></div></div>";
+  }
+  return s;
+}
+function renderPresentation(R) {
+  document.getElementById("presProj").textContent = state.projectName;
+  document.getElementById("presStage").innerHTML = renderSlide(R);
+  document.getElementById("presPrev").disabled = slideIndex === 0;
+  document.getElementById("presNext").disabled = slideIndex === TOTAL_SLIDES - 1;
+  var dots = "";
+  for (var i = 0; i < TOTAL_SLIDES; i++) {
+    dots += '<button class="' + (i === slideIndex ? "on" : "") + '" onclick="gotoSlide(' + i + ')" aria-label="Slide ' + (i + 1) + '"></button>';
+  }
+  document.getElementById("presDots").innerHTML = dots;
+}
+function openPresentation() { presOpen = true; slideIndex = 0; document.getElementById("pres").classList.add("open"); renderAll(); }
+function closePresentation() { presOpen = false; document.getElementById("pres").classList.remove("open"); }
+function nextSlide() { if (slideIndex < TOTAL_SLIDES - 1) { slideIndex++; renderAll(); } }
+function prevSlide() { if (slideIndex > 0) { slideIndex--; renderAll(); } }
+function gotoSlide(i) { slideIndex = i; renderAll(); }
+
+document.addEventListener("keydown", function (e) {
+  if (!presOpen) return;
+  if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); nextSlide(); }
+  if (e.key === "ArrowLeft") prevSlide();
+  if (e.key === "Escape") closePresentation();
+});
+
+// ================= APP =================
+function showSection(v) {
+  view = v;
+  ["overview", "costs", "repayment", "results"].forEach(function (id) {
+    document.getElementById("sec-" + id).classList.toggle("hidden", id !== v);
+  });
+  var btns = document.getElementById("nav").querySelectorAll("button");
+  btns.forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-v") === v); });
+}
+document.getElementById("nav").addEventListener("click", function (e) {
+  var b = e.target.closest("button");
+  if (b) showSection(b.getAttribute("data-v"));
+});
+
+function renderAll() {
+  var R = computeModel(state);
+  document.getElementById("projBadge").textContent = state.projectName;
+  renderOverview(R);
+  renderCosts(R);
+  renderRepayment(R);
+  renderResults(R);
+  if (presOpen) renderPresentation(R);
+}
+renderAll();
+</script>
+</body>
+</html>
