@@ -160,7 +160,10 @@ describe("INV-7 monotonicity probes", () => {
     expect(Math.abs(at40.costNpv - 4888228.88535)).toBeLessThan(0.01);
 
     const term15 = computeModel({ ...base, repayment: { ...base.repayment, termYears: 15 } });
-    expect(term15.paymentAmount).toBeLessThan(computeModel({ ...base, repayment: { ...base.repayment, termYears: 3 } }).paymentAmount);
+    const term3 = computeModel({ ...base, repayment: { ...base.repayment, termYears: 3 } });
+    expect(term15.paymentAmount).toBeLessThan(term3.paymentAmount);
+    expect(Math.abs(term15.paymentAmount - 318490.43128)).toBeLessThan(0.01);
+    expect(Math.abs(term3.paymentAmount - 903142.19709)).toBeLessThan(0.01);
   });
 });
 
