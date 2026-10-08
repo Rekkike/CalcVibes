@@ -13,9 +13,10 @@ import { AppraisalSection } from "./sections/AppraisalSection.js";
 import { ScenariosSection } from "./sections/ScenariosSection.js";
 import { OperatingSection } from "./sections/OperatingSection.js";
 import { TariffSection } from "./sections/TariffSection.js";
+import { FinancingSection } from "./sections/FinancingSection.js";
 import { Presentation } from "./presentation/Presentation.js";
 
-type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "appraisal" | "results" | "scenarios";
+type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "financing" | "appraisal" | "results" | "scenarios";
 
 export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
@@ -56,6 +57,8 @@ export function App() {
     setInputs((p) => ({ ...p, maintenance: m }));
   const setTariff = (t: import("../../core/src/types.js").TariffConfig) =>
     setInputs((p) => ({ ...p, tariff: t }));
+  const setFinancing = (fc: import("../../core/src/types.js").FinancingConfig) =>
+    setInputs((p) => ({ ...p, financing: fc }));
   const addCost = () => setInputs((p) => ({ ...p, costs: [...p.costs, blankCostLine(nextCostId(p.costs))] }));
   const removeCost = (id: string) => setInputs((p) => ({ ...p, costs: p.costs.filter((c) => c.id !== id) }));
   const updateCost = (id: string, patch: Partial<CostLine>) =>
@@ -84,7 +87,7 @@ export function App() {
       <header>
         <h1>{inputs.projectName || "Untitled project"}</h1>
         <nav>
-          {(["overview", "costs", "operating", "repayment", "tariff", "appraisal", "results", "scenarios"] as View[]).map((v) => (
+          {(["overview", "costs", "operating", "repayment", "tariff", "financing", "appraisal", "results", "scenarios"] as View[]).map((v) => (
             <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
               {v === "costs" ? "Cost model" : v[0].toUpperCase() + v.slice(1)}
             </button>
@@ -136,6 +139,9 @@ export function App() {
         )}
         {view === "tariff" && (
           <TariffSection inputs={inputs} result={result} setTariff={setTariff} startYear={startYear} />
+        )}
+        {view === "financing" && (
+          <FinancingSection inputs={inputs} setFinancing={setFinancing} />
         )}
         {view === "appraisal" && (
           <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} />

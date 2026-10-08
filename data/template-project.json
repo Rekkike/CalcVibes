@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "projectName": "Project Alpha",
   "currency": "EUR",
   "targetIrr": 12,
@@ -62,5 +62,16 @@
     "rows": [],
     "fixedAnnualAmount": null,
     "manualPrices": null
+  },
+  "financing": {
+    "enabled": false,
+    "sharePct": 60,
+    "debtRatePct": 6,
+    "termYears": 7,
+    "graceYears": 0,
+    "serviceStartYear": null,
+    "amortization": "annuity",
+    "leveragedSolve": false,
+    "perLineSharePct": {}
   }
 }

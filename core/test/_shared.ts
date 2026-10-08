@@ -15,6 +15,7 @@ export function templateLike(): ModelInputs {
     operatingLines: [],
     maintenance: { mode: "off" },
     tariff: { mode: "off", escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null },
+    financing: { enabled: false, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity", leveragedSolve: false, perLineSharePct: {} },
   };
 }
 
@@ -35,6 +36,7 @@ export function assertTemplateIdentity(): void {
     operatingLines: templateFile.operatingLines,
     maintenance: templateFile.maintenance,
     tariff: templateFile.tariff,
+    financing: templateFile.financing,
   });
   if (inline !== canonical) {
     throw new Error("The inline template copy in test/_shared.ts has drifted from data/template-project.json.");

@@ -53,6 +53,52 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         <dt>Currency</dt><dd>{currency}</dd>
       </dl>
       <p className="caveat">Nominal figures are undiscounted; the cost NPV and achieved IRR are discounted. {result.paybackYears === null ? "The project does not reach payback on the net vector." : "Payback is interpolated on the nominal cumulative net flow."}</p>
+      {result.financing !== null && (
+        <>
+          <h3>Equity metrics</h3>
+          <dl data-testid="equity-panel">
+            <dt>Equity outlay</dt><dd data-stat="equityOutlay">{roundForDisplay(result.financing.equity.outlay)}</dd>
+            <dt>Equity NPV at WACC (discounted)</dt><dd data-stat="equityNpvAtWacc">{roundForDisplay(result.financing.equity.npvAtWacc)}</dd>
+            <dt>Equity NPV at target (leveraged verification)</dt><dd data-stat="equityNpvAtTarget">{roundForDisplay(result.financing.equity.npvAtTarget)}</dd>
+            <dt>Equity payback (years)</dt><dd data-stat="equityPayback">{result.financing.equity.payback === null ? "—" : roundForDisplay(result.financing.equity.payback, 5)}</dd>
+            <dt>Equity IRR</dt>
+            <dd data-stat="equityIrr">
+              {result.financing.equity.zeroOutlay
+                ? "Not applicable (zero equity outlay)"
+                : result.financing.equity.irr === null ? "—" : percentForDisplay(result.financing.equity.irr)}
+              {result.financing.equity.irrAmbiguous && (
+                <span data-testid="equity-ambiguity-warning" className="warning">
+                  {" "}Warning: the equity net flow has {result.financing.equity.signChanges} sign changes; the equity IRR may not be unique.
+                </span>
+              )}
+            </dd>
+          </dl>
+          <h3>Debt schedule (yearly)</h3>
+          <table data-testid="debt-schedule">
+            <thead><tr><th>Year</th><th>Interest</th><th>Principal</th><th>Service</th></tr></thead>
+            <tbody>
+              {result.financing.yearly.map((y) => (
+                <tr key={y.year}><td>{yearHeader(y.year, startYear)}</td><td>{roundForDisplay(y.interest)}</td><td>{roundForDisplay(y.principal)}</td><td>{roundForDisplay(y.service)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+          <h3>DSCR (yearly)</h3>
+          <table data-testid="dscr-table">
+            <thead><tr><th>Year</th><th>Inflows</th><th>Debt service</th><th>DSCR</th></tr></thead>
+            <tbody>
+              {result.financing.dscr.filter((d) => d.dscr !== null).map((d) => (
+                <tr key={d.year} data-dscr-min={result.financing?.minDscr?.year === d.year ? "true" : "false"}>
+                  <td>{yearHeader(d.year, startYear)}</td><td>{roundForDisplay(d.inflows)}</td><td>{roundForDisplay(d.service)}</td>
+                  <td>{d.dscr === null ? "—" : roundForDisplay(d.dscr, 4)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {result.financing.minDscr !== null && (
+            <p data-testid="min-dscr">Minimum DSCR: {roundForDisplay(result.financing.minDscr.value, 4)} in {yearHeader(result.financing.minDscr.year, startYear)}</p>
+          )}
+        </>
+      )}
     </section>
   );
 }

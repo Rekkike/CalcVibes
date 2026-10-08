@@ -39,6 +39,7 @@ const inlineBaseline: ModelInputs = {
   operatingLines: [],
   maintenance: { mode: "off" },
   tariff: { mode: "off", escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null },
+  financing: { enabled: false, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity", leveragedSolve: false, perLineSharePct: {} },
 };
 
 describe("Chunk 0.5: template project golden fixture", () => {
@@ -139,6 +140,20 @@ describe("Chunk 0.5: template project golden fixture", () => {
     expect(r.signChanges).toBe(1);
     expect(Math.abs(r.totalCollected - 13143208.01)).toBeLessThan(0.01);
     expect(r.paymentAmount).toBeNull();
+  });
+
+  it("financing variant (schema v5 fields exercised): 60/6/7 annuity pins the FN-1 core", () => {
+    const financingVariant = { ...fileInputs, financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
+    const r = computeModel(financingVariant);
+    const z = r.financing as NonNullable<typeof r.financing>;
+    expect(Math.abs(z.drawnTotal - 4709916.00000)).toBeLessThan(0.01);
+    expect(Math.abs(z.serviceStartBalance - 5163129.98445)).toBeLessThan(0.01);
+    expect(Math.abs((z.annuityPayment as number) - 75033.07966)).toBeLessThan(0.01);
+    expect(z.minDscr?.year).toBe(10);
+    expect(Math.abs((z.minDscr?.value as number) - 1.5836652855)).toBeLessThan(1e-4);
+    expect(Math.abs((z.equity.irr as number) - 0.2000612172)).toBeLessThan(1e-6);
+    expect(Math.abs(z.equity.npvAtWacc - 1593384.30133)).toBeLessThan(0.01);
+    expect(Math.abs((r.paymentAmount as number) - 475309.13407)).toBeLessThan(0.01);
   });
 
   it("file-model identity: the file and the inline anchor are the same model", () => {

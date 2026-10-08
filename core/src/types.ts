@@ -31,6 +31,18 @@ export interface OperatingLine {
   escalation: number;
 }
 
+export interface FinancingConfig {
+  enabled: boolean;
+  sharePct: number;
+  debtRatePct: number;
+  termYears: number;
+  graceYears: number;
+  serviceStartYear: number | null;
+  amortization: "annuity" | "equal-principal";
+  leveragedSolve: boolean;
+  perLineSharePct: Record<string, number>;
+}
+
 export interface TariffRow {
   id: string;
   label: string;
@@ -86,6 +98,7 @@ export interface ModelInputs {
   operatingLines?: OperatingLine[];
   maintenance?: MaintenanceConfig;
   tariff?: TariffConfig;
+  financing?: FinancingConfig;
 }
 
 export interface MonthlyRow {
@@ -110,6 +123,51 @@ export interface LineTotal {
   id: string;
   name: string;
   total: number;
+}
+
+export interface FinancingYearlyRow {
+  year: number;
+  interest: number;
+  principal: number;
+  service: number;
+}
+
+export interface DscrRow {
+  year: number;
+  inflows: number;
+  service: number;
+  dscr: number | null;
+}
+
+export interface EquityMetrics {
+  outlay: number;
+  npvAtWacc: number;
+  npvAtTarget: number;
+  payback: number | null;
+  signChanges: number;
+  irr: number | null;
+  irrAmbiguous: boolean;
+  zeroOutlay: boolean;
+}
+
+export interface FinancingResult {
+  drawnTotal: number;
+  idc: number;
+  serviceStartBalance: number;
+  serviceStartMonth: number;
+  termMonths: number;
+  graceMonths: number;
+  amortizationType: "annuity" | "equal-principal";
+  annuityPayment: number | null;
+  principalPayment: number | null;
+  totalInterest: number;
+  totalService: number;
+  monthly: { interest: number[]; principal: number[]; service: number[]; balance: number[] };
+  yearly: FinancingYearlyRow[];
+  dscr: DscrRow[];
+  minDscr: { year: number; value: number } | null;
+  equity: EquityMetrics;
+  draws: number[];
 }
 
 export interface ModelResult {
@@ -142,4 +200,6 @@ export interface ModelResult {
   operatingTotal: number;
   tariffYears: TariffYearInfo[];
   tariffBaseUnitPrice: number | null;
+  financing: FinancingResult | null;
+  leveragedSolve: boolean;
 }

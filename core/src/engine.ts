@@ -57,6 +57,21 @@ interface PaymentSlot {
 
 export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: number }): import("./types.js").ModelResult {
   const issues = validateInputs(inp);
+  const finCfgIn = inp.financing && inp.financing.enabled ? inp.financing : null;
+  if (finCfgIn) {
+    const derivedStart = inp.costs.reduce((mx, c) => Math.max(mx, c.category === "capex" ? c.startYear : c.startYear + Math.max(1, c.durationYears) - 1), 0) || 1;
+    const preliminaryHorizon = Math.max(
+      Math.ceil(derivedStart * 12),
+      (inp.repayment.firstCollectionYear ?? derivedStart + inp.repayment.graceYears) * 12 + Math.round(Math.max(0, inp.repayment.termYears) * 12)
+    );
+    validateFinancing({ financing: inp.financing, horizon: preliminaryHorizon, lastCostMonth: derivedStart * 12 }, issues);
+    if (finCfgIn.leveragedSolve) {
+      const t = inp.tariff;
+      if (t && (t.mode === "manual" || t.mode === "fixed")) {
+        issues.push("The leveraged solve does not apply to manual or fixed tariff modes (FIN-LEVERAGED-MODE).");
+      }
+    }
+  }
   if (issues.length > 0) throw new EngineInputError(issues);
   const appraisal = inp.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } };
   const residualAmount = appraisal.residual.amount;
@@ -124,6 +139,28 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const lastInflowMonth = tariffCollectionMode0
     ? Math.max(lastTariffMonth, residualAmount > 0 ? residualMonth : 0)
     : Math.max(lastPaymentMonth, residualAmount > 0 ? residualMonth : 0);
+  const finCfg = finCfgIn;
+  if (finCfg) {
+    const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
+    if (S >= totalMonths) {
+      throw new EngineInputError([`Financing serviceStartYear ${finCfg.serviceStartYear ?? repaymentStartYear} times 12 must be below the model horizon ${totalMonths}.`]);
+    }
+    let fundableAfterStart = false;
+    inp.costs.forEach((c) => {
+      if (c.category !== "recurring" && c.category !== "capex") return;
+      const share = (finCfg.perLineSharePct?.[c.id] ?? finCfg.sharePct) / 100;
+      if (share <= 0) return;
+      if (c.category === "capex") {
+        if (c.startYear * 12 > S) fundableAfterStart = true;
+      } else {
+        const endMonth = (c.startYear + Math.max(1, c.durationYears) - 1) * 12;
+        if (endMonth > S) fundableAfterStart = true;
+      }
+    });
+    if (fundableAfterStart) {
+      throw new EngineInputError([`A debt-funded fundable cost lands strictly after the service start month ${S} (FIN-FUNDABLE-AFTER-START).`]);
+    }
+  }
   const operatingLinesIn = inp.operatingLines ?? [];
   const maintenanceCfg = inp.maintenance ?? { mode: "off" };
   const tariffCfg = tariffCfg0;
@@ -166,9 +203,58 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
 
   let dfSumEsc = 0;
   slots.forEach((s) => { dfSumEsc += s.escFactor * df(s.monthIndex); });
-  const solvedPayment = opts && opts.fixedPayment !== undefined
-    ? opts.fixedPayment
-    : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf) / dfSumEsc : 0);
+  const leveraged = finCfg !== null && finCfg.leveragedSolve;
+  let leveragedPayment: number | null = null;
+  if (leveraged && !tariffCollectionMode) {
+    let pvDraws = 0;
+    const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
+    let bal = 0;
+    const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
+    const drawAt = new Array<number>(totalMonths).fill(0);
+    inp.costs.forEach((c) => {
+      if (c.category !== "recurring" && c.category !== "capex") return;
+      const share = (finCfg.perLineSharePct?.[c.id] ?? finCfg.sharePct) / 100;
+      if (c.category === "capex") {
+        const m = Math.min(totalMonths, c.startYear * 12);
+        if (m >= 1) drawAt[m - 1] += share * c.amount;
+      } else {
+        const dur = Math.max(1, c.durationYears);
+        for (let y = c.startYear; y < c.startYear + dur; y++) {
+          const esc = Math.pow(1 + c.escalation / 100, y - c.startYear);
+          const monthly = (c.amount * esc) / 12;
+          for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= totalMonths; mm++) drawAt[mm - 1] += share * monthly;
+        }
+      }
+    });
+    for (let m = 1; m <= S; m++) bal = (bal + drawAt[m - 1]) * (1 + rD);
+    for (let m = 1; m <= S; m++) pvDraws += drawAt[m - 1] / Math.pow(1 + rM, m);
+    const N = finCfg.termYears * 12;
+    const G = finCfg.graceYears * 12;
+    const amortMonths = N - G;
+    const annA = rD === 0 ? bal / amortMonths : (bal * rD) / (1 - Math.pow(1 + rD, -amortMonths));
+    const prinA = finCfg.amortization === "equal-principal" ? bal / amortMonths : null;
+    let pvService = 0;
+    let running = bal;
+    for (let m = S + 1; m <= S + N; m++) {
+      const int = running * rD;
+      let pay = 0;
+      let prin = 0;
+      if (m <= S + G) {
+        pay = int;
+      } else {
+        prin = finCfg.amortization === "annuity" ? annA - int : (prinA as number);
+        pay = prin + int;
+      }
+      pvService += pay / Math.pow(1 + rM, m);
+      running -= prin;
+    }
+    leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmount * residualDf) / dfSumEsc;
+  }
+  const solvedPayment = leveraged && leveragedPayment !== null
+    ? leveragedPayment
+    : (opts && opts.fixedPayment !== undefined
+      ? opts.fixedPayment
+      : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf) / dfSumEsc : 0));
   const payment = tariffCollectionMode ? 0 : solvedPayment;
   const tariffEsc = tariffCfg.escalationPerYear / 100;
   const tariffInfos: import("./types.js").TariffYearInfo[] = [];
@@ -209,7 +295,52 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         if (volumeNpvWeight <= 0) {
           throw new EngineInputError(["Stable tariff infeasible: all weighted volumes are zero, so no base unit price can recover the cost NPV."]);
         }
-        const netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf;
+        let netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf;
+        if (leveraged) {
+          let pvDraws = 0;
+          const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
+          let bal = 0;
+          const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
+          const drawAt = new Array<number>(totalMonths).fill(0);
+          inp.costs.forEach((c) => {
+            if (c.category !== "recurring" && c.category !== "capex") return;
+            const share = (finCfg.perLineSharePct?.[c.id] ?? finCfg.sharePct) / 100;
+            if (c.category === "capex") {
+              const m = Math.min(totalMonths, c.startYear * 12);
+              if (m >= 1) drawAt[m - 1] += share * c.amount;
+            } else {
+              const dur = Math.max(1, c.durationYears);
+              for (let y = c.startYear; y < c.startYear + dur; y++) {
+                const esc = Math.pow(1 + c.escalation / 100, y - c.startYear);
+                const monthly = (c.amount * esc) / 12;
+                for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= totalMonths; mm++) drawAt[mm - 1] += share * monthly;
+              }
+            }
+          });
+          for (let m = 1; m <= S; m++) bal = (bal + drawAt[m - 1]) * (1 + rD);
+          for (let m = 1; m <= S; m++) pvDraws += drawAt[m - 1] / Math.pow(1 + rM, m);
+          const N = finCfg.termYears * 12;
+          const G = finCfg.graceYears * 12;
+          const amortMonths = N - G;
+          const annA = rD === 0 ? bal / amortMonths : (bal * rD) / (1 - Math.pow(1 + rD, -amortMonths));
+          const prinA = finCfg.amortization === "equal-principal" ? bal / amortMonths : null;
+          let pvService = 0;
+          let running = bal;
+          for (let m = S + 1; m <= S + N; m++) {
+            const int = running * rD;
+            let pay = 0;
+            let prin = 0;
+            if (m <= S + G) {
+              pay = int;
+            } else {
+              prin = finCfg.amortization === "annuity" ? annA - int : (prinA as number);
+              pay = prin + int;
+            }
+            pvService += pay / Math.pow(1 + rM, m);
+            running -= prin;
+          }
+          netRequirement = netRequirement - pvDraws + pvService;
+        }
         const base = netRequirement / volumeNpvWeight;
         tariffBaseUnitPrice = base;
         revenues = gridYears.map((_, k) => (base * Math.pow(1 + tariffEsc, k)) * weightedVolumes[k]);
@@ -332,7 +463,26 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     mirr = N > 0 ? Math.pow(ratio, 12 / N) - 1 : null;
   }
   const goalMet = achieved !== null && achieved >= target / 100 - 1e-9;
+  let financing: import("./types.js").FinancingResult | null = null;
+  if (finCfg) {
+    const inflowsByMonth = monthly.map((row) => row.inflow);
+    const netM = monthly.map((row) => row.net);
+    financing = computeFinancingOverlay({
+      costM,
+      inflowsByMonth,
+      netM,
+      horizon: totalMonths,
+      targetMonthlyRate: rM,
+      waccMonthlyRate: waccM,
+      firstCollectionYear: repaymentStartYear,
+      lastCostMonth: lastCostYear * 12,
+      projectIrr: achieved,
+      costLineTotals: lineTotals,
+      costs: inp.costs,
+    }, finCfg);
+  }
   return {
+    leveragedSolve: leveraged,
     totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: tariffCollectionMode ? null : solvedPayment,
     paymentCount: tariffCollectionMode ? null : slots.length, totalCollected: totalCollected,
     netGain: totalCollected - totalCost, achievedIrr: achieved,
@@ -345,6 +495,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     lastPaymentMonth: tariffCollectionMode ? lastTariffMonth : lastPaymentMonth,
     operatingLines: operatingInfos, operatingTotal: operatingTotal,
     tariffYears: tariffInfos, tariffBaseUnitPrice: tariffBaseUnitPrice,
+    financing: financing,
     npvCollectionsAtWacc: npvCollectionsAtWacc, npvCostsAtWacc: npvCostsAtWacc,
     profitabilityIndex: profitabilityIndex, discountedPaybackYears: discountedPaybackMonths === null ? null : discountedPaybackMonths / 12,
     mirr: mirr, goalMet: goalMet,
@@ -352,6 +503,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
 }
 
 import { EngineInputError, validateInputs } from "./validate.js";
+import { computeFinancingOverlay, validateFinancing } from "./financing.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;
 
