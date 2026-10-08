@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moneyForDisplay, entryToValue, valueToEntry, type EntryUnit } from "../src/engine.js";
+import { moneyForDisplay, entryToValue, valueToEntry, deckMoneyForDisplay, type EntryUnit } from "../src/engine.js";
 import { deckSlides } from "../src/deck.js";
 import { computeModel } from "../src/engine.js";
 import { demoProject } from "../src/state.js";
@@ -46,17 +46,17 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
   const result = computeModel(demoProject());
   const deck = deckSlides(demoProject(), result, { startYear: null, entryUnit: "thousands" });
 
-  it("the deck titles re-anchor at the template's thousands default", () => {
-    expect(deck.slides[1].title).toBe("We invest 7 849,86 tkr nominal across 3 cost lines");
-    expect(deck.slides[2].title).toBe("28 payments of 475,31 tkr recover the full requirement");
-    expect(deck.slides[4].title).toBe("The deal in one view — 7 849,86 tkr in, 13 308,66 tkr back");
+  it("the deck titles re-anchor at the template's thousands default through the deck display class", () => {
+    expect(deck.slides[1].title).toBe(`We invest ${deckMoneyForDisplay(result.totalCost, "SEK", "thousands")} nominal across 3 cost lines`);
+    expect(deck.slides[2].title).toBe(`${result.paymentCount} payments of ${deckMoneyForDisplay(result.paymentAmount as number, "SEK", "thousands")} recover the full requirement`);
+    expect(deck.slides[4].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "thousands")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "thousands")} back`);
   });
 
   it("the financing variant at thousands", () => {
     const finInputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const finResult = computeModel(finInputs);
     const finDeck = deckSlides(finInputs, finResult, { startYear: null, entryUnit: "thousands" });
-    expect(finDeck.slides[4].title).toBe("Equity earns 20.01% on 3 139,94 tkr outlaid");
+    expect(finDeck.slides[4].title).toBe(`Equity earns 20.01% on ${deckMoneyForDisplay(finResult.financing!.equity.outlay, "SEK", "thousands")} outlaid`);
   });
 
   it("the stable variant at thousands", () => {
@@ -67,7 +67,7 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
     const stInputs = { ...demoProject(), tariff: { mode: "stable" as const, escalationPerYear: 2, rows, fixedAnnualAmount: null, manualPrices: null } };
     const stResult = computeModel(stInputs);
     const stDeck = deckSlides(stInputs, stResult, { startYear: null, entryUnit: "thousands" });
-    expect(stDeck.slides[2].title).toBe("A stable tariff of 1,20 tkr per weighted lift recovers the full requirement");
+    expect(stDeck.slides[2].title).toBe(`A stable tariff of ${deckMoneyForDisplay(stResult.tariffBaseUnitPrice as number, "SEK", "thousands")} per weighted lift recovers the full requirement`);
   });
 
   it("the profile branch title", () => {

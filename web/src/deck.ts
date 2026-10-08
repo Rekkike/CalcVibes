@@ -1,5 +1,5 @@
 import type { ModelInputs, ModelResult, TariffRow } from "../../core/src/types.js";
-import { moneyForDisplay, percentTwoForDisplay, yearsTwoForDisplay, dscrTwoForDisplay } from "./engine.js";
+import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { yearHeader } from "./state.js";
 
@@ -60,7 +60,7 @@ export function deckSlides(
 ): DeckModel {
   const currency = (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK";
   const unit = opts.entryUnit ?? "ones";
-  const money = (v: number) => moneyForDisplay(v, currency, unit);
+  const money = (v: number) => deckMoneyForDisplay(v, currency, unit);
   const startYear = opts.startYear;
   const leveraged = result.leveragedSolve;
   const tariffCollectionMode = inputs.tariff !== undefined && inputs.tariff.mode !== "off" && inputs.tariff.mode !== "decompose";
@@ -157,12 +157,12 @@ export function deckSlides(
   }
   const insights: string[] = [];
   if (result.paybackYears !== null) {
-    insights.push(`You start turning a profit in ${yearHeader(Math.ceil(result.paybackYears), startYear)} (nominal payback ${yearsTwoForDisplay(result.paybackYears)}).`);
+    insights.push(`You start turning a profit in ${yearHeader(Math.ceil(result.paybackYears), startYear)} (nominal payback ${deckYearsForDisplay(result.paybackYears)}).`);
   } else {
     insights.push("The project does not turn a profit within the modeled horizon.");
   }
   if (result.discountedPaybackYears !== null) {
-    insights.push(`On a discounted basis, break-even arrives in ${yearHeader(Math.ceil(result.discountedPaybackYears), startYear)} (${yearsTwoForDisplay(result.discountedPaybackYears)}).`);
+    insights.push(`On a discounted basis, break-even arrives in ${yearHeader(Math.ceil(result.discountedPaybackYears), startYear)} (${deckYearsForDisplay(result.discountedPaybackYears)}).`);
   }
   slides.push({
     name: "recovery",
@@ -186,8 +186,8 @@ export function deckSlides(
       { label: "Goal check", value: result.goalMet ? "target achieved" : "target not achieved", kind: "text", rawValue: null },
       { label: "NPV at WACC (discounted)", value: money(result.npvAtWacc), kind: "money", rawValue: result.npvAtWacc, disclosure: "discounted at the WACC" },
       { label: "Profitability index", value: result.profitabilityIndex === null ? "—" : dscrTwoForDisplay(result.profitabilityIndex), kind: "dscr", rawValue: result.profitabilityIndex },
-      { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : yearsTwoForDisplay(result.paybackYears), kind: "years", rawValue: result.paybackYears },
-      { label: "Payback (discounted at WACC)", value: result.discountedPaybackYears === null ? "—" : yearsTwoForDisplay(result.discountedPaybackYears), kind: "years", rawValue: result.discountedPaybackYears },
+      { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), kind: "years", rawValue: result.paybackYears },
+      { label: "Payback (discounted at WACC)", value: result.discountedPaybackYears === null ? "—" : deckYearsForDisplay(result.discountedPaybackYears), kind: "years", rawValue: result.discountedPaybackYears },
       { label: "MIRR", value: result.mirr === null ? "—" : percentTwoForDisplay(result.mirr), kind: "percent", rawValue: result.mirr, disclosure: "finance and reinvestment rates as configured" },
     ],
     disclosures: returnsDisclosures,
@@ -222,8 +222,8 @@ export function deckSlides(
     { label: "Net gain", value: money(result.netGain) },
     { label: "Achieved IRR", value: `${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad" },
     { label: "NPV at WACC", value: money(result.npvAtWacc) },
-    { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : yearsTwoForDisplay(result.paybackYears) },
-    { label: "Payback (discounted)", value: result.discountedPaybackYears === null ? "—" : yearsTwoForDisplay(result.discountedPaybackYears) },
+    { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears) },
+    { label: "Payback (discounted)", value: result.discountedPaybackYears === null ? "—" : deckYearsForDisplay(result.discountedPaybackYears) },
     { label: "Break-even year", value: result.paybackYears === null ? "not within the horizon" : yearHeader(Math.ceil(result.paybackYears), startYear) },
     { label: "MIRR", value: percentTwoForDisplay(result.mirr ?? 0) },
     { label: "Profitability index", value: dscrTwoForDisplay(result.profitabilityIndex ?? 0) },

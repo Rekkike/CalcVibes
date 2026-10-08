@@ -44,7 +44,7 @@ describe("Task R4: VERDICT-NO / TOGGLE-POSITION / NO-DEAD-RULE", () => {
 describe("Task R3: FIN-TILES / NO-DEAD-BODY", () => {
   it("FIN-TILES: the financing variant renders exactly fifteen tiles, enumerated, the DSCR tile carrying the calendar-labeled year", async () => {
     const { demoProject } = await import("../src/state.js");
-    const { computeModel, moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay } = await import("../src/engine.js");
+    const { computeModel, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
     const { yearHeader } = await import("../src/state.js");
     const inputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
@@ -61,10 +61,10 @@ describe("Task R3: FIN-TILES / NO-DEAD-BODY", () => {
     const fin = result.financing;
     expect(fin).not.toBeNull();
     const byLabel = (l: string) => tiles.find((t) => t.label === l);
-    expect(byLabel("Equity outlay")?.value).toBe(moneyForDisplay(fin!.equity.outlay, "SEK", "ones"));
+    expect(byLabel("Equity outlay")?.value).toBe(deckMoneyForDisplay(fin!.equity.outlay, "SEK", "ones"));
     expect(byLabel("Equity IRR")?.value).toBe(percentTwoForDisplay(fin!.equity.irr as number));
-    expect(byLabel("Equity NPV at WACC (discounted)")?.value).toBe(moneyForDisplay(fin!.equity.npvAtWacc, "SEK", "ones"));
-    expect(byLabel("Drawn (nominal)")?.value).toBe(moneyForDisplay(fin!.drawnTotal, "SEK", "ones"));
+    expect(byLabel("Equity NPV at WACC (discounted)")?.value).toBe(deckMoneyForDisplay(fin!.equity.npvAtWacc, "SEK", "ones"));
+    expect(byLabel("Drawn (nominal)")?.value).toBe(deckMoneyForDisplay(fin!.drawnTotal, "SEK", "ones"));
     expect(byLabel("Minimum DSCR")?.value).toBe(dscrTwoForDisplay(fin!.minDscr!.value));
     expect(byLabel("Minimum DSCR")?.disclosure).toBe(`in ${yearHeader(fin!.minDscr!.year, null)}`);
   });
@@ -121,7 +121,7 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
 
   it("TILE-TRACE (the EX-1 repair): every base-demo deal tile value equals its engine field through the display formatters", async () => {
     const { demoProject } = await import("../src/state.js");
-    const { computeModel, moneyForDisplay, percentTwoForDisplay, yearsTwoForDisplay, dscrTwoForDisplay } = await import("../src/engine.js");
+    const { computeModel, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
     const { yearHeader } = await import("../src/state.js");
     const demo = demoProject();
@@ -130,13 +130,13 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const tiles = deck.slides[4].tiles ?? [];
     const byLabel = (l: string) => tiles.find((t) => t.label === l);
     const unit = "ones";
-    expect(byLabel("Total cost")?.value).toBe(moneyForDisplay(result.totalCost, "SEK", unit));
-    expect(byLabel("Total collected")?.value).toBe(moneyForDisplay(result.totalCollected, "SEK", unit));
-    expect(byLabel("Net gain")?.value).toBe(moneyForDisplay(result.netGain, "SEK", unit));
+    expect(byLabel("Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", unit));
+    expect(byLabel("Total collected")?.value).toBe(deckMoneyForDisplay(result.totalCollected, "SEK", unit));
+    expect(byLabel("Net gain")?.value).toBe(deckMoneyForDisplay(result.netGain, "SEK", unit));
     expect(byLabel("Achieved IRR")?.value).toBe(`${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(demo.targetIrr / 100)} target`);
-    expect(byLabel("NPV at WACC")?.value).toBe(moneyForDisplay(result.npvAtWacc, "SEK", unit));
-    expect(byLabel("Payback (nominal)")?.value).toBe(yearsTwoForDisplay(result.paybackYears as number));
-    expect(byLabel("Payback (discounted)")?.value).toBe(yearsTwoForDisplay(result.discountedPaybackYears as number));
+    expect(byLabel("NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", unit));
+    expect(byLabel("Payback (nominal)")?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
+    expect(byLabel("Payback (discounted)")?.value).toBe(deckYearsForDisplay(result.discountedPaybackYears as number));
     expect(byLabel("Break-even year")?.value).toBe(yearHeader(Math.ceil(result.paybackYears as number), null));
     expect(byLabel("MIRR")?.value).toBe(percentTwoForDisplay(result.mirr ?? 0));
     expect(byLabel("Profitability index")?.value).toBe(dscrTwoForDisplay(result.profitabilityIndex ?? 0));

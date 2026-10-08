@@ -57,6 +57,35 @@ export function valueToEntry(value: number, unit: EntryUnit): number {
   return value / unitFactor(unit);
 }
 
+
+export function deckMoneyForDisplay(value: number, currency: CurrencyCode = "SEK", unit: EntryUnit = "ones"): string {
+  const factor = unitFactor(unit);
+  const scaled = Math.abs(value) / factor;
+  const negative = value < 0;
+  const rounded = roundForDisplay(scaled, 0);
+  const grouped = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const body = grouped;
+  let token = "";
+  if (unit === "thousands") token = " k";
+  else if (unit === "millions") token = " M";
+  if (currency === "SEK") {
+    const sekToken = unit === "thousands" ? " tkr" : unit === "millions" ? " Mkr" : " kr";
+    return negative ? `-${body}${sekToken}` : `${body}${sekToken}`;
+  }
+  const prefix =
+    currency === "EUR" ? "\u20ac" :
+    currency === "USD" ? "$" :
+    currency === "GBP" ? "\u00a3" :
+    currency === "NOK" ? "NOK " :
+    "DKK ";
+  const withCurrency = `${prefix}${body}${token}`;
+  return negative ? `-${withCurrency}` : withCurrency;
+}
+
+export function deckYearsForDisplay(years: number): string {
+  return roundForDisplay(years, 1).toFixed(1) + " years";
+}
+
 export function percentTwoForDisplay(rate: number): string {
   return roundForDisplay(rate * 100, 2).toFixed(2) + "%";
 }

@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import { moneyForDisplay } from "./engine.js";
+import { deckMoneyForDisplay } from "./engine.js";
 import type { DeckModel } from "./deck.js";
 
 export interface DeckPdfTrace {
@@ -128,7 +128,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           let rowY = y;
           sc.data.forEach((d, di) => {
             const sharePct = Math.round((d.value / chartTotal) * 100);
-            const valText = moneyForDisplay(d.value, model.currency ?? "SEK", model.unit ?? "ones");
+            const valText = deckMoneyForDisplay(d.value, model.currency ?? "SEK", model.unit ?? "ones");
             doc.setFontSize(7);
             doc.setTextColor(50, 50, 50);
             doc.text(`${d.label} ${sharePct}%`, 24, rowY);
@@ -182,7 +182,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           });
           doc.setFontSize(8);
           doc.setTextColor(0, 0, 0);
-          const peakText = moneyForDisplay(chartMax, model.currency ?? "SEK", model.unit ?? "ones");
+          const peakText = deckMoneyForDisplay(chartMax, model.currency ?? "SEK", model.unit ?? "ones");
           doc.text(peakText, 20 + peakIdx * (barW + 2) + barW / 2, y + 26 - (chartMax / chartMax) * 26 - 2, { align: "center" });
           if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(peakText);
           y += 38;
@@ -195,7 +195,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       let rowY = y;
       slide.chart.data.forEach((d) => {
         const sharePct = Math.round((d.value / chartTotal) * 100);
-        const valText = moneyForDisplay(d.value, model.currency ?? "SEK", model.unit ?? "ones");
+        const valText = deckMoneyForDisplay(d.value, model.currency ?? "SEK", model.unit ?? "ones");
         doc.setFontSize(7);
         doc.setTextColor(50, 50, 50);
         doc.text(`${d.label} ${sharePct}%`, 24, rowY);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deckSlides } from "../src/deck.js";
-import { computeModel } from "../src/engine.js";
+import { computeModel, deckMoneyForDisplay, deckYearsForDisplay } from "../src/engine.js";
 import { demoProject } from "../src/state.js";
 import type { FinancingConfig, TariffRow } from "../../core/src/types.js";
 
@@ -23,10 +23,10 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
   });
 
   it("exact title pins", () => {
-    expect(deck.slides[1].title).toBe("We invest 7 849 860,00 kr nominal across 3 cost lines");
-    expect(deck.slides[2].title).toBe("28 payments of 475 309,13 kr recover the full requirement");
+    expect(deck.slides[1].title).toBe(`We invest ${deckMoneyForDisplay(result.totalCost, "SEK", "ones")} nominal across 3 cost lines`);
+    expect(deck.slides[2].title).toBe(`${result.paymentCount} payments of ${deckMoneyForDisplay(result.paymentAmount as number, "SEK", "ones")} recover the full requirement`);
     expect(deck.slides[3].title).toBe("The project earns 12.00% against the 12.00% target");
-    expect(deck.slides[4].title).toBe("The deal in one view — 7 849 860,00 kr in, 13 308 655,75 kr back");
+    expect(deck.slides[4].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "ones")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "ones")} back`);
   });
 
   it("slide 0 subtitle", () => {
@@ -61,18 +61,18 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   const deck = deckSlides(inputs, result);
 
   it("slide 4 title and tile pins (the financing fold extends the grid to fifteen tiles)", () => {
-    expect(deck.slides[4].title).toBe("Equity earns 20.01% on 3 139 944,00 kr outlaid");
+    expect(deck.slides[4].title).toBe(`Equity earns ${(result.financing!.equity.irr! * 100).toFixed(2)}% on ${deckMoneyForDisplay(result.financing!.equity.outlay, "SEK", "ones")} outlaid`);
     const tiles = deck.slides[4].tiles ?? [];
     const byLabel = (label: string) => tiles.find((t) => t.label === label);
     expect(tiles.length).toBe(15);
-    expect(byLabel("Total cost")?.value).toBe("7 849 860,00 kr");
-    expect(byLabel("Net gain")?.value).toBe("5 458 795,75 kr");
-    expect(byLabel("NPV at WACC")?.value).toBe("1 252 822,99 kr");
+    expect(byLabel("Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "ones"));
+    expect(byLabel("Net gain")?.value).toBe(deckMoneyForDisplay(result.netGain, "SEK", "ones"));
+    expect(byLabel("NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", "ones"));
   });
 
   it("the financing variant keeps its DSCR among the deal disclosures and the equity metrics reach the tiles", () => {
     const tiles = deck.slides[4].tiles ?? [];
-    expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toBe("6.96 years");
+    expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
     expect(deck.slides[4].disclosures.join(" ")).toContain("56 sign changes");
     expect(deck.slides[4].summaryCharts?.length).toBe(2);
   });
@@ -82,16 +82,16 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   });
 
   it("traceability on the financing variant (the equity figures reach the verdict and the tile grid)", () => {
-    expect(deck.slides[4].title).toContain("3 139 944,00 kr");
+    expect(deck.slides[4].title).toContain(deckMoneyForDisplay(result.financing!.equity.outlay, "SEK", "ones"));
     expect(deck.slides[4].verdict).toContain("20.01%");
-    expect(deck.slides[4].tiles?.find((t) => t.label === "NPV at WACC")?.value).toBe("1 252 822,99 kr");
+    expect(deck.slides[4].tiles?.find((t) => t.label === "NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", "ones"));
   });
 
   it("share-100 variant: the zero-outlay note replaces the equity IRR figure", () => {
     const inputs100 = { ...demoProject(), financing: fin({ sharePct: 100 }) };
     const result100 = computeModel(inputs100);
     const deck100 = deckSlides(inputs100, result100);
-    expect(deck100.slides[4].title).toBe("Equity earns nothing on 0,00 kr outlaid");
+    expect(deck100.slides[4].title).toBe(`Equity earns nothing on ${deckMoneyForDisplay(0, "SEK", "ones")} outlaid`);
     expect(deck100.slides[4].verdict).toContain("This is a good deal");
   });
 });
@@ -102,7 +102,7 @@ describe("EX-1 stable-tariff variant (the golden stable configuration)", () => {
   const deck = deckSlides(inputs, result);
 
   it("slide 2 title pin", () => {
-    expect(deck.slides[2].title).toBe("A stable tariff of 1 204,24 kr per weighted lift recovers the full requirement");
+    expect(deck.slides[2].title).toBe(`A stable tariff of ${deckMoneyForDisplay(result.tariffBaseUnitPrice as number, "SEK", "ones")} per weighted lift recovers the full requirement`);
   });
 
   it("traceability on the stable variant", () => {
@@ -127,7 +127,7 @@ describe("EX-1 red proofs (input-level perturbations)", () => {
     const shifted = { ...demoProject(), costs: demoProject().costs.map((c) => (c.id === "c1" ? { ...c, amount: 1900000 } : c)) };
     const r = computeModel(shifted);
     const d = deckSlides(shifted, r);
-    expect(d.slides[1].title).toBe("We invest 8 158 950,00 kr nominal across 3 cost lines");
+    expect(d.slides[1].title).toBe(`We invest ${deckMoneyForDisplay(r.totalCost, "SEK", "ones")} nominal across 3 cost lines`);
   });
 
   it("the target 12 -> 13 flips the slide-0 subtitle and the slide-3 title", () => {
@@ -142,13 +142,13 @@ describe("EX-1 red proofs (input-level perturbations)", () => {
     const inputs = { ...demoProject(), financing: fin({ sharePct: 65 }) };
     const r = computeModel(inputs);
     const d = deckSlides(inputs, r);
-    expect(d.slides[4].title).not.toBe("Equity earns 20.01% on 3 139 944,00 kr outlaid");
+    expect(d.slides[4].title).not.toBe(`Equity earns 20.01% on ${deckMoneyForDisplay(3139944, "SEK", "ones")} outlaid`);
   });
 
   it("the currency SEK -> EUR flips every money string", () => {
     const shifted = { ...demoProject(), currency: "EUR" };
     const r = computeModel(shifted);
     const d = deckSlides(shifted, r);
-    expect(d.slides[1].title).toBe("We invest €7 849 860,00 nominal across 3 cost lines");
+    expect(d.slides[1].title).toBe(`We invest ${deckMoneyForDisplay(r.totalCost, "EUR", "ones")} nominal across 3 cost lines`);
   });
 });

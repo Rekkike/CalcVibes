@@ -17,17 +17,16 @@ describe("Task A: CONTRAST", () => {
 });
 
 describe("Task B: CHART-LABEL / ONE-COMPOSITION / PEAK-LABEL", () => {
-  it("the donut renders segment labels with names and shares and the center total", () => {
+  it("the Cost section renders the composition rows with names, shares, and values (re-anchored per v0.5.7)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    const donut = document.querySelector('[data-testid="composition-donut"]') as SVGElement;
-    const labels = donut.querySelectorAll('[data-testid="donut-segment-label"]');
-    expect(labels.length).toBe(3);
-    expect((labels[0] as SVGTextElement).textContent).toContain("Development team");
-    expect((labels[0] as SVGTextElement).textContent).toContain("71%");
-    const center = donut.querySelector('[data-testid="donut-center-total"]');
-    expect(center && center.textContent).toContain("7 849 860");
+    const rows = document.querySelector('[data-testid="composition-rows-wrap"] [data-testid="composition-rows"]') as HTMLElement;
+    const rowEls = rows.querySelectorAll("[data-composition-row]");
+    expect(rowEls.length).toBe(3);
+    expect(rowEls[0].querySelector('[data-row-label="name"]')?.textContent).toContain("Development team");
+    expect(rowEls[0].querySelector('[data-row-label="share"]')?.textContent).toContain("71%");
+    expect(rowEls[0].querySelector('[data-row-label="value"]')?.textContent).toContain("5 563");
   });
 
   it("the deck investment slide carries exactly one composition figure (the donut retired per v0.5.6)", () => {
@@ -76,13 +75,13 @@ describe("Task D: INSIGHT-BREAKEVEN / INSIGHT-NULL / VERDICT / GLOSSES", () => {
     const { demoProject } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
-    const { yearsTwoForDisplay } = await import("../src/engine.js");
+    const { deckYearsForDisplay } = await import("../src/engine.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
     const insights = deck.slides[2].insights ?? [];
     expect(insights.length).toBeGreaterThan(0);
     expect(insights[0]).toContain("You start turning a profit in");
-    expect(insights[0]).toContain(yearsTwoForDisplay(result.paybackYears as number));
+    expect(insights[0]).toContain(deckYearsForDisplay(result.paybackYears as number));
     const { yearHeader } = await import("../src/state.js");
     expect(insights[0]).toContain(`in ${yearHeader(Math.ceil(result.paybackYears as number), null)}`);
   });
@@ -180,7 +179,7 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     const result = computeModel(blankProject());
     const deck = deckSlides(blankProject(), result, { startYear: null });
     const tiles = deck.slides[4].tiles ?? [];
-    expect(tiles.find((t) => t.label === "Total cost")?.value).toContain("0,00");
+    expect(tiles.find((t) => t.label === "Total cost")?.value).toBe("0 kr");
     expect(tiles.find((t) => t.label === "Break-even year")?.value).toBe("not within the horizon");
   });
 });

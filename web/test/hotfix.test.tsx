@@ -10,7 +10,7 @@ describe("Task H3: NO-TAUTOLOGY / PEAK-PDF-FORMAT", () => {
 
   it("PEAK-PDF-FORMAT: the PDF mini-bars peak equals the formatter output at the unit in force", async () => {
     const { demoProject } = await import("../src/state.js");
-    const { computeModel, moneyForDisplay } = await import("../src/engine.js");
+    const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
     const { buildDeckPdf } = await import("../src/pdf.js");
     const demo = demoProject();
@@ -19,7 +19,7 @@ describe("Task H3: NO-TAUTOLOGY / PEAK-PDF-FORMAT", () => {
     const model = deckSlides(demo, result, { startYear: null });
     const bars = model.slides[4].summaryCharts?.[1];
     const peak = Math.max(...(bars?.data ?? []).map((d) => d.value));
-    const expected = moneyForDisplay(peak, "SEK", unit);
+    const expected = deckMoneyForDisplay(peak, "SEK", unit);
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(model, "Project Alpha", trace);
     const tracedDeal = trace.drawnFigures[4].join("|");

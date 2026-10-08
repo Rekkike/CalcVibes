@@ -90,27 +90,33 @@ describe("Task C: STAGE-BG / GLOWS / FADE / DISPLAY-TYPE / CHROME (structural)",
 });
 
 describe("Task D: charts (structural, engine-traceable)", () => {
-  it("CHART-APP: the yearly chart renders with bar count equal to the yearly row count", () => {
+  it("CHART-APP (re-anchored per v0.5.7): the paired cost/inflow columns render with HTML year labels and the cumulative line on its own chart", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
-    const chart = document.querySelector('[data-testid="yearly-chart"]') as SVGElement;
-    expect(chart).toBeTruthy();
-    const costBars = chart.querySelectorAll('[data-chart-bar="cost"]');
-    const inflowBars = chart.querySelectorAll('[data-chart-bar="inflow"]');
+    const columns = document.querySelector('[data-testid="cost-inflow-columns"]') as HTMLElement;
+    expect(columns).toBeTruthy();
+    const costBars = columns.querySelectorAll('[data-chart-bar="cost"]');
+    const inflowBars = columns.querySelectorAll('[data-chart-bar="inflow"]');
     expect(costBars.length).toBe(10);
     expect(inflowBars.length).toBe(10);
     expect((costBars[0] as SVGRectElement).getAttribute("fill")).toBe("#fb7185");
+    expect(columns.querySelectorAll('[data-testid="column-year-label"]').length).toBe(10);
+    const line = document.querySelector('[data-testid="cumulative-line"]') as HTMLElement;
+    expect(line).toBeTruthy();
+    expect(line.querySelector('[data-chart-line="cumulative"]')).toBeTruthy();
+    expect(columns.querySelector("svg text")).toBeNull();
     expect((inflowBars[0] as SVGRectElement).getAttribute("fill")).toBe("#34d399");
-    expect(chart.querySelector('[data-chart-line="cumulative"]')?.getAttribute("stroke")).toBe("#0074ba");
+    expect(line.querySelector('[data-chart-line="cumulative"]')?.getAttribute("stroke")).toBe("#0074ba");
   });
 
-  it("DONUT-APP: the composition donut segments equal the cost line count", () => {
+  it("APP-ROWS (re-anchored from DONUT-APP per v0.5.7): the Cost section renders the composition rows", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    const donut = document.querySelector('[data-testid="composition-donut"]') as SVGElement;
-    expect(donut.querySelectorAll("[data-donut-segment]").length).toBe(3);
+    const rows = document.querySelector('[data-testid="composition-rows-wrap"] [data-testid="composition-rows"]') as HTMLElement;
+    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(3);
+    expect(document.querySelector('[data-testid="composition-donut"]')).toBeNull();
   });
 
   it("CHART-DECK: the investment donut and recovery bars render on the stage", () => {

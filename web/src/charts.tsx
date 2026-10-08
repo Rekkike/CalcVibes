@@ -13,112 +13,69 @@ export const STAGE_CHART_COLORS = {
   zeroLine: "rgba(148,163,184,0.45)",
 };
 
-export function YearlyChart(props: { yearly: YearlyRow[]; labelFor: (year: number) => string; stage?: boolean }) {
-  const { yearly, labelFor, stage = false } = props;
-  const W = 780, H = 270, padL = 74, padB = 34;
+export function CostInflowColumns(props: {
+  yearly: YearlyRow[];
+  labelFor: (year: number) => string;
+  valueFor: (v: number) => string;
+}) {
+  const { yearly, labelFor, valueFor } = props;
   const max = Math.max(1, ...yearly.map((y) => Math.max(y.cost, y.inflow)));
-  const plotW = W - padL - 16;
-  const n = yearly.length;
-  const groupW = plotW / Math.max(1, n);
-  const barW = Math.min(14, groupW / 3);
-  const yFor = (v: number) => H - padB - (v / max) * (H - padB - 20);
-  const cumValues = yearly.map((y) => y.cumulative);
-  const cumMin = Math.min(...cumValues, 0);
-  const cumMax = Math.max(...cumValues, 1);
-  const yCum = (v: number) => H - padB - ((v - cumMin) / (cumMax - cumMin)) * (H - padB - 20);
+  const peakCostIdx = yearly.reduce((bi, y, i) => (y.cost > yearly[bi].cost ? i : bi), 0);
+  const peakInflowIdx = yearly.reduce((bi, y, i) => (y.inflow > yearly[bi].inflow ? i : bi), 0);
   return (
-    <svg data-testid="yearly-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Yearly cost, inflow, and cumulative">
-      {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-        <line key={f} x1={padL} x2={W - 8} y1={yFor(max * f)} y2={yFor(max * f)} stroke={stage ? STAGE_CHART_COLORS.gridline : "#e5e5ea"} />
-      ))}
-      <line x1={padL} x2={W - 8} y1={yFor(0)} y2={yFor(0)} stroke={stage ? STAGE_CHART_COLORS.zeroLine : "#343434"} />
-      {yearly.map((y, i) => {
-        const gx = padL + i * groupW;
-        return (
-          <g key={y.year}>
-            <rect data-chart-bar="cost" x={gx + groupW / 2 - barW - 1} y={yFor(y.cost)} width={barW} height={yFor(0) - yFor(y.cost)} fill={CHART_COLORS.costBar} rx={3} />
-            <rect data-chart-bar="inflow" x={gx + groupW / 2 + 1} y={yFor(y.inflow)} width={barW} height={yFor(0) - yFor(y.inflow)} fill={CHART_COLORS.inflowBar} rx={3} />
-            <text x={gx + groupW / 2} y={H - 14} fontSize="10" textAnchor="middle" fill={stage ? STAGE_CHART_COLORS.axisText : "#717273"}>{labelFor(y.year)}</text>
-          </g>
-        );
-      })}
-      <polyline
-        data-chart-line="cumulative"
-        points={yearly.map((y, i) => `${padL + i * groupW + groupW / 2},${yCum(y.cumulative)}`).join(" ")}
-        fill="none"
-        stroke={CHART_COLORS.cumulative}
-        strokeWidth={2.5}
-      />
-      <circle cx={padL + 6} cy={16} r={4} fill={CHART_COLORS.costBar} />
-      <text x={padL + 14} y={19} fontSize="10" fill={stage ? STAGE_CHART_COLORS.axisText : "#717273"}>Cost</text>
-      <circle cx={padL + 60} cy={16} r={4} fill={CHART_COLORS.inflowBar} />
-      <text x={padL + 68} y={19} fontSize="10" fill={stage ? STAGE_CHART_COLORS.axisText : "#717273"}>Inflow</text>
-      <circle cx={padL + 118} cy={16} r={4} fill={CHART_COLORS.cumulative} />
-      <text x={padL + 126} y={19} fontSize="10" fill={stage ? STAGE_CHART_COLORS.axisText : "#717273"}>Cumulative</text>
-    </svg>
+    <div data-testid="cost-inflow-columns" className="chart-block app-chart">
+      <div className="paired-columns">
+        {yearly.map((y, i) => (
+          <div key={y.year} data-column-year={y.year} className="paired-column">
+            <span data-testid="column-peak-cost" className={i === peakCostIdx && y.cost > 0 ? "column-peak" : "column-peak hidden-peak"}>{i === peakCostIdx && y.cost > 0 ? valueFor(y.cost) : "\u00a0"}</span>
+            <svg viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true" className="paired-svg">
+              <rect data-chart-bar="cost" x={0} y={100 - Math.round((y.cost / max) * 100)} width={10} height={Math.round((y.cost / max) * 100)} fill={CHART_COLORS.costBar} rx={2} />
+            </svg>
+            <span data-testid="column-peak-inflow" className={i === peakInflowIdx && y.inflow > 0 ? "column-peak inflow-peak" : "column-peak inflow-peak hidden-peak"}>{i === peakInflowIdx && y.inflow > 0 ? valueFor(y.inflow) : "\u00a0"}</span>
+            <svg viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true" className="paired-svg">
+              <rect data-chart-bar="inflow" x={0} y={100 - Math.round((y.inflow / max) * 100)} width={10} height={Math.round((y.inflow / max) * 100)} fill={CHART_COLORS.inflowBar} rx={2} />
+            </svg>
+            <span data-testid="column-year-label" className="column-year-label">{labelFor(y.year)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-export interface DonutLabel {
-  name: string;
-  sharePct: number;
-}
-
-export function donutLabels(lineTotals: LineTotal[]): DonutLabel[] {
-  const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
-  return lineTotals.map((l) => ({ name: l.name, sharePct: Math.round((l.total / total) * 100) }));
-}
-
-export const DONUT_LABEL_FONT_SIZE = 9;
-const DONUT_LABEL_CHAR_WIDTH = 0.6 * DONUT_LABEL_FONT_SIZE;
-const DONUT_LABEL_COL_X = 170;
-const DONUT_LABEL_RIGHT_PAD = 8;
-
-export function donutViewBoxWidth(lineTotals: LineTotal[]): number {
-  const labels = donutLabels(lineTotals);
-  const widest = labels.reduce((w, lb) => Math.max(w, lb.name.length), 0);
-  const pctSuffix = " 100%".length;
-  const bound = DONUT_LABEL_COL_X + (widest + pctSuffix) * DONUT_LABEL_CHAR_WIDTH + DONUT_LABEL_RIGHT_PAD;
-  return Math.max(260, Math.ceil(bound));
-}
-
-export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boolean; centerTotal?: string; kicker?: string }) {
-  const { lineTotals, centerTotal, stage = false, kicker } = props;
-  const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
-  const labels = donutLabels(lineTotals);
-  const R = 58, SW = 24, C = 80;
-  const colors = ["#0074ba", "#34d399", "#fb7185", "#b45309", "#717273", "#103558"];
-  let acc = 0;
-  const vbW = donutViewBoxWidth(lineTotals);
+export function CumulativeLine(props: {
+  yearly: YearlyRow[];
+  labelFor: (year: number) => string;
+  valueFor: (v: number) => string;
+}) {
+  const { yearly, labelFor, valueFor } = props;
+  const values = yearly.map((y) => y.cumulative);
+  const max = Math.max(...values, 0);
+  const min = Math.min(...values, 0);
+  const span = Math.max(1e-12, max - min);
+  const xFor = (i: number) => yearly.length > 1 ? (i / (yearly.length - 1)) * 100 : 50;
+  const yFor = (v: number) => 100 - ((v - min) / span) * 100;
+  const zeroCrossIdx = values.findIndex((v, i) => i > 0 && values[i - 1] < 0 && v >= 0);
+  const zeroY = yFor(0);
+  const points = values.map((v, i) => `${xFor(i).toFixed(2)},${yFor(v).toFixed(2)}`).join(" ");
   return (
-    <svg data-testid="composition-donut" viewBox={`0 0 ${vbW} ${kicker !== undefined ? 180 : 160}`} role="img" aria-label="Cost composition">
-      {kicker !== undefined && (
-        <text data-testid="chart-kicker" x={12} y={kicker !== undefined ? 12 : 0} fontSize="10" fontWeight="700" letterSpacing="0.08em" fill={stage ? "#cce9ff" : "#103558"}>{kicker.toUpperCase()}</text>
-      )}
-      {centerTotal !== undefined && (
-        <text data-testid="donut-center-total" x={C} y={C + 4} fontSize="13" fontWeight="700" textAnchor="middle" fill={stage ? "#e2e8f0" : "#343434"}>{centerTotal}</text>
-      )}
-      {labels.map((lb, i) => (
-        <text key={"lbl-" + i} data-testid="donut-segment-label" x={DONUT_LABEL_COL_X} y={34 + i * 14} fontSize={DONUT_LABEL_FONT_SIZE} fill={stage ? "#e2e8f0" : "#717273"}>{lb.name} {lb.sharePct}%</text>
-      ))}
-      {lineTotals.map((l, i) => {
-        const frac = l.total / total;
-        const start = acc;
-        acc += frac;
-        const a0 = start * 2 * Math.PI - Math.PI / 2;
-        const a1 = acc * 2 * Math.PI - Math.PI / 2;
-        const large = frac > 0.5 ? 1 : 0;
-        const x1 = C + R * Math.cos(a1), y1 = C + R * Math.sin(a1);
-        return (
-          <path
-            key={l.id}
-            data-donut-segment={l.id}
-            d={`M ${C + R} ${C} A ${R} ${R} 0 ${large} 1 ${x1} ${y1} L ${(C + (R - SW) * Math.cos(a1)).toFixed(4)} ${(C + (R - SW) * Math.sin(a1)).toFixed(4)} A ${R - SW} ${R - SW} 0 ${large} 0 ${(C + (R - SW) * Math.cos(a0)).toFixed(4)} ${(C + (R - SW) * Math.sin(a0)).toFixed(4)} Z`}
-            fill={colors[i % colors.length]}
-          />
-        );
-      })}
-    </svg>
+    <div data-testid="cumulative-line" className="chart-block app-chart">
+      <div className="line-points">
+        <span data-testid="line-start-value" className="line-endpoint">{valueFor(values[0] ?? 0)}</span>
+        <span data-testid="line-end-value" className="line-endpoint">{valueFor(values[values.length - 1] ?? 0)}</span>
+      </div>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" className="cumulative-svg">
+        <line data-testid="zero-baseline" x1={0} x2={100} y1={zeroY.toFixed(2)} y2={zeroY.toFixed(2)} stroke="var(--line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <polyline data-chart-line="cumulative" points={points} fill="none" stroke={CHART_COLORS.cumulative} strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="line-years">
+        <span data-testid="line-first-year" className="column-year-label">{labelFor(yearly[0]?.year ?? 1)}</span>
+        {zeroCrossIdx > 0 && (
+          <span data-testid="line-zero-crossing" className="column-year-label">zero at {labelFor(yearly[zeroCrossIdx].year)}</span>
+        )}
+        <span data-testid="line-last-year" className="column-year-label">{labelFor(yearly[yearly.length - 1]?.year ?? yearly.length)}</span>
+      </div>
+    </div>
   );
 }
 
