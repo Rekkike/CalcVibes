@@ -52,6 +52,7 @@ export interface TariffYearInfo {
   weightedVolume: number;
   unitPrice: number | null;
   revenue: number;
+  perRowCharges: Record<string, number> | null;
 }
 
 export interface MaintenanceConfig {
@@ -115,7 +116,7 @@ export interface ModelResult {
   totalCost: number;
   costNpv: number;
   paymentAmount: number | null;
-  paymentCount: number;
+  paymentCount: number | null;
   totalCollected: number;
   netGain: number;
   achievedIrr: number | null;

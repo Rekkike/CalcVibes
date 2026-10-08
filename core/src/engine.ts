@@ -121,7 +121,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const residualDf = residualAmount > 0 && residualMonth <= totalMonths ? df(residualMonth) : 0;
   const firstCollectionMonth = repaymentStartYear * 12;
   const lastPaymentMonth = slots.length > 0 ? slots[slots.length - 1].monthIndex : firstCollectionMonth;
-  const lastInflowMonth = tariffCfg0.mode !== "off"
+  const lastInflowMonth = tariffCollectionMode0
     ? Math.max(lastTariffMonth, residualAmount > 0 ? residualMonth : 0)
     : Math.max(lastPaymentMonth, residualAmount > 0 ? residualMonth : 0);
   const operatingLinesIn = inp.operatingLines ?? [];
@@ -185,8 +185,12 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         if (weightedVolumes[k] <= 0 && required > 0) {
           throw new EngineInputError([`Grid year ${year} has zero weighted volume against a positive required collection.`]);
         }
-        const unitPrice = required / weightedVolumes[k];
-        tariffInfos.push({ year, required, weightedVolume: weightedVolumes[k], unitPrice, revenue: required });
+        const unitPrice = weightedVolumes[k] > 0 ? required / weightedVolumes[k] : null;
+        const perRowCharges: Record<string, number> | null = {};
+        for (const row of tariffCfg.rows) {
+          (perRowCharges as Record<string, number>)[row.id] = row.weight * (unitPrice as number);
+        }
+        tariffInfos.push({ year, required, weightedVolume: weightedVolumes[k], unitPrice, revenue: required, perRowCharges });
       }
     } else {
       let revenues: number[] = [];
@@ -217,7 +221,11 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       for (let k = 0; k < gridYears.length; k++) {
         const year = gridYears[k];
         const unitPrice = tariffCfg.mode === "manual" ? (tariffCfg.manualPrices?.[k] ?? null) : (tariffCfg.mode === "stable" ? (tariffBaseUnitPrice as number) * Math.pow(1 + tariffEsc, k) : null);
-        tariffInfos.push({ year, required: null, weightedVolume: weightedVolumes[k], unitPrice, revenue: revenues[k] });
+        const perRowCharges: Record<string, number> | null = {};
+        for (const row of tariffCfg.rows) {
+          (perRowCharges as Record<string, number>)[row.id] = row.weight * (unitPrice as number);
+        }
+        tariffInfos.push({ year, required: null, weightedVolume: weightedVolumes[k], unitPrice, revenue: revenues[k], perRowCharges });
       }
     }
   }
@@ -326,14 +334,15 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const goalMet = achieved !== null && achieved >= target / 100 - 1e-9;
   return {
     totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: tariffCollectionMode ? null : solvedPayment,
-    paymentCount: slots.length, totalCollected: totalCollected,
+    paymentCount: tariffCollectionMode ? null : slots.length, totalCollected: totalCollected,
     netGain: totalCollected - totalCost, achievedIrr: achieved,
     paybackYears: paybackMonths === null ? null : paybackMonths / 12,
     lastCostYear: lastCostYear, repaymentStartYear: repaymentStartYear,
     monthly: monthly, yearly: yearly, lineTotals: lineTotals,
     signChanges: signChanges, irrAmbiguous: signChanges > 1,
     npvAtTarget: npvAtTarget, npvAtWacc: npvAtWacc,
-    firstPaymentMonth: firstCollectionMonth, lastPaymentMonth: lastPaymentMonth,
+    firstPaymentMonth: firstCollectionMonth,
+    lastPaymentMonth: tariffCollectionMode ? lastTariffMonth : lastPaymentMonth,
     operatingLines: operatingInfos, operatingTotal: operatingTotal,
     tariffYears: tariffInfos, tariffBaseUnitPrice: tariffBaseUnitPrice,
     npvCollectionsAtWacc: npvCollectionsAtWacc, npvCostsAtWacc: npvCostsAtWacc,
@@ -409,6 +418,7 @@ export interface SolveTermResult {
   termYears: number | null;
   lastPaymentMonth: number | null;
   shortfall: number | null;
+  minimalityShortfall: number | null;
   result: import("./types.js").ModelResult;
 }
 
@@ -460,7 +470,7 @@ export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResul
       if (d < 1e-12 * dfSumIter) { bad = true; break; }
     }
     if (bad) { infeasible = true; n = null; dfSum = dfSumIter; break; }
-    const solvedLast = startMonth + (nIter as number) * spacing;
+    const solvedLast = startMonth + ((nIter as number) - 1) * spacing;
     if (solvedLast === windowEnd || !hasOperating) {
       n = nIter;
       dfSum = dfSumIter;
@@ -475,11 +485,17 @@ export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResul
   }
   if (infeasible || n === null) {
     const result = computeModel({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears } });
-    return { paymentCount: null, termYears: null, lastPaymentMonth: null, shortfall: targetNpv - dfSum, result };
+    return { paymentCount: null, termYears: null, lastPaymentMonth: null, shortfall: targetNpv - dfSum, minimalityShortfall: null, result };
   }
   const termYears = n / ppy;
   const lastPaymentMonth = startMonth + (n - 1) * spacing;
   const result = computeModel({ ...inp, repayment: { ...inp.repayment, termYears } }, { fixedPayment: payment });
-  const shortfall = targetNpv - dfSum;
-  return { paymentCount: n, termYears, lastPaymentMonth, shortfall, result };
+  const shortfall = result.costNpv - dfSum;
+  let dfSumMinusOne = 0;
+  for (let j = 0; j < (n as number) - 1; j++) {
+    const escFactor = Math.pow(1 + esc, Math.floor(j / ppy));
+    dfSumMinusOne += escFactor / Math.pow(1 + rM, startMonth + j * spacing);
+  }
+  const minimalityShortfall = result.costNpv - payment * dfSumMinusOne;
+  return { paymentCount: n, termYears, lastPaymentMonth, shortfall, minimalityShortfall, result };
 }

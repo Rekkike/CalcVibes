@@ -1,5 +1,6 @@
 import type { ModelInputs, ModelResult, TariffConfig, TariffRow } from "../../../core/src/types.js";
-import { roundForDisplay } from "../engine.js";
+import { computeModel, roundForDisplay } from "../engine.js";
+import { useMemo } from "react";
 import { yearHeader } from "../state.js";
 
 export function TariffSection(props: {
@@ -10,7 +11,19 @@ export function TariffSection(props: {
 }) {
   const { inputs, result, setTariff, startYear } = props;
   const t = inputs.tariff ?? { mode: "off" as const, escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null };
-  const gridYears = result ? result.tariffYears.map((y) => y.year) : [];
+  const spanYears = useMemo(() => {
+    if (result) return result.tariffYears.map((y) => y.year);
+    try {
+      const span = computeModel({ ...inputs, tariff: undefined });
+      const first = Math.round(span.firstPaymentMonth / 12);
+      const years: number[] = [];
+      for (let k = 0; k < inputs.repayment.termYears + 1; k++) years.push(first + k);
+      return years;
+    } catch {
+      return [];
+    }
+  }, [result, inputs]);
+  const gridYears = spanYears;
   const updateRow = (id: string, patch: Partial<TariffRow>) =>
     setTariff({ ...t, rows: t.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
   return (
@@ -42,7 +55,7 @@ export function TariffSection(props: {
             <thead>
               <tr>
                 <th>Descriptor</th><th>Weight</th>
-                {gridYears.map((y, k) => <th key={y}>{yearHeader(y - (startYear ?? 0) > 0 ? y : y, startYear)}</th>)}
+                {gridYears.map((y) => <th key={y}>{yearHeader(y, startYear)}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -68,8 +81,21 @@ export function TariffSection(props: {
           <button data-action="add-tariff-row" onClick={() => setTariff({ ...t, rows: [...t.rows, { id: "r" + (t.rows.length + 1), label: "", weight: 1, lifts: [] }] })}>Add tariff row</button>
         </>
       )}
-      {t.mode === "manual" && result !== null && (
-        <h3>Manual prices</h3>
+      {t.mode === "manual" && (
+        <>
+          <h3>Manual prices (one per grid column)</h3>
+          {gridYears.map((y, k) => (
+            <label key={y}>Price for collection year {y}{" "}
+              <input data-field="manualPrice" data-column={k} type="number"
+                value={t.manualPrices?.[k] ?? 0}
+                onChange={(e) => {
+                  const prices = (t.manualPrices ?? gridYears.map(() => 0)).slice();
+                  prices[k] = parseFloat(e.target.value) || 0;
+                  setTariff({ ...t, manualPrices: prices });
+                }} />
+            </label>
+          ))}
+        </>
       )}
       {result !== null && result.tariffYears.length > 0 && (
         <div data-testid="tariff-results">
@@ -81,7 +107,7 @@ export function TariffSection(props: {
             <tbody>
               {result.tariffYears.map((y, k) => (
                 <tr key={y.year} data-year={y.year}>
-                  <td>{yearHeader(y.year - gridYears[0] + 1, startYear)}</td>
+                  <td>{yearHeader(y.year, startYear)}</td>
                   <td>{y.required === null ? "—" : roundForDisplay(y.required)}</td>
                   <td>{roundForDisplay(y.weightedVolume)}</td>
                   <td>{y.unitPrice === null ? "—" : roundForDisplay(y.unitPrice, 4)}</td>
@@ -90,12 +116,12 @@ export function TariffSection(props: {
               ))}
             </tbody>
           </table>
-          {t.rows.length > 0 && result.tariffYears.length > 0 && result.tariffYears[0].unitPrice !== null && (
+          {t.rows.length > 0 && result.tariffYears.length > 0 && result.tariffYears[0].perRowCharges !== null && (
             <>
-              <h4>Per-lift charges (weight x unit price), engine-emitted</h4>
+              <h4>Per-lift charges (engine-emitted)</h4>
               <ul data-testid="per-lift-charges">
                 {t.rows.map((row) => (
-                  <li key={row.id}>{row.label}: {roundForDisplay(row.weight * (result.tariffYears[0].unitPrice as number), 4)}</li>
+                  <li key={row.id} data-row-charge={row.id}>{row.label}: {roundForDisplay((result.tariffYears[0].perRowCharges as Record<string, number>)[row.id], 4)}</li>
                 ))}
               </ul>
             </>

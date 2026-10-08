@@ -87,6 +87,21 @@ export function validateInputs(inp: ModelInputs): string[] {
     if (t.mode === "fixed" && (t.fixedAnnualAmount === null || t.fixedAnnualAmount < 0)) {
       issues.push("Fixed annual amount must be a non-negative number in fixed mode.");
     }
+    if (t.mode === "manual") {
+      if (t.manualPrices === null) {
+        issues.push("Manual prices are required in manual mode.");
+      } else {
+        const gridCount = t.rows.length > 0 ? Math.max(...t.rows.map((r) => r.lifts.length)) : 0;
+        if (t.manualPrices.length !== gridCount) {
+          issues.push(`Manual prices count (${t.manualPrices.length}) must equal the grid column count (${gridCount}).`);
+        }
+        t.manualPrices.forEach((p, i) => {
+          if (!Number.isFinite(p) || p < 0) {
+            issues.push(`Manual price at column ${i + 1} must be a finite non-negative number.`);
+          }
+        });
+      }
+    }
   }
   if (inp.appraisal) {
     const a = inp.appraisal;
