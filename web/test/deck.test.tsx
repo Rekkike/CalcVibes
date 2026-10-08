@@ -61,11 +61,11 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   const result = computeModel(inputs);
   const deck = deckSlides(inputs, result);
 
-  it("slide 4 title and tile pins (the figure rows folded into the Task G tile grid)", () => {
+  it("slide 4 title and tile pins (the financing fold extends the grid to fifteen tiles)", () => {
     expect(deck.slides[4].title).toBe("Equity earns 20.01% on 3 139 944,00 kr outlaid");
     const tiles = deck.slides[4].tiles ?? [];
     const byLabel = (label: string) => tiles.find((t) => t.label === label);
-    expect(tiles.length).toBe(10);
+    expect(tiles.length).toBe(15);
     expect(byLabel("Total cost")?.value).toBe("7 849 860,00 kr");
     expect(byLabel("Net gain")?.value).toBe("5 458 795,75 kr");
     expect(byLabel("NPV at WACC")?.value).toBe("1 252 822,99 kr");

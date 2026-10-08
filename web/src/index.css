@@ -213,6 +213,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.app-root .header-controls {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
 /* Responsive: single-column usable layout on the iPhone of record */
 @media (max-width: 480px) {
   .app-root {
@@ -500,11 +507,6 @@
   color: #ffffff;
 }
 
-[data-testid="presentation"] .deck-sub {
-  font-size: 15px;
-  color: #9db4cc;
-}
-
 [data-testid="presentation"] .kicker {
   font-size: 13px;
   text-transform: uppercase;
@@ -595,6 +597,100 @@
   }
   [data-testid="presentation"] .deck-slide {
     animation: none;
+  }
+}
+
+/* ===== v0.5.5R Task R1: the summary infographic styled on the stage ===== */
+[data-testid="presentation"] .summary-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-testid="presentation"] .deck-tile {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid #1d3a5f;
+  border-radius: 12px;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+[data-testid="presentation"] .deck-tile .stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9db4cc;
+}
+
+[data-testid="presentation"] .deck-tile .stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+[data-testid="presentation"] .deck-tile.tone-ok .stat-value {
+  color: var(--ok);
+}
+
+[data-testid="presentation"] .deck-tile.tone-bad .stat-value {
+  color: var(--bad);
+}
+
+[data-testid="presentation"] .summary-charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-testid="presentation"] .summary-charts > div {
+  flex: 1 1 260px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+[data-testid="presentation"] [data-slide-chart],
+[data-testid="presentation"] .summary-charts svg {
+  width: 100%;
+  height: auto;
+  box-sizing: border-box;
+}
+
+[data-testid="presentation"] svg {
+  max-width: 100%;
+}
+
+/* ===== v0.5.5R Task R5: whole charts in print ===== */
+@media print {
+  [data-testid="presentation"] .deck-tile {
+    background: #ffffff;
+    border: 1px solid #e5e5ea;
+  }
+  [data-testid="presentation"] .deck-tile .stat-label {
+    color: #717273;
+  }
+  [data-testid="presentation"] .deck-tile .stat-value {
+    color: #343434;
+  }
+  [data-testid="presentation"] .deck-tile.tone-ok .stat-value {
+    color: #059669;
+  }
+  [data-testid="presentation"] .deck-tile.tone-bad .stat-value {
+    color: #e11d48;
+  }
+  [data-testid="presentation"] [data-testid="peak-label"] {
+    fill: #343434;
   }
 }
 

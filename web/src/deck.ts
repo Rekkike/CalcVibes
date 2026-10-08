@@ -22,6 +22,7 @@ export interface DeckTile {
   label: string;
   value: string;
   tone?: "ok" | "bad";
+  disclosure?: string;
 }
 
 export interface DeckSlide {
@@ -192,30 +193,15 @@ export function deckSlides(
 
   // Slide 4 — deal
   let dealTitle: string;
-  const dealBody: DeckFigure[] = [];
   const dealDisclosures: string[] = [];
   if (result.financing === null) {
     dealTitle = `The deal in one view — ${money(result.totalCost)} in, ${money(result.totalCollected)} back`;
-    dealBody.push({ label: "Invested (nominal)", value: money(result.totalCost), kind: "money", rawValue: result.totalCost });
-    dealBody.push({ label: "Collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
-    dealBody.push({ label: "Net gain (nominal)", value: money(result.netGain), kind: "money", rawValue: result.netGain });
-    dealBody.push({ label: "Payback (nominal)", value: result.paybackYears === null ? "—" : yearsTwoForDisplay(result.paybackYears), kind: "years", rawValue: result.paybackYears });
   } else {
     const eq = result.financing.equity;
-    const irrFigure: DeckFigure = eq.zeroOutlay
-      ? { label: "Equity IRR", value: "Not applicable (zero equity outlay)", kind: "text", rawValue: null }
-      : { label: "Equity IRR", value: eq.irr === null ? "—" : percentTwoForDisplay(eq.irr), kind: "percent", rawValue: eq.irr };
     if (eq.irrAmbiguous) {
       dealDisclosures.push(`The equity net flow has ${eq.signChanges} sign changes; the equity IRR may not be unique.`);
     }
     dealTitle = `Equity earns ${eq.zeroOutlay ? "nothing" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid`;
-    dealBody.push({ label: "Equity outlay", value: money(eq.outlay), kind: "money", rawValue: eq.outlay });
-    dealBody.push({ label: "Equity NPV at WACC (discounted)", value: money(eq.npvAtWacc), kind: "money", rawValue: eq.npvAtWacc, disclosure: "discounted at the WACC" });
-    dealBody.push(irrFigure);
-    dealBody.push({ label: "Drawn (nominal)", value: money(result.financing.drawnTotal), kind: "money", rawValue: result.financing.drawnTotal });
-    if (result.financing.minDscr !== null) {
-      dealBody.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), kind: "dscr", rawValue: result.financing.minDscr.value, disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}` });
-    }
   }
   let verdict: string | undefined;
   if (result.financing === null) {
@@ -240,6 +226,16 @@ export function deckSlides(
     { label: "MIRR", value: percentTwoForDisplay(result.mirr ?? 0) },
     { label: "Profitability index", value: dscrTwoForDisplay(result.profitabilityIndex ?? 0) },
   ];
+  if (result.financing !== null) {
+    const eq = result.financing.equity;
+    tiles.push({ label: "Equity outlay", value: money(eq.outlay) });
+    tiles.push({ label: "Equity IRR", value: eq.zeroOutlay ? "not applicable (zero equity outlay)" : (eq.irr === null ? "—" : percentTwoForDisplay(eq.irr)) });
+    tiles.push({ label: "Equity NPV at WACC (discounted)", value: money(eq.npvAtWacc) });
+    tiles.push({ label: "Drawn (nominal)", value: money(result.financing.drawnTotal) });
+    if (result.financing.minDscr !== null) {
+      tiles.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}` });
+    }
+  }
   const summaryCharts: DeckChartSlot[] = [
     { kind: "donut", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
     { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },

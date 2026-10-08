@@ -4,13 +4,16 @@ import { deckSlides } from "../deck.js";
 import { moneyForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
 import { CompositionDonut, RecoveryBars } from "../charts.js";
-import type { EntryUnit } from "../engine.js";
+import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit }) {
   const { inputs, result, onExit, startYear = null, entryUnit = "ones" } = props;
   const [slide, setSlide] = useState(0);
   const totalSlides = 5;
   const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit }) : null;
+  const currency = (inputs.currency as CurrencyCode) ?? "SEK";
+  const peakFor = (v: number) => moneyForDisplay(v, currency, entryUnit);
+  const donutCenter = result !== null ? moneyForDisplay(result.totalCost, currency, entryUnit) : undefined;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -22,7 +25,6 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
     return () => window.removeEventListener("keydown", handler);
   }, [onExit]);
 
-  
   return (
     <div data-testid="presentation" data-slide={slide}>
       <header>
@@ -48,14 +50,15 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                   <div key={"tile-" + j} data-tile={t.label} className={"stat-card deck-tile" + (t.tone !== undefined ? ` tone-${t.tone}` : "")}>
                     <span className="stat-label">{t.label}</span>
                     <span className="stat-value">{t.value}</span>
+                    {t.disclosure !== undefined && <span className="deck-disclosure">{t.disclosure}</span>}
                   </div>
                 ))}
               </div>
             )}
             {sl.summaryCharts !== undefined && result !== null && (
               <div data-testid="summary-charts" className="summary-charts">
-                <div data-summary-chart="donut"><CompositionDonut lineTotals={result.lineTotals} centerTotal={moneyForDisplay(result.totalCost, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK", entryUnit)} /></div>
-                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} /></div>
+                <div data-summary-chart="donut"><CompositionDonut lineTotals={result.lineTotals} stage centerTotal={donutCenter} kicker="Where the money goes" /></div>
+                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker="When the inflows arrive" /></div>
               </div>
             )}
             {sl.body.map((f, j) => (
@@ -79,12 +82,12 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             ))}
             {i === 1 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="investment">
-                <CompositionDonut lineTotals={result.lineTotals} centerTotal={moneyForDisplay(result.totalCost, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK", entryUnit)} />
+                <CompositionDonut lineTotals={result.lineTotals} stage centerTotal={donutCenter} kicker="Where the money goes" />
               </div>
             )}
             {i === 2 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="recovery">
-                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} />
+                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker="When the inflows arrive" />
               </div>
             )}
             

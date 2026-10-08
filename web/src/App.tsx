@@ -142,7 +142,7 @@ export function App() {
 
   return (
     <div className="app-root" data-theme={theme}>
-      <header>
+      <header className="app-header">
         <h1>{inputs.projectName || "Untitled project"}</h1>
         <nav>
           {(["overview", "costs", "operating", "repayment", "tariff", "financing", "appraisal", "results", "scenarios", "detail"] as View[]).map((v) => (
@@ -170,18 +170,20 @@ export function App() {
         <button data-action="print-deck" onClick={printDeck}>Print deck</button>
         <button data-action="download-pdf" onClick={downloadPdf} disabled={result === null}>Download PDF</button>
         {result === null && <span data-testid="export-disabled-reason" className="muted">XLSX and PDF export are disabled until the input issues are resolved.</span>}
-        <label>Theme{" "}
-          <select data-field="theme" value={theme} onChange={(e) => setTheme(e.target.value as "light" | "dark")}>
-            <option value="light">light</option>
-            <option value="dark">dark</option>
-          </select>
-        </label>
-        <span data-testid="version" className="muted">{VERSION}</span>
         <label>Entry unit{" "}
           <select data-field="entryUnit" value={entryUnit} onChange={(e) => setEntryUnit(e.target.value as EntryUnit)}>
             {ENTRY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </label>
+        <div data-testid="header-controls" className="header-controls">
+          <label>Theme{" "}
+            <select data-field="theme" value={theme} onChange={(e) => setTheme(e.target.value as "light" | "dark")}>
+              <option value="light">light</option>
+              <option value="dark">dark</option>
+            </select>
+          </label>
+          <span data-testid="version" className="muted">{VERSION}</span>
+        </div>
       </header>
       {(issues.length > 0 || engineIssues.length > 0) && (
         <section data-testid="issues-summary" className="issues">

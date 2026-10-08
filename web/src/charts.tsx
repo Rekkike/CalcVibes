@@ -68,20 +68,23 @@ export function donutLabels(lineTotals: LineTotal[]): DonutLabel[] {
   return lineTotals.map((l) => ({ name: l.name, sharePct: Math.round((l.total / total) * 100) }));
 }
 
-export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boolean; centerTotal?: string }) {
-  const { lineTotals, centerTotal } = props;
+export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boolean; centerTotal?: string; kicker?: string }) {
+  const { lineTotals, centerTotal, stage = false, kicker } = props;
   const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
   const labels = donutLabels(lineTotals);
   const R = 58, SW = 24, C = 80;
   const colors = ["#0074ba", "#34d399", "#fb7185", "#b45309", "#717273", "#103558"];
   let acc = 0;
   return (
-    <svg data-testid="composition-donut" viewBox="0 0 260 160" role="img" aria-label="Cost composition">
+    <svg data-testid="composition-donut" viewBox={`0 0 260 ${kicker !== undefined ? 180 : 160}`} role="img" aria-label="Cost composition">
+      {kicker !== undefined && (
+        <text data-testid="chart-kicker" x={12} y={kicker !== undefined ? 12 : 0} fontSize="10" fontWeight="700" letterSpacing="0.08em" fill={stage ? "#cce9ff" : "#103558"}>{kicker.toUpperCase()}</text>
+      )}
       {centerTotal !== undefined && (
-        <text data-testid="donut-center-total" x={C} y={C + 4} fontSize="13" fontWeight="700" textAnchor="middle" fill="#343434">{centerTotal}</text>
+        <text data-testid="donut-center-total" x={C} y={C + 4} fontSize="13" fontWeight="700" textAnchor="middle" fill={stage ? "#e2e8f0" : "#343434"}>{centerTotal}</text>
       )}
       {labels.map((lb, i) => (
-        <text key={"lbl-" + i} data-testid="donut-segment-label" x={C + 90} y={20 + i * 14} fontSize="9" fill="#717273">{lb.name} {lb.sharePct}%</text>
+        <text key={"lbl-" + i} data-testid="donut-segment-label" x={C + 90} y={34 + i * 14} fontSize="9" fill={stage ? "#e2e8f0" : "#717273"}>{lb.name} {lb.sharePct}%</text>
       ))}
       {lineTotals.map((l, i) => {
         const frac = l.total / total;
@@ -104,8 +107,8 @@ export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boole
   );
 }
 
-export function RecoveryBars(props: { collectionsGrid: GridRow[]; years: number; labelFor: (year: number) => string }) {
-  const { collectionsGrid, years, labelFor } = props;
+export function RecoveryBars(props: { collectionsGrid: GridRow[]; years: number; labelFor: (year: number) => string; peakFor?: (value: number) => string; kicker?: string }) {
+  const { collectionsGrid, years, labelFor, peakFor, kicker } = props;
   const inflows = new Array<number>(years).fill(0);
   for (const row of collectionsGrid) {
     for (let k = 0; k < Math.min(years, row.amounts.length); k++) inflows[k] += row.amounts[k];
@@ -117,7 +120,10 @@ export function RecoveryBars(props: { collectionsGrid: GridRow[]; years: number;
   const barW = Math.min(28, groupW / 2);
   const yFor = (v: number) => H - padB - (v / max) * (H - padB - 20);
   return (
-    <svg data-testid="recovery-bars" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Yearly collections">
+    <svg data-testid="recovery-bars" viewBox={`0 0 ${W} ${H + (kicker !== undefined ? 18 : 0)}`} role="img" aria-label="Yearly collections">
+      {kicker !== undefined && (
+        <text data-testid="chart-kicker" x={padL} y={12} fontSize="11" fontWeight="700" letterSpacing="0.08em" fill="#cce9ff">{kicker.toUpperCase()}</text>
+      )}
       {[0, 0.5, 1].map((f) => (
         <line key={f} x1={padL} x2={W - 8} y1={yFor(max * f)} y2={yFor(max * f)} stroke={STAGE_CHART_COLORS.gridline} />
       ))}
@@ -128,9 +134,9 @@ export function RecoveryBars(props: { collectionsGrid: GridRow[]; years: number;
           <g key={k}>
             <rect data-chart-bar="collection" x={padL + k * groupW + groupW / 2 - barW / 2} y={yFor(v)} width={barW} height={yFor(0) - yFor(v)} fill={CHART_COLORS.inflowBar} rx={3} />
             {k === peakIdx && v > 0 && (
-              <text data-testid="peak-label" x={padL + k * groupW + groupW / 2} y={yFor(v) - 6} fontSize="10" textAnchor="middle" fill="#e2e8f0">{v >= 1000 ? (v / 1000).toFixed(0) + "k" : String(v)}</text>
+              <text data-testid="peak-label" x={padL + k * groupW + groupW / 2} y={yFor(v) - 6} fontSize="10" textAnchor="middle" fill="#e2e8f0">{peakFor !== undefined ? peakFor(v) : (v >= 1000 ? (v / 1000).toFixed(0) + "k" : String(v))}</text>
             )}
-            <text x={padL + k * groupW + groupW / 2} y={H - 14} fontSize="10" textAnchor="middle" fill={STAGE_CHART_COLORS.axisText}>{labelFor(k + 1)}</text>
+            <text data-testid="bar-year-label" x={padL + k * groupW + groupW / 2} y={H - 14} fontSize="10" textAnchor="middle" fill={STAGE_CHART_COLORS.axisText}>{labelFor(k + 1)}</text>
           </g>
         ));
       })()}
