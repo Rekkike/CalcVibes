@@ -30,10 +30,12 @@ export function validateInputs(inp: ModelInputs): string[] {
         }
       }
     }
-    if (!(c.amount > 0)) {
+    const capexOverrideSuspension =
+      c.category === "capex" && c.yearOverrides !== undefined && Object.keys(c.yearOverrides).length > 0;
+    if (!(c.amount > 0) && !capexOverrideSuspension) {
       issues.push(`Cost line ${c.id} (${c.name}) has a non-positive amount.`);
     }
-    if (!Number.isInteger(c.startYear) || c.startYear < 1) {
+    if ((!Number.isInteger(c.startYear) || c.startYear < 1) && !capexOverrideSuspension) {
       issues.push(`Cost line ${c.id} (${c.name}) has a start year that is not an integer of at least 1.`);
     }
     if (c.category === "recurring" && c.durationYears < 1) {

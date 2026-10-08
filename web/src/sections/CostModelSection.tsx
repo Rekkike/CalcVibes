@@ -1,6 +1,7 @@
 import type { CostLine, ModelInputs } from "../../../core/src/types.js";
 import { CURRENCIES, spreadFill } from "../state.js";
 import { CompositionDonut } from "../charts.js";
+import { moneyForDisplay } from "../engine.js";
 
 
 export function CostModelSection(props: {
@@ -121,7 +122,7 @@ export function CostModelSection(props: {
       <button data-action="add-cost" onClick={addCost}>Add cost line</button>
       {result !== null && (
         <div className="scroll" data-testid="composition-donut-wrap">
-          <CompositionDonut lineTotals={result.lineTotals} />
+          <CompositionDonut lineTotals={result.lineTotals} centerTotal={moneyForDisplay(result.totalCost, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK")} />
         </div>
       )}
     </section>

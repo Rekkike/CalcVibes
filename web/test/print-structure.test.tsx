@@ -31,20 +31,15 @@ describe("Task B: full-deck print rendering", () => {
   });
 });
 
-describe("Task E: composition bar, one accent", () => {
-  it("no second color literal in the bar markup; the fill derives from the accent token", () => {
+describe("Task E: composition, one figure (re-anchored to the donut per v0.5.5 Task B)", () => {
+  it("the deck investment slide carries exactly one composition figure: the labeled donut", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const bar = document.querySelector('[data-testid="composition-bar"]') as SVGElement;
-    expect(bar).toBeTruthy();
-    const segments = bar.querySelectorAll(".composition-bar-segment");
-    expect(segments.length).toBe(3);
-    for (const seg of segments) {
-      expect((seg as SVGRectElement).getAttribute("fill")).toBe("var(--accent)");
-    }
-    expect(bar.innerHTML).not.toContain("#10b981");
-    expect(bar.innerHTML).not.toContain("#6366f1");
+    expect(document.querySelector('[data-testid="composition-bar"]')).toBeNull();
+    const donut = document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]');
+    expect(donut).toBeTruthy();
+    expect((donut as SVGElement).querySelectorAll("[data-donut-segment]").length).toBe(3);
   });
 });

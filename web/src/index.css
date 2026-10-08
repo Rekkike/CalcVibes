@@ -1,23 +1,10 @@
 
 
-:root {
-  --font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-  --accent: #6366f1;
-  --ink: #111827;
-  --muted: #6b7280;
-  --surface: #ffffff;
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2.5rem;
-  --content-width: 56rem;
-}
 
 [data-testid="presentation"] {
   font-family: var(--font);
   color: var(--ink);
-  background: var(--surface);
+  background: var(--card);
 }
 
 [data-testid="presentation"] .deck-slide {
@@ -27,7 +14,7 @@
 }
 
 [data-testid="presentation"] .deck-slide-header {
-  color: var(--muted);
+  color: var(--mut);
   font-size: 0.85rem;
 }
 
@@ -60,17 +47,17 @@
 }
 
 [data-testid="presentation"] .deck-disclosure {
-  color: var(--muted);
+  color: var(--mut);
   font-size: 0.85em;
 }
 
 [data-testid="presentation"] .warning {
-  color: var(--muted);
+  color: var(--mut);
   font-size: 0.9em;
 }
 
 [data-testid="presentation"] .deck-slide-footer {
-  color: var(--muted);
+  color: var(--mut);
   font-size: 0.8rem;
   display: flex;
   justify-content: space-between;
@@ -78,7 +65,7 @@
 }
 
 [data-testid="presentation"] .muted {
-  color: var(--muted);
+  color: var(--mut);
 }
 
 .deck-slide[data-slide-active="false"] { display: none; }
@@ -96,7 +83,7 @@
 .app-root {
   font-family: var(--font);
   color: var(--ink);
-  background: var(--surface);
+  background: var(--card);
   max-width: var(--content-width);
   margin: 0 auto;
   padding: var(--space-4) var(--space-3);
@@ -125,8 +112,8 @@
 .app-root button {
   font-family: var(--font);
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--muted);
-  background: var(--surface);
+  border: 1px solid var(--mut);
+  background: var(--card);
   color: var(--ink);
   cursor: pointer;
 }
@@ -154,7 +141,7 @@
 .app-root select {
   font-family: var(--font);
   padding: var(--space-1);
-  border: 1px solid var(--muted);
+  border: 1px solid var(--mut);
   font-variant-numeric: tabular-nums;
 }
 
@@ -170,7 +157,7 @@
 .app-root section h3,
 .app-root section h4 {
   font-family: var(--font);
-  color: var(--muted);
+  color: var(--mut);
 }
 
 /* Section tables: right-aligned values with tabular numerals */
@@ -182,7 +169,7 @@
 
 .app-root table th {
   text-align: left;
-  color: var(--muted);
+  color: var(--mut);
   font-weight: 600;
   padding: var(--space-1);
 }
@@ -205,7 +192,7 @@
 }
 
 .app-root .issues {
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
   padding: var(--space-2) var(--space-3);
   margin: var(--space-3) 0;
 }
@@ -217,7 +204,7 @@
 }
 
 .app-root dt {
-  color: var(--muted);
+  color: var(--mut);
 }
 
 .app-root dd {
@@ -266,6 +253,13 @@
   --ok: #059669;
   --bad: #e11d48;
   --warn: #b45309;
+  --font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+  --content-width: 56rem;
 }
 
 .app-root {
@@ -522,11 +516,11 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.2em;
-  color: #5b7ba0;
+  color: #e2e8f0;
 }
 
 [data-testid="presentation"] .deck-slide-footer {
-  color: #5b7ba0;
+  color: #e2e8f0;
   font-size: 0.8rem;
 }
 
@@ -552,7 +546,7 @@
 }
 
 [data-testid="presentation"] .deck-disclosure {
-  color: #94a3b8;
+  color: #e2e8f0;
   font-size: 0.85em;
 }
 
@@ -614,4 +608,51 @@
 .app-root .caveat {
   color: var(--mut);
   font-size: 0.85em;
+}
+
+
+/* v0.5.5 Task E: the dark app theme (data-theme attribute override) */
+.app-root[data-theme="dark"] {
+  --bg: #081c33;
+  --card: #0f2947;
+  --tint: #14304f;
+  --line: #1d3a5f;
+  --ink: #e2e8f0;
+  --mut: #9db4cc;
+  --navy: #cce9ff;
+  --ok: #34d399;
+  --bad: #fb7185;
+  --warn: #fbbf24;
+}
+
+
+/* v0.5.5 Task C: print renders the designed light theme */
+@media print {
+  [data-testid="presentation"] .deck-figure {
+    background: #ffffff;
+    border: 1px solid #e5e5ea;
+    border-radius: 12px;
+    color: #343434;
+  }
+  [data-testid="presentation"] .deck-figure .deck-figure-value {
+    color: #343434;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-testid="presentation"] .deck-slide-header {
+    background: #103558;
+    color: #ffffff;
+    padding: 6px 10px;
+    border-radius: 8px 8px 0 0;
+  }
+  [data-testid="presentation"] .deck-slide-header,
+  [data-testid="presentation"] .deck-slide-footer {
+    color: #343434;
+  }
+  [data-testid="presentation"] .deck-disclosure {
+    color: #717273;
+  }
+  [data-testid="presentation"] .deck-slide-footer {
+    color: #717273;
+    border-top: 1px solid #e5e5ea;
+  }
 }

@@ -28,6 +28,12 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     if (footerPage > 0) doc.addPage();
     footerPage += 1;
     const slideFirstPage = footerPage;
+    doc.setFillColor(16, 53, 88);
+    doc.rect(0, 0, 297, 14, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.text(projectName.toUpperCase(), 14, 9.5);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(24);
     if (trace) trace.drawnTitles.push(slide.title);
     doc.text(slide.title, 20, 30, { maxWidth: 257 });
@@ -42,11 +48,32 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         footerPage += 1;
         y = CONTENT_TOP;
       }
+      doc.setDrawColor(229, 229, 234);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(18, y - 5, 221, needed + 3, 2, 2, "FD");
       doc.text(lines, 20, y);
       if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(fig.value);
       y += needed;
     }
     doc.setFontSize(9);
+    if (slide.insights !== undefined) {
+      for (const d of slide.insights) {
+        const lines = doc.splitTextToSize(`Insight: ${d}`, 220);
+        const needed = DISCLOSURE_LINE_HEIGHT * lines.length;
+        if (y + needed > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+        doc.text(lines, 20, y);
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d);
+        y += needed;
+      }
+    }
+    if (slide.verdict !== undefined) {
+      const lines = doc.splitTextToSize(`Verdict: ${slide.verdict}`, 220);
+      const needed = DISCLOSURE_LINE_HEIGHT * lines.length;
+      if (y + needed > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+      doc.text(lines, 20, y);
+      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.verdict);
+      y += needed;
+    }
     for (const d of slide.disclosures) {
       const lines = doc.splitTextToSize(d, 220);
       const needed = DISCLOSURE_LINE_HEIGHT * lines.length;
@@ -90,7 +117,9 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       y += 50;
     }
     doc.setFontSize(10);
-    doc.text(`${projectName} — page ${slideFirstPage} of ${total} slides`, 20, 195);
+    doc.setDrawColor(229, 229, 234);
+    doc.line(14, 190, 283, 190);
+    doc.text(`${projectName} — slide ${slideFirstPage} of ${total} slides — Generated from the live model`, 14, 195);
   });
   return doc;
 }

@@ -18,16 +18,36 @@ export interface DeckChartSlot {
   data: { label: string; value: number }[];
 }
 
+export interface DeckTile {
+  label: string;
+  value: string;
+  tone?: "ok" | "bad";
+}
+
 export interface DeckSlide {
   name: string;
   title: string;
   body: DeckFigure[];
   disclosures: string[];
   chart?: DeckChartSlot;
+  insights?: string[];
+  verdict?: string;
+  tiles?: DeckTile[];
+  summaryCharts?: DeckChartSlot[];
 }
+
+export const TERM_GLOSSES: { term: string; gloss: string }[] = [
+  { term: "NPV", gloss: "Net present value: the value of all cash flows in today's money." },
+  { term: "IRR", gloss: "Internal rate of return: the yearly return the project earns on invested money." },
+  { term: "WACC", gloss: "Weighted average cost of capital: the minimum return investors require." },
+  { term: "MIRR", gloss: "Modified internal rate of return: IRR adjusted for reinvestment of interim cash." },
+  { term: "Payback", gloss: "Payback: how long until cumulative inflows cover the invested cost." },
+  { term: "Profitability index", gloss: "Profitability index: the value created per unit of cost, at the benchmark rate." },
+];
 
 export interface DeckModel {
   slides: DeckSlide[];
+  glosses?: { term: string; gloss: string }[];
 }
 
 export function deckSlides(
@@ -132,12 +152,22 @@ export function deckSlides(
   for (const row of result.collectionsGrid) {
     for (let k = 0; k < Math.min(yearsCount, row.amounts.length); k++) inflowByYear[k] += row.amounts[k];
   }
+  const insights: string[] = [];
+  if (result.paybackYears !== null) {
+    insights.push(`You start turning a profit in ${yearHeader(Math.ceil(result.paybackYears), startYear)} (nominal payback ${yearsTwoForDisplay(result.paybackYears)}).`);
+  } else {
+    insights.push("The project does not turn a profit within the modeled horizon.");
+  }
+  if (result.discountedPaybackYears !== null) {
+    insights.push(`On a discounted basis, break-even arrives in ${yearHeader(Math.ceil(result.discountedPaybackYears), startYear)} (${yearsTwoForDisplay(result.discountedPaybackYears)}).`);
+  }
   slides.push({
     name: "recovery",
     title: recoveryTitle,
     body: recoveryBody,
     disclosures: leveraged ? ["Collections solved so the equity earns the target (leveraged solve)"] : [],
     chart: { kind: "bars", data: inflowByYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })) },
+    insights,
   });
 
   // Slide 3 — returns
@@ -187,9 +217,36 @@ export function deckSlides(
       dealBody.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), kind: "dscr", rawValue: result.financing.minDscr.value, disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}` });
     }
   }
-  slides.push({ name: "deal", title: dealTitle, body: dealBody, disclosures: dealDisclosures });
+  let verdict: string | undefined;
+  if (result.financing === null) {
+    verdict = result.goalMet
+      ? `This is a good deal: it earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the target, and the net gain is ${money(result.netGain)}.`
+      : `This deal falls short: it earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the target, and the net gain is ${money(result.netGain)}.`;
+  } else {
+    const eq = result.financing.equity;
+    verdict = result.goalMet
+      ? `This is a good deal: the equity earns ${eq.zeroOutlay ? "nothing" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid, and the project meets its target.`
+      : `This deal falls short: the project earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the target, and the equity does not recover its outlay.`;
+  }
+  const tiles: DeckTile[] = [
+    { label: "Total cost", value: money(result.totalCost) },
+    { label: "Total collected", value: money(result.totalCollected) },
+    { label: "Net gain", value: money(result.netGain) },
+    { label: "Achieved IRR", value: `${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad" },
+    { label: "NPV at WACC", value: money(result.npvAtWacc) },
+    { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : yearsTwoForDisplay(result.paybackYears) },
+    { label: "Payback (discounted)", value: result.discountedPaybackYears === null ? "—" : yearsTwoForDisplay(result.discountedPaybackYears) },
+    { label: "Break-even year", value: result.paybackYears === null ? "not within the horizon" : yearHeader(Math.ceil(result.paybackYears), startYear) },
+    { label: "MIRR", value: percentTwoForDisplay(result.mirr ?? 0) },
+    { label: "Profitability index", value: dscrTwoForDisplay(result.profitabilityIndex ?? 0) },
+  ];
+  const summaryCharts: DeckChartSlot[] = [
+    { kind: "donut", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
+    { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },
+  ];
+  slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts });
 
-  return { slides };
+  return { slides, glosses: TERM_GLOSSES };
 }
 
 export type { TariffRow };

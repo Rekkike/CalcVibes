@@ -58,14 +58,31 @@ export function YearlyChart(props: { yearly: YearlyRow[]; labelFor: (year: numbe
   );
 }
 
-export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boolean }) {
-  const { lineTotals } = props;
+export interface DonutLabel {
+  name: string;
+  sharePct: number;
+}
+
+export function donutLabels(lineTotals: LineTotal[]): DonutLabel[] {
   const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
+  return lineTotals.map((l) => ({ name: l.name, sharePct: Math.round((l.total / total) * 100) }));
+}
+
+export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boolean; centerTotal?: string }) {
+  const { lineTotals, centerTotal } = props;
+  const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
+  const labels = donutLabels(lineTotals);
   const R = 58, SW = 24, C = 80;
   const colors = ["#0074ba", "#34d399", "#fb7185", "#b45309", "#717273", "#103558"];
   let acc = 0;
   return (
-    <svg data-testid="composition-donut" viewBox="0 0 160 160" role="img" aria-label="Cost composition">
+    <svg data-testid="composition-donut" viewBox="0 0 260 160" role="img" aria-label="Cost composition">
+      {centerTotal !== undefined && (
+        <text data-testid="donut-center-total" x={C} y={C + 4} fontSize="13" fontWeight="700" textAnchor="middle" fill="#343434">{centerTotal}</text>
+      )}
+      {labels.map((lb, i) => (
+        <text key={"lbl-" + i} data-testid="donut-segment-label" x={C + 90} y={20 + i * 14} fontSize="9" fill="#717273">{lb.name} {lb.sharePct}%</text>
+      ))}
       {lineTotals.map((l, i) => {
         const frac = l.total / total;
         const start = acc;
@@ -105,12 +122,18 @@ export function RecoveryBars(props: { collectionsGrid: GridRow[]; years: number;
         <line key={f} x1={padL} x2={W - 8} y1={yFor(max * f)} y2={yFor(max * f)} stroke={STAGE_CHART_COLORS.gridline} />
       ))}
       <line x1={padL} x2={W - 8} y1={yFor(0)} y2={yFor(0)} stroke={STAGE_CHART_COLORS.zeroLine} />
-      {inflows.map((v, k) => (
-        <g key={k}>
-          <rect data-chart-bar="collection" x={padL + k * groupW + groupW / 2 - barW / 2} y={yFor(v)} width={barW} height={yFor(0) - yFor(v)} fill={CHART_COLORS.inflowBar} rx={3} />
-          <text x={padL + k * groupW + groupW / 2} y={H - 14} fontSize="10" textAnchor="middle" fill={STAGE_CHART_COLORS.axisText}>{labelFor(k + 1)}</text>
-        </g>
-      ))}
+      {(() => {
+        const peakIdx = inflows.indexOf(Math.max(...inflows));
+        return inflows.map((v, k) => (
+          <g key={k}>
+            <rect data-chart-bar="collection" x={padL + k * groupW + groupW / 2 - barW / 2} y={yFor(v)} width={barW} height={yFor(0) - yFor(v)} fill={CHART_COLORS.inflowBar} rx={3} />
+            {k === peakIdx && v > 0 && (
+              <text data-testid="peak-label" x={padL + k * groupW + groupW / 2} y={yFor(v) - 6} fontSize="10" textAnchor="middle" fill="#e2e8f0">{v >= 1000 ? (v / 1000).toFixed(0) + "k" : String(v)}</text>
+            )}
+            <text x={padL + k * groupW + groupW / 2} y={H - 14} fontSize="10" textAnchor="middle" fill={STAGE_CHART_COLORS.axisText}>{labelFor(k + 1)}</text>
+          </g>
+        ));
+      })()}
     </svg>
   );
 }

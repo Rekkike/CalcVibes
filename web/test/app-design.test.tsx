@@ -10,9 +10,9 @@ describe("Task A: application-wide design system (structural pins)", () => {
   it("app-chrome token usage: the app shell consumes the tokens (a token flip goes red)", () => {
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\.app-root\s*\{\s*[^}]*font-family:\s*var\(--font\)/);
-    expect(css).toMatch(/\.app-root\s*\{\s*[^}]*background:\s*var\(--surface\)/);
+    expect(css).toMatch(/\.app-root\s*\{\s*[^}]*background:\s*var\(--bg\)/);
     expect(css).toMatch(/\.app-root button\.active\s*\{[^}]*var\(--accent\)/);
-    expect(css).toMatch(/--accent:\s*#6366f1/);
+    expect(css).toMatch(/--accent:\s*#0074ba/);
     render(<App />);
     expect(document.querySelector(".app-root")).toBeTruthy();
   });

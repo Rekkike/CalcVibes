@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
+import { moneyForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
 import { CompositionDonut, RecoveryBars } from "../charts.js";
 import type { EntryUnit } from "../engine.js";
@@ -41,6 +42,22 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
           <section key={sl.name} data-slide-name={sl.name} data-slide-index={i} data-slide-active={slide === i ? "true" : "false"} className="deck-slide deck-slide-print">
             <header className="deck-slide-header">{inputs.projectName || "Untitled project"}</header>
             {i === 0 ? <h1>{sl.title}</h1> : <h2>{sl.title}</h2>}
+            {sl.tiles !== undefined && (
+              <div data-testid="summary-tiles" className="summary-tiles">
+                {sl.tiles.map((t, j) => (
+                  <div key={"tile-" + j} data-tile={t.label} className={"stat-card deck-tile" + (t.tone !== undefined ? ` tone-${t.tone}` : "")}>
+                    <span className="stat-label">{t.label}</span>
+                    <span className="stat-value">{t.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sl.summaryCharts !== undefined && result !== null && (
+              <div data-testid="summary-charts" className="summary-charts">
+                <div data-summary-chart="donut"><CompositionDonut lineTotals={result.lineTotals} centerTotal={moneyForDisplay(result.totalCost, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK", entryUnit)} /></div>
+                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} /></div>
+              </div>
+            )}
             {sl.body.map((f, j) => (
               <p key={j} className="deck-figure">
                 <span className="deck-figure-label">{f.label}</span>
@@ -48,12 +65,21 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 {f.disclosure !== undefined && <span className="deck-disclosure">{f.disclosure}</span>}
               </p>
             ))}
+            {sl.insights !== undefined && sl.insights.map((d, j) => (
+              <p key={"ins-" + j} data-testid="deck-insight" className="deck-disclosure insight">{d}</p>
+            ))}
+            {sl.verdict !== undefined && (
+              <p data-testid="deck-verdict" className="deck-disclosure insight">{sl.verdict}</p>
+            )}
             {sl.disclosures.map((d, j) => (
               <p key={j} className="warning deck-disclosure">{d}</p>
             ))}
+            {i === 4 && deck?.glosses !== undefined && deck.glosses.map((g, j) => (
+              <p key={"gl-" + j} data-testid="term-gloss" className="deck-disclosure"><strong>{g.term}</strong>: {g.gloss}</p>
+            ))}
             {i === 1 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="investment">
-                <CompositionDonut lineTotals={result.lineTotals} />
+                <CompositionDonut lineTotals={result.lineTotals} centerTotal={moneyForDisplay(result.totalCost, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK", entryUnit)} />
               </div>
             )}
             {i === 2 && result !== null && (
@@ -61,22 +87,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} />
               </div>
             )}
-            {i === 1 && result !== null && (
-              <svg data-testid="composition-bar" width="600" height="120" role="img" aria-label="Cost composition">
-                {(() => {
-                  const total = result.lineTotals.reduce((a, l) => a + l.total, 0);
-                  let x = 0;
-                  return result.lineTotals.map((l, k) => {
-                    const w = (l.total / total) * 600;
-                    const rect = <rect key={k} x={x} y={40} width={w} height={40} className="composition-bar-segment" fill="var(--accent)" fillOpacity={1 - k * (0.6 / Math.max(1, result.lineTotals.length - 1))} />;
-                    const label = <text key={k + "t"} x={x + 4} y={100} fontSize="12">{l.name}</text>;
-                    x += w;
-                    return [rect, label];
-                  });
-                })()}
-                <line x1="0" y1="80" x2="600" y2="80" stroke="var(--ink)" />
-              </svg>
-            )}
+            
             <footer className="deck-slide-footer">
               <span>slide {i + 1} of {deck.slides.length}</span>
               <span>Generated from the live model — {inputs.projectName || "Untitled project"}</span>

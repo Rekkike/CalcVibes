@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { computeModel, solveTerm, CURRENCIES_ENUM, ENTRY_UNITS } from "./engine.js";
+import { computeModel, solveTerm, CURRENCIES_ENUM, ENTRY_UNITS, VERSION } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
@@ -28,6 +28,7 @@ export function App() {
   const [modePayment, setModePayment] = useState(400000);
   const [startYear, setStartYear] = useState<number | null>(null);
   const [entryUnit, setEntryUnit] = useState<EntryUnit>("thousands");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [startYearError, setStartYearError] = useState<string | null>(null);
   const [scenarioTargets, setScenarioTargets] = useState<number[] | null>(null);
   const [scenarioTerms, setScenarioTerms] = useState<number[] | null>(null);
@@ -140,7 +141,7 @@ export function App() {
   }
 
   return (
-    <div className="app-root">
+    <div className="app-root" data-theme={theme}>
       <header>
         <h1>{inputs.projectName || "Untitled project"}</h1>
         <nav>
@@ -169,6 +170,13 @@ export function App() {
         <button data-action="print-deck" onClick={printDeck}>Print deck</button>
         <button data-action="download-pdf" onClick={downloadPdf} disabled={result === null}>Download PDF</button>
         {result === null && <span data-testid="export-disabled-reason" className="muted">XLSX and PDF export are disabled until the input issues are resolved.</span>}
+        <label>Theme{" "}
+          <select data-field="theme" value={theme} onChange={(e) => setTheme(e.target.value as "light" | "dark")}>
+            <option value="light">light</option>
+            <option value="dark">dark</option>
+          </select>
+        </label>
+        <span data-testid="version" className="muted">{VERSION}</span>
         <label>Entry unit{" "}
           <select data-field="entryUnit" value={entryUnit} onChange={(e) => setEntryUnit(e.target.value as EntryUnit)}>
             {ENTRY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}

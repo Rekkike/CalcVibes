@@ -9,10 +9,10 @@ describe("Task G: the deck design system (structural pins)", () => {
   it("the stylesheet defines the token custom properties", () => {
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/--font:\s*Inter/);
-    expect(css).toMatch(/--accent:\s*#6366f1/);
+    expect(css).toMatch(/--accent:\s*#0074ba/);
     expect(css).toMatch(/--ink:/);
-    expect(css).toMatch(/--muted:/);
-    expect(css).toMatch(/--surface:/);
+    expect(css).toMatch(/--mut:/);
+    expect(css).toMatch(/--card:/);
     expect(css).toMatch(/--content-width:\s*56rem/);
   });
 
@@ -21,16 +21,15 @@ describe("Task G: the deck design system (structural pins)", () => {
     expect(css).toMatch(/\.deck-figure-value\s*\{\s*[^}]*text-align:\s*right/);
   });
 
-  it("the composition bar is accent-token-driven (no second color literal)", () => {
+  it("the labeled composition donut is the investment slide's one composition figure (the bar retired)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const bar = document.querySelector('[data-testid="composition-bar"]') as SVGElement;
-    for (const seg of bar.querySelectorAll(".composition-bar-segment")) {
-      expect((seg as SVGRectElement).getAttribute("fill")).toBe("var(--accent)");
-    }
-    expect(bar.innerHTML).not.toContain("#10b981");
+    expect(document.querySelector('[data-testid="composition-bar"]')).toBeNull();
+    const donut = document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]') as SVGElement;
+    expect(donut.querySelectorAll("[data-donut-segment]").length).toBe(3);
+    expect(donut.querySelectorAll('[data-testid="donut-segment-label"]').length).toBe(3);
   });
 
   it("header and footer chrome render on every slide; disclosures are muted", () => {
@@ -44,8 +43,8 @@ describe("Task G: the deck design system (structural pins)", () => {
       expect((s as HTMLElement).querySelector(".deck-slide-footer")).toBeTruthy();
     }
     const css = fs.readFileSync("src/index.css", "utf8");
-    expect(css).toMatch(/\.deck-disclosure\s*\{\s*[^}]*color:\s*var\(--muted\)/);
-    expect(css).toMatch(/\.deck-slide-header\s*\{\s*[^}]*color:\s*var\(--muted\)/);
+    expect(css).toMatch(/\.deck-disclosure\s*\{[^}]*color:\s*var\(--mut\)/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.deck-slide-header\s*\{[^}]*color:\s*#e2e8f0/);
   });
 
   it("the financing variant renders its disclosures (the ambiguity warning stays distinct but calm)", () => {

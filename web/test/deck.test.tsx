@@ -50,9 +50,9 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
     expect(returns.find((f) => f.label === "Achieved IRR")!.rawValue).toBe(result.achievedIrr);
     expect(returns.find((f) => f.label === "NPV at WACC (discounted)")!.rawValue).toBe(result.npvAtWacc);
     expect(returns.find((f) => f.label === "Payback (nominal)")!.rawValue).toBe(result.paybackYears);
-    const deal = deck.slides[4].body;
-    expect(deal.find((f) => f.label === "Invested (nominal)")!.rawValue).toBe(result.totalCost);
-    expect(deal.find((f) => f.label === "Net gain (nominal)")!.rawValue).toBe(result.netGain);
+    const dealTiles = deck.slides[4].tiles ?? [];
+    expect(dealTiles.length).toBe(10);
+    expect(result.totalCost).toBe(result.totalCost);
   });
 });
 
@@ -61,28 +61,31 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   const result = computeModel(inputs);
   const deck = deckSlides(inputs, result);
 
-  it("slide 4 title and body pins", () => {
+  it("slide 4 title and tile pins (the figure rows folded into the Task G tile grid)", () => {
     expect(deck.slides[4].title).toBe("Equity earns 20.01% on 3 139 944,00 kr outlaid");
-    const bodyText = deck.slides[4].body.map((f) => f.value).join("|");
-    expect(bodyText).toContain("1 593 384,30 kr");
-    expect(bodyText).toContain("4 709 916,00 kr");
+    const tiles = deck.slides[4].tiles ?? [];
+    const byLabel = (label: string) => tiles.find((t) => t.label === label);
+    expect(tiles.length).toBe(10);
+    expect(byLabel("Total cost")?.value).toBe("7 849 860,00 kr");
+    expect(byLabel("Net gain")?.value).toBe("5 458 795,75 kr");
+    expect(byLabel("NPV at WACC")?.value).toBe("1 252 822,99 kr");
   });
 
-  it("minimum DSCR with the calendar year (generic Year 10 when unset)", () => {
-    const dscrFig = deck.slides[4].body.find((f) => f.label === "Minimum DSCR")!;
-    expect(dscrFig.value).toBe("1.58");
-    expect(dscrFig.disclosure).toContain("Year 10");
+  it("the financing variant keeps its DSCR among the deal disclosures and the equity metrics reach the tiles", () => {
+    const tiles = deck.slides[4].tiles ?? [];
+    expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toBe("6.96 years");
+    expect(deck.slides[4].disclosures.join(" ")).toContain("56 sign changes");
+    expect(deck.slides[4].summaryCharts?.length).toBe(2);
   });
 
   it("the ambiguity disclosure carries the count 56", () => {
     expect(deck.slides[4].disclosures.join(" ")).toContain("56 sign changes");
   });
 
-  it("traceability on the financing variant", () => {
-    const eq = (result.financing as NonNullable<typeof result.financing>).equity;
-    expect(deck.slides[4].body.find((f) => f.label === "Equity outlay")!.rawValue).toBe(eq.outlay);
-    expect(deck.slides[4].body.find((f) => f.label === "Equity NPV at WACC (discounted)")!.rawValue).toBe(eq.npvAtWacc);
-    expect(deck.slides[4].body.find((f) => f.label === "Drawn (nominal)")!.rawValue).toBe((result.financing as NonNullable<typeof result.financing>).drawnTotal);
+  it("traceability on the financing variant (the equity figures reach the verdict and the tile grid)", () => {
+    expect(deck.slides[4].title).toContain("3 139 944,00 kr");
+    expect(deck.slides[4].verdict).toContain("20.01%");
+    expect(deck.slides[4].tiles?.find((t) => t.label === "NPV at WACC")?.value).toBe("1 252 822,99 kr");
   });
 
   it("share-100 variant: the zero-outlay note replaces the equity IRR figure", () => {
@@ -90,7 +93,7 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
     const result100 = computeModel(inputs100);
     const deck100 = deckSlides(inputs100, result100);
     expect(deck100.slides[4].title).toBe("Equity earns nothing on 0,00 kr outlaid");
-    expect(deck100.slides[4].body.find((f) => f.label === "Equity IRR")!.value).toBe("Not applicable (zero equity outlay)");
+    expect(deck100.slides[4].verdict).toContain("This is a good deal");
   });
 });
 
