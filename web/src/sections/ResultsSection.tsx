@@ -2,7 +2,7 @@ import type { ModelResult } from "../../../core/src/types.js";
 import { percentForDisplay, roundForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
 import { CostInflowColumns, CumulativeLine } from "../charts.js";
-import { moneyForDisplay } from "../engine.js";
+import { deckMoneyForDisplay } from "../engine.js";
 
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null }) {
   const { result, targetIrr, currency, startYear = null } = props;
@@ -20,8 +20,8 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         )}
       </p>
       <h3>Yearly schedule</h3>
-      <CostInflowColumns yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => moneyForDisplay(v, currency as Parameters<typeof moneyForDisplay>[1])} />
-      <CumulativeLine yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => moneyForDisplay(v, currency as Parameters<typeof moneyForDisplay>[1])} />
+      <CostInflowColumns yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
+      <CumulativeLine yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
       <table data-testid="yearly-table">
         <thead>
           <tr><th>Year</th><th>Cost (nominal)</th><th>Collections (nominal)</th><th>Net (nominal)</th><th>Cumulative net (nominal)</th></tr>

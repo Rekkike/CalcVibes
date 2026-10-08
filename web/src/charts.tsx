@@ -27,11 +27,11 @@ export function CostInflowColumns(props: {
       <div className="paired-columns">
         {yearly.map((y, i) => (
           <div key={y.year} data-column-year={y.year} className="paired-column">
-            <span data-testid="column-peak-cost" className={i === peakCostIdx && y.cost > 0 ? "column-peak" : "column-peak hidden-peak"}>{i === peakCostIdx && y.cost > 0 ? valueFor(y.cost) : "\u00a0"}</span>
+            <span data-testid="column-peak-cost" className={i === peakCostIdx && y.cost > 0 ? "column-peak" : "column-peak hidden-peak"}>{i === peakCostIdx && y.cost > 0 ? `Cost peak ${valueFor(y.cost)}` : "\u00a0"}</span>
             <svg viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true" className="paired-svg">
               <rect data-chart-bar="cost" x={0} y={100 - Math.round((y.cost / max) * 100)} width={10} height={Math.round((y.cost / max) * 100)} fill={CHART_COLORS.costBar} rx={2} />
             </svg>
-            <span data-testid="column-peak-inflow" className={i === peakInflowIdx && y.inflow > 0 ? "column-peak inflow-peak" : "column-peak inflow-peak hidden-peak"}>{i === peakInflowIdx && y.inflow > 0 ? valueFor(y.inflow) : "\u00a0"}</span>
+            <span data-testid="column-peak-inflow" className={i === peakInflowIdx && y.inflow > 0 ? "column-peak inflow-peak" : "column-peak inflow-peak hidden-peak"}>{i === peakInflowIdx && y.inflow > 0 ? `Inflow peak ${valueFor(y.inflow)}` : "\u00a0"}</span>
             <svg viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true" className="paired-svg">
               <rect data-chart-bar="inflow" x={0} y={100 - Math.round((y.inflow / max) * 100)} width={10} height={Math.round((y.inflow / max) * 100)} fill={CHART_COLORS.inflowBar} rx={2} />
             </svg>
@@ -126,7 +126,7 @@ export function RecoveryBars(props: {
       <div className="recovery-grid">
         {inflows.map((v, k) => (
           <div key={k} data-recovery-column={k} className="recovery-column">
-            <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? peakFor(v) : "\u00a0"}</span>
+            <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? `${peakFor(v)} in ${labelFor(k + 1)}` : "\u00a0"}</span>
             <svg viewBox={`0 0 10 ${Math.max(1, Math.round((v / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
               <rect x={0} y={0} width={10} height={Math.max(1, Math.round((v / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
             </svg>

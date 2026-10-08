@@ -238,7 +238,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
 
   it("CHART-PURPOSE: every deck chart carries its kicker title, its labels, and its total", async () => {
     const { demoProject } = await import("../src/state.js");
-    const { computeModel, moneyForDisplay } = await import("../src/engine.js");
+    const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const demo = demoProject();
     const result = computeModel(demo);
     const unit = "thousands";
@@ -251,7 +251,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(3);
     const firstRow = investmentRows?.querySelector("[data-composition-row]");
     expect(firstRow?.querySelector('[data-row-label="name"]')?.textContent).toBe(result.lineTotals[0].name);
-    expect(firstRow?.querySelector('[data-row-label="value"]')?.textContent).toBe(moneyForDisplay(result.lineTotals[0].total, "SEK", unit));
+    expect(firstRow?.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(result.lineTotals[0].total, "SEK", unit));
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const recoveryBars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]');
@@ -269,7 +269,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
 
   it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force", async () => {
     const { demoProject } = await import("../src/state.js");
-    const { computeModel, moneyForDisplay } = await import("../src/engine.js");
+    const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const demo = demoProject();
     const result = computeModel(demo);
     const unit = "thousands";
@@ -281,7 +281,12 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
       for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
       return acc;
     }, new Array<number>(result.yearly.length).fill(0)));
-    expect(peak.textContent).toBe(moneyForDisplay(peakValue, "SEK", unit));
+    const { yearHeader } = await import("../src/state.js");
+    const peakYear = result.collectionsGrid.reduce((acc, row) => {
+      for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
+      return acc;
+    }, new Array<number>(result.yearly.length).fill(0)).reduce((bi, v, i, arr) => (v > arr[bi] ? i : bi), 0) + 1;
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(peakValue, "SEK", unit)} in ${yearHeader(peakYear, null)}`);
   });
 
   it("PEAK-PRINT: the print stylesheet carries the peak-label ink variant", () => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
-import { moneyForDisplay } from "../engine.js";
+import { deckMoneyForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
 import { CompositionRows, RecoveryBars } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
@@ -12,7 +12,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
   const totalSlides = 5;
   const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit }) : null;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
-  const peakFor = (v: number) => moneyForDisplay(v, currency, entryUnit);
+  const peakFor = (v: number) => deckMoneyForDisplay(v, currency, entryUnit);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -56,7 +56,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.summaryCharts !== undefined && result !== null && (
               <div data-testid="summary-charts" className="summary-charts">
-                <div data-summary-chart="donut"><CompositionRows lineTotals={result.lineTotals} valueFor={(t) => moneyForDisplay(t, currency, entryUnit)} kicker="Where the money goes" /></div>
+                <div data-summary-chart="donut"><CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker="Where the money goes" /></div>
                 <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker="When the inflows arrive" /></div>
               </div>
             )}
@@ -81,7 +81,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             ))}
             {i === 1 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="investment">
-                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => moneyForDisplay(t, currency, entryUnit)} kicker="Where the money goes" />
+                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker="Where the money goes" />
               </div>
             )}
             {i === 2 && result !== null && (

@@ -8,7 +8,7 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
   it("COMPOSITION-ROWS: one labeled row per cost line; the shares sum to 100; no donut in the deck scope", async () => {
     const { demoProject } = await import("../src/state.js");
-    const { computeModel, moneyForDisplay } = await import("../src/engine.js");
+    const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const demo = demoProject();
     const result = computeModel(demo);
     const unit = "thousands";
@@ -23,7 +23,7 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     result.lineTotals.forEach((lt, i) => {
       const row = rowEls[i] as HTMLElement;
       expect(row.querySelector('[data-row-label="name"]')?.textContent).toBe(lt.name);
-      expect(row.querySelector('[data-row-label="value"]')?.textContent).toBe(moneyForDisplay(lt.total, "SEK", unit));
+      expect(row.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(lt.total, "SEK", unit));
       const shareText = row.querySelector('[data-row-label="share"]')?.textContent ?? "0%";
       shareSum += Number(shareText.replace("%", ""));
     });
