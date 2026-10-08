@@ -115,7 +115,7 @@ All computation on a monthly-resolution cash-flow vector; annual aggregation for
 - web/test — UI tests.
 - docs/ — this specification, the environment discipline, research, sources.
 - prototype/ — the standalone reference prototype (behavioral reference of record for the v0.1 engine).
-- data/ — project-file JSON schema and examples. First artifact: template-project.json (Project Alpha, schema version 4), the regression anchor of record (section 4.8).
+- data/ — project-file JSON schema and examples. First artifact: template-project.json (Project Alpha, schema version 5 since v0.4), the regression anchor of record (section 4.8).
 
 ## 7. Versioning contract and roadmap
 
