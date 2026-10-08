@@ -49,6 +49,8 @@ export const TERM_GLOSSES: { term: string; gloss: string }[] = [
 export interface DeckModel {
   slides: DeckSlide[];
   glosses?: { term: string; gloss: string }[];
+  currency?: Parameters<typeof moneyForDisplay>[1];
+  unit?: EntryUnit;
 }
 
 export function deckSlides(
@@ -242,7 +244,7 @@ export function deckSlides(
   ];
   slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts });
 
-  return { slides, glosses: TERM_GLOSSES };
+  return { slides, glosses: TERM_GLOSSES, currency, unit };
 }
 
 export type { TariffRow };

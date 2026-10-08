@@ -29,28 +29,37 @@ describe("EX-4 route B: jsPDF deck builder", () => {
 });
 
 describe("v0.5.1 Task A/C: PDF action, pagination, trace", () => {
-  it("every body figure of every slide appears in the trace (base demo); page count pinned", () => {
+  it("every body figure and every deal tile appears in the trace (base demo); page count pinned", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
-    buildDeckPdf(model, demoProject().projectName, trace);
+    const doc = buildDeckPdf(model, demoProject().projectName, trace);
+    expect(doc.getNumberOfPages()).toBe(5);
     expect(trace.drawnFigures.length).toBe(5);
     for (let i = 0; i < 5; i++) {
       for (const fig of model.slides[i].body) {
         expect(trace.drawnFigures[i]).toContain(fig.value);
       }
     }
+    const tiles = model.slides[4].tiles ?? [];
+    expect(tiles.length).toBe(10);
+    const tracedDeal = trace.drawnFigures[4].join("|");
+    for (const t of tiles) {
+      expect(tracedDeal).toContain(t.value);
+      expect(tracedDeal).toContain(t.label.toUpperCase());
+    }
   });
 
-  it("the financing-on variant: the densest deal slide carries all five figures plus the disclosure; page count pinned", () => {
+  it("the financing-on variant: the deal slide carries all fifteen tiles plus the disclosure; page count pinned", () => {
     const finInputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const finResult = computeModel(finInputs);
     const finModel = deckSlides(finInputs, finResult);
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(finModel, finInputs.projectName, trace);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(5);
-    const dealFigures = finModel.slides[4].body.map((f) => f.value);
+    const tiles = finModel.slides[4].tiles ?? [];
+    expect(tiles.length).toBe(15);
     const traced = trace.drawnFigures[4].join("|");
-    for (const v of dealFigures) {
-      expect(traced).toContain(v);
+    for (const t of tiles) {
+      expect(traced).toContain(t.value);
     }
     expect(finModel.slides[4].disclosures.length).toBeGreaterThan(0);
   });

@@ -8,7 +8,7 @@ export const CHART_COLORS = {
 
 export const STAGE_CHART_COLORS = {
   gridline: "rgba(148,163,184,0.16)",
-  axisText: "#8ea0b8",
+  axisText: "#e2e8f0",
   zeroLine: "rgba(148,163,184,0.45)",
 };
 
@@ -68,6 +68,19 @@ export function donutLabels(lineTotals: LineTotal[]): DonutLabel[] {
   return lineTotals.map((l) => ({ name: l.name, sharePct: Math.round((l.total / total) * 100) }));
 }
 
+export const DONUT_LABEL_FONT_SIZE = 9;
+const DONUT_LABEL_CHAR_WIDTH = 0.6 * DONUT_LABEL_FONT_SIZE;
+const DONUT_LABEL_COL_X = 170;
+const DONUT_LABEL_RIGHT_PAD = 8;
+
+export function donutViewBoxWidth(lineTotals: LineTotal[]): number {
+  const labels = donutLabels(lineTotals);
+  const widest = labels.reduce((w, lb) => Math.max(w, lb.name.length), 0);
+  const pctSuffix = " 100%".length;
+  const bound = DONUT_LABEL_COL_X + (widest + pctSuffix) * DONUT_LABEL_CHAR_WIDTH + DONUT_LABEL_RIGHT_PAD;
+  return Math.max(260, Math.ceil(bound));
+}
+
 export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boolean; centerTotal?: string; kicker?: string }) {
   const { lineTotals, centerTotal, stage = false, kicker } = props;
   const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
@@ -75,8 +88,9 @@ export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boole
   const R = 58, SW = 24, C = 80;
   const colors = ["#0074ba", "#34d399", "#fb7185", "#b45309", "#717273", "#103558"];
   let acc = 0;
+  const vbW = donutViewBoxWidth(lineTotals);
   return (
-    <svg data-testid="composition-donut" viewBox={`0 0 260 ${kicker !== undefined ? 180 : 160}`} role="img" aria-label="Cost composition">
+    <svg data-testid="composition-donut" viewBox={`0 0 ${vbW} ${kicker !== undefined ? 180 : 160}`} role="img" aria-label="Cost composition">
       {kicker !== undefined && (
         <text data-testid="chart-kicker" x={12} y={kicker !== undefined ? 12 : 0} fontSize="10" fontWeight="700" letterSpacing="0.08em" fill={stage ? "#cce9ff" : "#103558"}>{kicker.toUpperCase()}</text>
       )}
@@ -84,7 +98,7 @@ export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boole
         <text data-testid="donut-center-total" x={C} y={C + 4} fontSize="13" fontWeight="700" textAnchor="middle" fill={stage ? "#e2e8f0" : "#343434"}>{centerTotal}</text>
       )}
       {labels.map((lb, i) => (
-        <text key={"lbl-" + i} data-testid="donut-segment-label" x={C + 90} y={34 + i * 14} fontSize="9" fill={stage ? "#e2e8f0" : "#717273"}>{lb.name} {lb.sharePct}%</text>
+        <text key={"lbl-" + i} data-testid="donut-segment-label" x={DONUT_LABEL_COL_X} y={34 + i * 14} fontSize={DONUT_LABEL_FONT_SIZE} fill={stage ? "#e2e8f0" : "#717273"}>{lb.name} {lb.sharePct}%</text>
       ))}
       {lineTotals.map((l, i) => {
         const frac = l.total / total;

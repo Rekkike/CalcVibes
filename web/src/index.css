@@ -3,7 +3,7 @@
 
 [data-testid="presentation"] {
   font-family: var(--font);
-  color: var(--ink);
+  color: #e2e8f0;
   background: var(--card);
 }
 
@@ -32,7 +32,7 @@
 }
 
 [data-testid="presentation"] .deck-figure-label {
-  color: var(--ink);
+  color: #e2e8f0;
 }
 
 [data-testid="presentation"] .deck-figure-value {
@@ -65,7 +65,7 @@
 }
 
 [data-testid="presentation"] .muted {
-  color: var(--mut);
+  color: #e2e8f0;
 }
 
 .deck-slide[data-slide-active="false"] { display: none; }
@@ -226,14 +226,24 @@
     padding: var(--space-3) var(--space-2);
   }
   .app-root header.app-header {
-    flex-direction: column;
-    align-items: stretch;
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
   }
   .app-root nav {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
   }
   .app-root nav button {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
     text-align: left;
   }
   .app-root table {
@@ -241,7 +251,7 @@
     overflow-x: auto;
   }
   .app-root label {
-    width: 100%;
+    width: auto;
   }
 }
 
@@ -369,7 +379,9 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(255, 255, 255, 0.94);
+  max-height: 100vh;
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
@@ -626,7 +638,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #9db4cc;
+  color: #e2e8f0;
 }
 
 [data-testid="presentation"] .deck-tile .stat-value {

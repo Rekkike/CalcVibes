@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { moneyForDisplay } from "./engine.js";
 import type { DeckModel } from "./deck.js";
 
 export interface DeckPdfTrace {
@@ -62,7 +63,10 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           const valLines = doc.splitTextToSize(t.value, cardW - 6) as string[];
           doc.text(valLines[valLines.length - 1], x + cardW - 3, y + cardH - 3, { align: "right" });
           doc.setTextColor(0, 0, 0);
-          if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(t.value);
+          if (trace) {
+            trace.drawnFigures[trace.drawnFigures.length - 1]?.push(t.value);
+            trace.drawnFigures[trace.drawnFigures.length - 1]?.push(t.label.toUpperCase());
+          }
         }
         y += cardH + gap;
       }
@@ -158,7 +162,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           });
           doc.setFontSize(8);
           doc.setTextColor(0, 0, 0);
-          const peakText = String(chartMax);
+          const peakText = moneyForDisplay(chartMax, model.currency ?? "SEK", model.unit ?? "ones");
           doc.text(peakText, 20 + peakIdx * (barW + 2) + barW / 2, y + 26 - (chartMax / chartMax) * 26 - 2, { align: "center" });
           if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(peakText);
           y += 38;

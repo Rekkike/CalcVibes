@@ -52,7 +52,6 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
     expect(returns.find((f) => f.label === "Payback (nominal)")!.rawValue).toBe(result.paybackYears);
     const dealTiles = deck.slides[4].tiles ?? [];
     expect(dealTiles.length).toBe(10);
-    expect(result.totalCost).toBe(result.totalCost);
   });
 });
 
