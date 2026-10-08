@@ -56,6 +56,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         y = CONTENT_TOP;
       }
       doc.text(lines, 20, y);
+      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d);
       y += needed;
     }
     slidePageCount.push(footerPage - slideFirstPage + 1);

@@ -16,6 +16,22 @@ export function blankProject(): ModelInputs {
 export interface ProjectSettings {
   startYear: number | null;
   currency?: string;
+  scenarioTargets?: number[];
+  scenarioTerms?: number[];
+  scenarioBalloons?: number[];
+}
+
+export function spreadFill(total: number, firstYear: number, yearCount: number): Record<number, number> {
+  const fill: Record<number, number> = {};
+  if (yearCount <= 0) return fill;
+  const base = total / yearCount;
+  for (let k = 0; k < yearCount - 1; k++) {
+    fill[firstYear + k] = base;
+  }
+  let assigned = 0;
+  for (const v of Object.values(fill)) assigned += v;
+  fill[firstYear + yearCount - 1] = total - assigned;
+  return fill;
 }
 
 export function blankOperatingLine(id: string): OperatingLine {

@@ -30,6 +30,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
           const doc = buildDeckPdf(deck as NonNullable<typeof deck>, inputs.projectName || "project");
           doc.save(`${inputs.projectName || "project"}.pdf`);
         }} disabled={result === null}>Download PDF</button>
+        {result === null && <span data-testid="export-disabled-reason" className="muted">Exports and PDF are disabled until the input issues are resolved.</span>}
       </header>
       <main>
         {deck === null && <p data-testid="deck-placeholder">No result to present.</p>}

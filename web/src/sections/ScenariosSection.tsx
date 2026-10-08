@@ -2,18 +2,52 @@ import type { ModelInputs } from "../../../core/src/types.js";
 import { scenarioResults, tornado, paymentVsTermTargetTable, paymentVsBalloonTermTable } from "../../../core/src/scenarios.js";
 import { roundForDisplay } from "../engine.js";
 
-export function ScenariosSection(props: { inputs: ModelInputs }) {
-  const { inputs } = props;
+type ListSetter = (v: number[] | null) => void;
+
+function ScenarioListEditor(props: { label: string; values: number[] | null; fallback: number[]; onChange: ListSetter }) {
+  const { label, values, fallback, onChange } = props;
+  const current = values ?? fallback;
+  return (
+    <div data-testid={`scenario-list-${label}`} className="scenario-list">
+      <h4>{label}</h4>
+      {current.map((v, i) => (
+        <div key={i} className="scenario-list-row">
+          <input
+            data-field={`scenario-${label}`}
+            data-index={i}
+            type="number"
+            value={v}
+            onChange={(e) => {
+              const next = current.slice();
+              next[i] = parseFloat(e.target.value) || 0;
+              onChange(next);
+            }}
+          />
+          <button data-action={`scenario-remove-${label}`} data-index={i} onClick={() => onChange(current.filter((_, j) => j !== i))}>Remove</button>
+        </div>
+      ))}
+      <button data-action={`scenario-add-${label}`} onClick={() => onChange([...current, 0])}>Add</button>
+    </div>
+  );
+}
+
+export function ScenariosSection(props: { inputs: ModelInputs; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; onScenarioTargetsChange?: ListSetter; onScenarioTermsChange?: ListSetter; onScenarioBalloonsChange?: ListSetter }) {
+  const { inputs, scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null, onScenarioTargetsChange, onScenarioTermsChange, onScenarioBalloonsChange } = props;
   const sc = scenarioResults(inputs);
   const t = tornado(inputs);
-  const terms = [5, 7, 9];
-  const targets = [8, 12, 16];
-  const balloons = [0, 1000000, 2000000];
+  const terms = scenarioTerms ?? [5, 7, 9];
+  const targets = scenarioTargets ?? [8, 12, 16];
+  const balloons = scenarioBalloons ?? [0, 1000000, 2000000];
   const twoWay = paymentVsTermTargetTable(inputs, terms, targets);
   const bt = paymentVsBalloonTermTable(inputs, balloons, terms);
   return (
     <section data-testid="scenarios">
       <h2>Scenarios and sensitivity</h2>
+      <div className="scenario-lists">
+        {onScenarioTargetsChange && <ScenarioListEditor label="target" values={scenarioTargets} fallback={[8, 12, 16]} onChange={onScenarioTargetsChange} />}
+        {onScenarioTermsChange && <ScenarioListEditor label="term" values={scenarioTerms} fallback={[5, 7, 9]} onChange={onScenarioTermsChange} />}
+        {onScenarioBalloonsChange && <ScenarioListEditor label="balloon" values={scenarioBalloons} fallback={[0, 1000000, 2000000]} onChange={onScenarioBalloonsChange} />}
+      </div>
       <h3>Named scenario sets</h3>
       <table data-testid="scenario-table">
         <thead><tr><th>Scenario</th><th>Payment</th><th>Total cost</th><th>Payments</th></tr></thead>

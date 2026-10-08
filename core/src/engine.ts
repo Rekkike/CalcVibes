@@ -81,7 +81,13 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const costs = inp.costs;
   let lastCostYear = 0;
   costs.forEach((c) => {
-    const end = c.category === "capex" ? c.startYear : c.startYear + Math.max(1, c.durationYears) - 1;
+    const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+    let end: number;
+    if (c.category === "capex") {
+      end = overrides ? Math.max(...Object.keys(overrides).map(Number)) : c.startYear;
+    } else {
+      end = c.startYear + Math.max(1, c.durationYears) - 1;
+    }
     lastCostYear = Math.max(lastCostYear, end);
   });
   if (lastCostYear === 0) lastCostYear = 1;
@@ -102,14 +108,24 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   if (lastTariffMonth > totalMonths) totalMonths = lastTariffMonth;
   const costM = new Array<number>(totalMonths).fill(0);
   costs.forEach((c) => {
+    const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
     if (c.category === "capex") {
-      const m = Math.min(totalMonths, c.startYear * 12);
-      if (m >= 1) costM[m - 1] += c.amount;
+      if (overrides) {
+        for (const [yStr, amount] of Object.entries(overrides)) {
+          const y = Number(yStr);
+          const m = Math.min(totalMonths, y * 12);
+          if (m >= 1) costM[m - 1] += amount;
+        }
+      } else {
+        const m = Math.min(totalMonths, c.startYear * 12);
+        if (m >= 1) costM[m - 1] += c.amount;
+      }
     } else {
       const dur = Math.max(1, c.durationYears);
       for (let y = c.startYear; y < c.startYear + dur; y++) {
-        const esc = Math.pow(1 + c.escalation / 100, y - c.startYear);
-        const monthly = (c.amount * esc) / 12;
+        const overridden = overrides && Object.prototype.hasOwnProperty.call(overrides, String(y));
+        const annual = overridden ? (overrides as Record<number, number>)[y] : c.amount * Math.pow(1 + c.escalation / 100, y - c.startYear);
+        const monthly = annual / 12;
         for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= totalMonths; mm++) costM[mm - 1] += monthly;
       }
     }
@@ -413,9 +429,22 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     });
   }
   const lineTotals = costs.map((c) => {
+    const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
     let total = 0;
-    if (c.category === "capex") total = c.amount;
-    else {
+    if (overrides) {
+      if (c.category === "capex") {
+        for (const amount of Object.values(overrides)) total += amount;
+      } else {
+        const dur2 = Math.max(1, c.durationYears);
+        for (let j = 0; j < dur2; j++) {
+          const y = c.startYear + j;
+          const overridden = Object.prototype.hasOwnProperty.call(overrides, String(y));
+          total += overridden ? (overrides as Record<number, number>)[y] : c.amount * Math.pow(1 + c.escalation / 100, j);
+        }
+      }
+    } else if (c.category === "capex") {
+      total = c.amount;
+    } else {
       const dur2 = Math.max(1, c.durationYears);
       for (let j = 0; j < dur2; j++) total += c.amount * Math.pow(1 + c.escalation / 100, j);
     }
@@ -510,7 +539,13 @@ type ModelInputsLike = import("./types.js").ModelInputs;
 function lastCostYearOf(inp: ModelInputsLike): number {
   let last = 0;
   inp.costs.forEach((c) => {
-    const end = c.category === "capex" ? c.startYear : c.startYear + Math.max(1, c.durationYears) - 1;
+    const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+    let end: number;
+    if (c.category === "capex") {
+      end = overrides ? Math.max(...Object.keys(overrides).map(Number)) : c.startYear;
+    } else {
+      end = c.startYear + Math.max(1, c.durationYears) - 1;
+    }
     last = Math.max(last, end);
   });
   return last === 0 ? 1 : last;
@@ -522,13 +557,24 @@ function costNpvOf(inp: ModelInputsLike, rM: number, operatingWindowEnd: number 
   const costM = new Array<number>(totalMonths).fill(0);
   inp.costs.forEach((c) => {
     if (c.category === "capex") {
-      const m = Math.min(totalMonths, c.startYear * 12);
-      if (m >= 1) costM[m - 1] += c.amount;
+      const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+      if (overrides) {
+        for (const [yStr, amount] of Object.entries(overrides)) {
+          const y = Number(yStr);
+          const m = Math.min(totalMonths, y * 12);
+          if (m >= 1) costM[m - 1] += amount;
+        }
+      } else {
+        const m = Math.min(totalMonths, c.startYear * 12);
+        if (m >= 1) costM[m - 1] += c.amount;
+      }
     } else {
       const dur = Math.max(1, c.durationYears);
+      const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
       for (let y = c.startYear; y < c.startYear + dur; y++) {
-        const esc2 = Math.pow(1 + c.escalation / 100, y - c.startYear);
-        const monthly = (c.amount * esc2) / 12;
+        const overridden = overrides && Object.prototype.hasOwnProperty.call(overrides, String(y));
+        const annual = overridden ? (overrides as Record<number, number>)[y] : c.amount * Math.pow(1 + c.escalation / 100, y - c.startYear);
+        const monthly = annual / 12;
         for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= totalMonths; mm++) costM[mm - 1] += monthly;
       }
     }

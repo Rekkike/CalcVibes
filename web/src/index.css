@@ -90,3 +90,172 @@
   [data-testid="presentation"] .deck-slide-header,
   [data-testid="presentation"] .deck-slide-footer { display: block; }
 }
+
+
+/* ===== Application-wide design system (Task A, v0.5.2) ===== */
+.app-root {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--surface);
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3);
+}
+
+.app-root header.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.app-root h1 {
+  font-family: var(--font);
+  font-size: 1.5rem;
+  color: var(--ink);
+  margin: 0;
+}
+
+.app-root nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.app-root button {
+  font-family: var(--font);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--muted);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.app-root button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.app-root button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app-root label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+  margin: var(--space-2) var(--space-2) var(--space-2) 0;
+}
+
+.app-root input,
+.app-root select {
+  font-family: var(--font);
+  padding: var(--space-1);
+  border: 1px solid var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-root section {
+  margin-top: var(--space-4);
+}
+
+.app-root section h2 {
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+.app-root section h3,
+.app-root section h4 {
+  font-family: var(--font);
+  color: var(--muted);
+}
+
+/* Section tables: right-aligned values with tabular numerals */
+.app-root table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.app-root table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  padding: var(--space-1);
+}
+
+.app-root table td {
+  padding: var(--space-1);
+}
+
+.app-root .table-value-cell,
+.app-root td.table-value-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Warnings distinct from disclosures (v0.5.2 observation 1) */
+.app-root .warning {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-left: 3px solid var(--accent);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.9em;
+}
+
+.app-root .muted,
+.app-root .deck-disclosure,
+.app-root .caveat {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.app-root .issues {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.app-root dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+}
+
+.app-root dt {
+  color: var(--muted);
+}
+
+.app-root dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Responsive: single-column usable layout on the iPhone of record */
+@media (max-width: 480px) {
+  .app-root {
+    padding: var(--space-3) var(--space-2);
+  }
+  .app-root header.app-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .app-root nav {
+    flex-direction: column;
+  }
+  .app-root nav button {
+    width: 100%;
+    text-align: left;
+  }
+  .app-root table {
+    display: block;
+    overflow-x: auto;
+  }
+  .app-root label {
+    width: 100%;
+  }
+}

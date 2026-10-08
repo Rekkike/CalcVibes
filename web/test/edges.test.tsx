@@ -18,11 +18,13 @@ describe("EX-5 edges", () => {
     const nameInput = document.querySelector('[data-line="c1"] [data-field="name"]') as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "" } });
     const xlsx = byAction("export-xlsx") as HTMLButtonElement;
-    const printBtn = byAction("print-deck") as HTMLButtonElement;
+    const pdfBtn = byAction("download-pdf") as HTMLButtonElement;
     expect(xlsx.disabled).toBe(true);
-    expect(printBtn.disabled).toBe(true);
+    expect(pdfBtn.disabled).toBe(true);
     const reason = document.querySelector('[data-testid="export-disabled-reason"]');
     expect(reason && reason.textContent).toContain("Exports, print, and PDF are disabled until the input issues are resolved");
+    // Print deck intentionally opens the placeholder deck on an invalid model (v0.5.2 Task C, observation 2)
+    expect((byAction("print-deck") as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("an unrecognized legacy currency string surfaces as an issue, collect-all", () => {
@@ -66,6 +68,6 @@ describe("Task F: template legacy currency field removed", () => {
     const raw = JSON.parse(fs.readFileSync("../data/template-project.json", "utf8"));
     expect(raw.currency).toBeUndefined();
     expect(raw.settings.currency).toBe("SEK");
-    expect(raw.schemaVersion).toBe(6);
+    expect(raw.schemaVersion).toBe(7);
   });
 });

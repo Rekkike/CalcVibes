@@ -26,14 +26,39 @@ export function App() {
   const [modePayment, setModePayment] = useState(400000);
   const [startYear, setStartYear] = useState<number | null>(null);
   const [startYearError, setStartYearError] = useState<string | null>(null);
+  const [scenarioTargets, setScenarioTargets] = useState<number[] | null>(null);
+  const [scenarioTerms, setScenarioTerms] = useState<number[] | null>(null);
+  const [scenarioBalloons, setScenarioBalloons] = useState<number[] | null>(null);
 
   const issues = useMemo(() => {
     const list = validateInputs(inputs);
     if (!CURRENCIES_ENUM.includes(inputs.currency as (typeof CURRENCIES_ENUM)[number])) {
       list.push(`Currency "${inputs.currency}" is not a recognized currency (SEK, EUR, USD, GBP, NOK, DKK).`);
     }
+    const checkList = (name: string, arr: number[] | null, validate: (v: number) => boolean, message: (v: number) => string) => {
+      if (arr === null) return;
+      if (arr.length === 0) {
+        list.push(`Scenario ${name} list must not be empty.`);
+        return;
+      }
+      const seen = new Set<number>();
+      for (const v of arr) {
+        if (!Number.isFinite(v)) {
+          list.push(`Scenario ${name} list contains a non-finite entry.`);
+        } else if (!validate(v)) {
+          list.push(message(v));
+        }
+        if (seen.has(v)) {
+          list.push(`Scenario ${name} list contains a duplicate entry (${v}).`);
+        }
+        seen.add(v);
+      }
+    };
+    checkList("target", scenarioTargets, (v) => v >= 0, (v) => `Scenario target ${v} must not be negative.`);
+    checkList("term", scenarioTerms, (v) => v > 0, (v) => `Scenario term ${v} must be positive.`);
+    checkList("balloon", scenarioBalloons, (v) => v >= 0, (v) => `Scenario balloon ${v} must not be negative.`);
     return list;
-  }, [inputs]);
+  }, [inputs, scenarioTargets, scenarioTerms, scenarioBalloons]);
   const { result, engineIssues } = useMemo(() => {
     if (issues.length > 0) return { result: null, engineIssues: [] as string[] };
     try {
@@ -85,7 +110,7 @@ export function App() {
     const doc = buildDeckPdf(model, inputs.projectName || "project");
     doc.save(`${inputs.projectName || "project"}.pdf`);
   };
-  const printDeck = () => { window.print(); };
+  const printDeck = () => { setPresOpen(true); };
   const addCost = () => setInputs((p) => ({ ...p, costs: [...p.costs, blankCostLine(nextCostId(p.costs))] }));
   const removeCost = (id: string) => setInputs((p) => ({ ...p, costs: p.costs.filter((c) => c.id !== id) }));
   const updateCost = (id: string, patch: Partial<CostLine>) =>
@@ -110,7 +135,7 @@ export function App() {
   }
 
   return (
-    <div>
+    <div className="app-root">
       <header>
         <h1>{inputs.projectName || "Untitled project"}</h1>
         <nav>
@@ -122,7 +147,7 @@ export function App() {
         </nav>
         <button data-action="load-demo" onClick={() => setInputs(demoProject())}>Load demo project (Project Alpha)</button>
         <button data-action="new-project" onClick={() => setInputs(blankProject())}>New project</button>
-        <button data-action="present" onClick={() => setPresOpen(true)} disabled={result === null}>Present results</button>
+        <button data-action="present" onClick={() => setPresOpen(true)}>Present results</button>
         <label>Project start year (optional, 1900–2200){" "}
           <input data-field="startYear" type="number" value={startYear ?? ""} onChange={(e) => {
             const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
@@ -136,7 +161,7 @@ export function App() {
         </label>
         {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
         <button data-action="export-xlsx" onClick={exportXlsx} disabled={result === null}>Export XLSX</button>
-        <button data-action="print-deck" onClick={printDeck} disabled={result === null}>Print deck</button>
+        <button data-action="print-deck" onClick={printDeck}>Print deck</button>
         <button data-action="download-pdf" onClick={downloadPdf} disabled={result === null}>Download PDF</button>
         {result === null && <span data-testid="export-disabled-reason" className="muted">Exports, print, and PDF are disabled until the input issues are resolved.</span>}
       </header>
@@ -197,7 +222,7 @@ export function App() {
             <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} />
           </section>
         )}
-        {view === "scenarios" && <ScenariosSection inputs={inputs} />}
+        {view === "scenarios" && <ScenariosSection inputs={inputs} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} onScenarioTargetsChange={setScenarioTargets} onScenarioTermsChange={setScenarioTerms} onScenarioBalloonsChange={setScenarioBalloons} />}
         {view === "results" && result === null && <p>Resolve the input issues to see results.</p>}
       </main>
       <footer>CalcVibes — every figure is computed by the core engine; the UI performs no financial arithmetic.</footer>

@@ -6,6 +6,7 @@ export interface CostLine {
   startYear: number;
   durationYears: number;
   escalation: number;
+  yearOverrides?: Record<number, number>;
 }
 
 export interface RepaymentParams {

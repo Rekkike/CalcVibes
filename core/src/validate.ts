@@ -16,6 +16,20 @@ export function validateInputs(inp: ModelInputs): string[] {
     if (!c.name || c.name.trim() === "") {
       issues.push(`Cost line ${c.id} has an empty name.`);
     }
+    if (c.yearOverrides) {
+      for (const [yStr, amount] of Object.entries(c.yearOverrides)) {
+        const y = Number(yStr);
+        if (!(amount > 0) || !Number.isFinite(amount)) {
+          issues.push(`Cost line ${c.id} (${c.name}) has a non-positive or non-finite override amount at year ${y}.`);
+        }
+        if (c.category === "recurring") {
+          const spanEnd = c.startYear + Math.max(1, c.durationYears) - 1;
+          if (y < c.startYear || y > spanEnd) {
+            issues.push(`Cost line ${c.id} (${c.name}) has a recurring override at year ${y} outside its span ${c.startYear}..${spanEnd}.`);
+          }
+        }
+      }
+    }
     if (!(c.amount > 0)) {
       issues.push(`Cost line ${c.id} (${c.name}) has a non-positive amount.`);
     }
