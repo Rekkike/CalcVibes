@@ -22,7 +22,7 @@ describe("EX-5 edges", () => {
     expect(xlsx.disabled).toBe(true);
     expect(pdfBtn.disabled).toBe(true);
     const reason = document.querySelector('[data-testid="export-disabled-reason"]');
-    expect(reason && reason.textContent).toContain("Exports, print, and PDF are disabled until the input issues are resolved");
+    expect(reason && reason.textContent).toContain("XLSX and PDF export are disabled until the input issues are resolved");
     // Print deck intentionally opens the placeholder deck on an invalid model (v0.5.2 Task C, observation 2)
     expect((byAction("print-deck") as HTMLButtonElement).disabled).toBe(false);
   });
@@ -68,6 +68,6 @@ describe("Task F: template legacy currency field removed", () => {
     const raw = JSON.parse(fs.readFileSync("../data/template-project.json", "utf8"));
     expect(raw.currency).toBeUndefined();
     expect(raw.settings.currency).toBe("SEK");
-    expect(raw.schemaVersion).toBe(7);
+    expect(raw.schemaVersion).toBe(8);
   });
 });

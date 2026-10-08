@@ -1,5 +1,6 @@
 import type { ModelInputs, ModelResult, TariffRow } from "../../core/src/types.js";
 import { moneyForDisplay, percentTwoForDisplay, yearsTwoForDisplay, dscrTwoForDisplay } from "./engine.js";
+import type { EntryUnit } from "./engine.js";
 import { yearHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
@@ -26,10 +27,11 @@ export interface DeckModel {
 export function deckSlides(
   inputs: ModelInputs,
   result: ModelResult,
-  opts: { startYear: number | null } = { startYear: null },
+  opts: { startYear: number | null; entryUnit?: EntryUnit } = { startYear: null },
 ): DeckModel {
   const currency = (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK";
-  const money = (v: number) => moneyForDisplay(v, currency);
+  const unit = opts.entryUnit ?? "ones";
+  const money = (v: number) => moneyForDisplay(v, currency, unit);
   const startYear = opts.startYear;
   const leveraged = result.leveragedSolve;
   const tariffCollectionMode = inputs.tariff !== undefined && inputs.tariff.mode !== "off" && inputs.tariff.mode !== "decompose";
@@ -99,6 +101,19 @@ export function deckSlides(
   } else if (inputs.tariff?.mode === "manual") {
     recoveryTitle = "Manual per-year prices — evaluated, not solved";
     recoveryBody.push({ label: "Mode", value: "evaluated, not solved", kind: "text", rawValue: null });
+    recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
+  } else if (inputs.repayment.collectionsOverrides && Object.keys(inputs.repayment.collectionsOverrides).length > 0) {
+    recoveryTitle = "A per-year collections profile — evaluated, not solved";
+    recoveryBody.push({ label: "Mode", value: "evaluated, not solved", kind: "text", rawValue: null });
+    for (const gr of result.collectionsGrid) {
+      if (gr.id === "profile") {
+        for (let k = 0; k < gr.amounts.length; k++) {
+          if (gr.amounts[k] > 0) {
+            recoveryBody.push({ label: `Collections ${yearHeader(k + 1, startYear)}`, value: money(gr.amounts[k]), kind: "money", rawValue: gr.amounts[k] });
+          }
+        }
+      }
+    }
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   } else {
     recoveryTitle = "A fixed amount per year — evaluated, not solved";

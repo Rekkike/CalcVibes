@@ -86,6 +86,29 @@ export function validateInputs(inp: ModelInputs): string[] {
       issues.push("Maintenance must have exactly one active mode: percent or fixed.");
     }
   }
+  const collectionsProfile = inp.repayment.collectionsOverrides && Object.keys(inp.repayment.collectionsOverrides).length > 0 ? inp.repayment.collectionsOverrides : null;
+  if (collectionsProfile) {
+    for (const [yStr, amount] of Object.entries(collectionsProfile)) {
+      const y = Number(yStr);
+      if (!Number.isInteger(y) || y < 1) {
+        issues.push(`Collections profile year ${yStr} must be an integer of at least 1 (COL-PROFILE-YEAR).`);
+      }
+      if (!(amount > 0) || !Number.isFinite(amount)) {
+        issues.push(`Collections profile amount at year ${y} must be positive and finite (COL-PROFILE-AMOUNT).`);
+      }
+    }
+    if (inp.tariff && inp.tariff.mode !== "off") {
+      issues.push("A collections profile cannot combine with a tariff mode other than off (COL-TARIFF-CONFLICT).");
+    }
+    if (inp.financing && inp.financing.enabled && inp.financing.leveragedSolve) {
+      issues.push("A collections profile cannot combine with the leveraged solve (FIN-LEVERAGED-PROFILE).");
+    }
+  }
+  if (inp.projectLengthYears !== undefined && inp.projectLengthYears !== null) {
+    if (!Number.isInteger(inp.projectLengthYears) || inp.projectLengthYears < 1) {
+      issues.push(`Project length must be an integer of at least 1 (PROJ-LENGTH-INVALID); got ${inp.projectLengthYears}.`);
+    }
+  }
   if (inp.tariff && inp.tariff.mode !== "off") {
     const t = inp.tariff;
     t.rows.forEach((row) => {

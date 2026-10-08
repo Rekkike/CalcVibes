@@ -7,6 +7,7 @@ export function blankProject(): ModelInputs {
   return {
     projectName: "",
     currency: "SEK",
+    entryUnit: "thousands",
     targetIrr: 12,
     costs: [],
     repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0 },

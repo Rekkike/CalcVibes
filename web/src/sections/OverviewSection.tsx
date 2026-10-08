@@ -6,8 +6,9 @@ export function OverviewSection(props: {
   result: ModelResult | null;
   setProjectName: (v: string) => void;
   setTargetIrr: (v: string) => void;
+  setProjectLength: (v: number | null) => void;
 }) {
-  const { inputs, result, setProjectName, setTargetIrr } = props;
+  const { inputs, result, setProjectName, setTargetIrr, setProjectLength } = props;
   return (
     <section data-testid="overview">
       <h2>Overview</h2>
@@ -18,6 +19,11 @@ export function OverviewSection(props: {
       <label>
         Target IRR (%){" "}
         <input data-field="targetIrr" type="number" value={inputs.targetIrr} onChange={(e) => setTargetIrr(e.target.value)} />
+      </label>
+      <label>
+        Project length (years; empty = derived horizon){" "}
+        <input data-field="projectLength" type="number" value={inputs.projectLengthYears ?? ""} onChange={(e) =>
+          setProjectLength(e.target.value === "" ? null : parseFloat(e.target.value) || 0)} />
       </label>
       {result !== null ? (
         <dl data-testid="headline-stats">

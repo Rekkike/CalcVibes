@@ -91,6 +91,8 @@ describe("Task B: decompose operating window", () => {
       const c = JSON.parse(JSON.stringify(o)) as Record<string, unknown>;
       delete c.tariffYears;
       delete c.tariffBaseUnitPrice;
+      delete c.costGrid;
+      delete c.collectionsGrid;
       return c;
     };
     expect(JSON.stringify(strip(decM))).toBe(JSON.stringify(strip(offM)));

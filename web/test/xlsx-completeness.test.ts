@@ -100,31 +100,35 @@ describe("D-2: Metrics identity — one row per top-level scalar of ModelResult;
     expect(metricsRows.get("tariffBaseUnitPrice")).toBe(null);
   });
 
-  it("financing-on variant: financing scalars and the complete equity set", async () => {
+  it("XLSX-FIN-IDENT: the Metrics financing rows enumerated from FinancingResult leaf-for-leaf (no hand-keyed list)", async () => {
     const inputs = { ...demoProject(), financing: fin() };
     const result = computeModel(inputs);
     const map = await sheetMap(await buildWorkbook(inputs, result));
     const metricsRows = rowValues(map.get("Metrics") as Ws);
     const f = result.financing as NonNullable<ModelResult["financing"]>;
-    for (const [key, value] of [
-      ["financing.drawnTotal", f.drawnTotal],
-      ["financing.idc", f.idc],
-      ["financing.serviceStartBalance", f.serviceStartBalance],
-      ["financing.serviceStartMonth", f.serviceStartMonth],
-      ["financing.totalInterest", f.totalInterest],
-      ["financing.totalService", f.totalService],
-      ["financing.amortizationType", f.amortizationType],
-      ["financing.minDscrValue", f.minDscr?.value],
-      ["financing.minDscrYear", f.minDscr?.year],
-      ["equity.outlay", f.equity.outlay],
-      ["equity.npvAtWacc", f.equity.npvAtWacc],
-      ["equity.npvAtTarget", f.equity.npvAtTarget],
-      ["equity.payback", f.equity.payback],
-      ["equity.signChanges", f.equity.signChanges],
-      ["equity.irr", f.equity.irr],
-      ["equity.irrAmbiguous", "true"],
-      ["equity.zeroOutlay", "false"],
-    ] as [string, number | string][]) {
+    const leaves = new Map<string, number | string>();
+    for (const [key, value] of scalarLeaves({
+      drawnTotal: f.drawnTotal,
+      idc: f.idc,
+      serviceStartBalance: f.serviceStartBalance,
+      serviceStartMonth: f.serviceStartMonth,
+      termMonths: f.termMonths,
+      graceMonths: f.graceMonths,
+      amortizationType: f.amortizationType,
+      annuityPayment: f.annuityPayment,
+      principalPayment: f.principalPayment,
+      totalInterest: f.totalInterest,
+      totalService: f.totalService,
+      minDscrValue: f.minDscr === null ? null : f.minDscr.value,
+      minDscrYear: f.minDscr === null ? null : f.minDscr.year,
+    })) {
+      leaves.set(`financing.${key}`, value as number | string);
+    }
+    for (const [key, value] of scalarLeaves(f.equity, "equity")) {
+      leaves.set(key, typeof value === "boolean" ? (value ? "true" : "false") : (value as number | string));
+    }
+    for (const [key, value] of leaves) {
+      expect(metricsRows.has(key)).toBe(true);
       expect(metricsRows.get(key)).toBe(value);
     }
   });

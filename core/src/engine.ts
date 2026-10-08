@@ -79,6 +79,11 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const target = inp.targetIrr;
   const rM = Math.pow(1 + target / 100, 1 / 12) - 1;
   const costs = inp.costs;
+  const collectionsProfile = inp.repayment.collectionsOverrides && Object.keys(inp.repayment.collectionsOverrides).length > 0 ? inp.repayment.collectionsOverrides : null;
+  const profileMode = collectionsProfile !== null;
+  const profileYears = collectionsProfile ? Object.keys(collectionsProfile).map(Number).sort((a, b) => a - b) : [];
+  const profileEndMonth = profileYears.length > 0 ? profileYears[profileYears.length - 1] * 12 : 0;
+  const profileFirstMonth = profileYears.length > 0 ? (profileYears[0] - 1) * 12 + 1 : 0;
   let lastCostYear = 0;
   costs.forEach((c) => {
     const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
@@ -94,7 +99,9 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const overrideYear = inp.repayment.firstCollectionYear ?? null;
   const repaymentStartYear = overrideYear !== null ? overrideYear : lastCostYear + inp.repayment.graceYears;
   const termMonths = Math.round(Math.max(0, inp.repayment.termYears) * 12);
-  let totalMonths = Math.max(Math.ceil(lastCostYear * 12), repaymentStartYear * 12 + termMonths);
+  let totalMonths = profileMode
+    ? Math.max(Math.ceil(lastCostYear * 12), profileEndMonth)
+    : Math.max(Math.ceil(lastCostYear * 12), repaymentStartYear * 12 + termMonths);
   if (residualAmount > 0) totalMonths = Math.max(totalMonths, residualYear * 12);
   const tariffCfg0 = inp.tariff ?? { mode: "off" as const, escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null };
   const gridFirstYear = repaymentStartYear;
@@ -106,6 +113,29 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const tariffCollectionMode0 = tariffCfg0.mode === "stable" || tariffCfg0.mode === "manual" || tariffCfg0.mode === "fixed";
   const lastTariffMonth = tariffCfg0.mode !== "off" ? gridYears[gridYears.length - 1] * 12 : -1;
   if (lastTariffMonth > totalMonths) totalMonths = lastTariffMonth;
+  if (inp.projectLengthYears !== undefined && inp.projectLengthYears !== null) {
+    const lengthMonths = inp.projectLengthYears * 12;
+    const offenders: string[] = [];
+    const costEnd = lastCostYear * 12;
+    if (costEnd > lengthMonths) offenders.push(`the cost program ends at month ${costEnd}`);
+    if (profileMode) {
+      if (profileEndMonth > lengthMonths) offenders.push(`the collections profile ends at month ${profileEndMonth}`);
+    } else {
+      const scheduleEnd = repaymentStartYear * 12 + termMonths;
+      if (scheduleEnd > lengthMonths) offenders.push(`the repayment schedule ends at month ${scheduleEnd}`);
+    }
+    if (lastTariffMonth > lengthMonths) offenders.push(`the tariff grid ends at month ${lastTariffMonth}`);
+    if (residualAmount > 0 && residualYear * 12 > lengthMonths) offenders.push(`the residual lands at month ${residualYear * 12}`);
+    const finCfg0 = inp.financing && inp.financing.enabled ? inp.financing : null;
+    if (finCfg0) {
+      const serviceEnd = (finCfg0.serviceStartYear ?? repaymentStartYear) * 12 + finCfg0.termYears * 12;
+      if (serviceEnd > lengthMonths) offenders.push(`the financing service ends at month ${serviceEnd}`);
+    }
+    if (offenders.length > 0) {
+      throw new EngineInputError([`Project length ${inp.projectLengthYears} years is shorter than the modeled schedules (PROJ-LENGTH-EXCEEDED): ${offenders.join("; ")}.`]);
+    }
+    totalMonths = lengthMonths;
+  }
   const costM = new Array<number>(totalMonths).fill(0);
   costs.forEach((c) => {
     const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
@@ -144,8 +174,9 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   const balloonMonth = repaymentStartYear * 12 + termMonths;
   const df = (m: number) => 1 / Math.pow(1 + rM, m);
-  const balloonDf = balloonMonth <= totalMonths ? df(balloonMonth) : 0;
-  if (inp.repayment.balloon > 0 && inp.repayment.balloon * balloonDf >= costNpv) {
+  const balloonMonthProfile = profileEndMonth;
+  const balloonDf = (profileMode ? balloonMonthProfile : balloonMonth) <= totalMonths ? df(profileMode ? balloonMonthProfile : balloonMonth) : 0;
+  if (!profileMode && inp.repayment.balloon > 0 && inp.repayment.balloon * balloonDf >= costNpv) {
     throw new EngineInputError(["The balloon's discounted value at the target rate reaches the cost NPV; the solved payment would be non-positive."]);
   }
   const residualMonth = residualYear * 12;
@@ -271,7 +302,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     : (opts && opts.fixedPayment !== undefined
       ? opts.fixedPayment
       : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf) / dfSumEsc : 0));
-  const payment = tariffCollectionMode ? 0 : solvedPayment;
+  const payment = tariffCollectionMode || profileMode ? 0 : solvedPayment;
   const tariffEsc = tariffCfg.escalationPerYear / 100;
   const tariffInfos: import("./types.js").TariffYearInfo[] = [];
   let tariffBaseUnitPrice: number | null = null;
@@ -378,7 +409,15 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
 
   const inflowByMonth: Record<number, number> = {};
-  if (!tariffCollectionMode) {
+  if (profileMode) {
+    for (const y of profileYears) {
+      const amount = (collectionsProfile as Record<number, number>)[y];
+      const monthly = amount / 12;
+      for (let m = (y - 1) * 12 + 1; m <= y * 12; m++) {
+        inflowByMonth[m] = (inflowByMonth[m] || 0) + monthly;
+      }
+    }
+  } else if (!tariffCollectionMode) {
     slots.forEach((s) => {
       inflowByMonth[s.monthIndex] = (inflowByMonth[s.monthIndex] || 0) + payment * s.escFactor;
     });
@@ -395,8 +434,9 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       }
     }
   }
-  if (inp.repayment.balloon > 0 && balloonMonth <= totalMonths) {
-    inflowByMonth[balloonMonth] = (inflowByMonth[balloonMonth] || 0) + inp.repayment.balloon;
+  const balloonLandingMonth = profileMode ? profileEndMonth : balloonMonth;
+  if (inp.repayment.balloon > 0 && balloonLandingMonth <= totalMonths) {
+    inflowByMonth[balloonLandingMonth] = (inflowByMonth[balloonLandingMonth] || 0) + inp.repayment.balloon;
   }
   if (residualAmount > 0 && residualMonth <= totalMonths) {
     inflowByMonth[residualMonth] = (inflowByMonth[residualMonth] || 0) + residualAmount;
@@ -452,7 +492,9 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   });
   const totalCost = lineTotals.reduce((a, l) => a + l.total, 0) + operatingTotal;
   let totalCollected = 0;
-  if (!tariffCollectionMode) {
+  if (profileMode) {
+    for (const y of profileYears) totalCollected += (collectionsProfile as Record<number, number>)[y];
+  } else if (!tariffCollectionMode) {
     slots.forEach((s) => { totalCollected += payment * s.escFactor; });
   } else {
     for (const t of tariffInfos) totalCollected += t.revenue;
@@ -492,6 +534,89 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     mirr = N > 0 ? Math.pow(ratio, 12 / N) - 1 : null;
   }
   const goalMet = achieved !== null && achieved >= target / 100 - 1e-9;
+  const totalYearsForGrid = Math.ceil(totalMonths / 12);
+  const costGrid: import("./types.js").GridRow[] = [];
+  const zeroRow = () => new Array<number>(totalYearsForGrid).fill(0);
+  for (const c of inp.costs) {
+    const amounts = zeroRow();
+    const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+    if (c.category === "capex") {
+      const years = overrides ? Object.keys(overrides).map(Number) : [c.startYear];
+      for (const y of years) {
+        if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += overrides ? (overrides as Record<number, number>)[y] : c.amount;
+      }
+    } else {
+      const dur = Math.max(1, c.durationYears);
+      for (let y = c.startYear; y < c.startYear + dur && y <= totalYearsForGrid; y++) {
+        const overridden = overrides && Object.prototype.hasOwnProperty.call(overrides, String(y));
+        amounts[y - 1] += overridden ? (overrides as Record<number, number>)[y] : c.amount * Math.pow(1 + c.escalation / 100, y - c.startYear);
+      }
+    }
+    costGrid.push({ id: c.id, name: c.name, kind: "cost", amounts });
+  }
+  for (const o of operatingInfos) {
+    if (o.id === "maintenance") continue;
+    const amounts = zeroRow();
+    for (let m = o.effectiveWindow[0]; m <= o.effectiveWindow[1]; m++) {
+      const y = Math.floor((m - 1) / 12) + 1;
+      if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += o.total / Math.max(1, o.effectiveWindow[1] - o.effectiveWindow[0] + 1);
+    }
+    costGrid.push({ id: o.id, name: o.label, kind: "operating", amounts });
+  }
+  if (maintenanceCfg.mode !== "off") {
+    const mInfo = operatingInfos.find((o) => o.id === "maintenance");
+    if (mInfo) {
+      const amounts = zeroRow();
+      for (let m = mInfo.effectiveWindow[0]; m <= mInfo.effectiveWindow[1]; m++) {
+        const y = Math.floor((m - 1) / 12) + 1;
+        if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += mInfo.total / Math.max(1, mInfo.effectiveWindow[1] - mInfo.effectiveWindow[0] + 1);
+      }
+      costGrid.push({ id: "maintenance", name: "Maintenance (derived)", kind: "maintenance", amounts });
+    }
+  }
+  const collectionsGrid: import("./types.js").GridRow[] = [];
+  if (profileMode) {
+    const amounts = zeroRow();
+    for (const y of profileYears) {
+      if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += (collectionsProfile as Record<number, number>)[y];
+    }
+    collectionsGrid.push({ id: "profile", name: "Collections profile", kind: "profile", amounts });
+  } else if (tariffCfg0.mode !== "off" && tariffInfos.length > 0) {
+    if ((inp.tariff?.rows ?? []).length === 0) {
+      const amounts = zeroRow();
+      for (const t of tariffInfos) {
+        if (t.year >= 1 && t.year <= totalYearsForGrid) amounts[t.year - 1] += t.revenue;
+      }
+      collectionsGrid.push({ id: "tariff", name: "Tariff collections", kind: "tariff", amounts });
+    } else {
+      for (const row of inp.tariff?.rows ?? []) {
+        const amounts = zeroRow();
+        for (const t of tariffInfos) {
+          const charge = t.perRowCharges?.[row.id];
+          if (t.year >= 1 && t.year <= totalYearsForGrid) amounts[t.year - 1] += charge ?? 0;
+        }
+        collectionsGrid.push({ id: row.id, name: row.label, kind: "tariff", amounts });
+      }
+    }
+  } else {
+    const amounts = zeroRow();
+    for (const sl of slots) {
+      const y = Math.floor((sl.monthIndex - 1) / 12) + 1;
+      if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += payment * sl.escFactor;
+    }
+    collectionsGrid.push({ id: "payments", name: "Payment stream", kind: "payments", amounts });
+  }
+  if (inp.repayment.balloon > 0 && (profileMode ? profileEndMonth : balloonMonth) <= totalMonths) {
+    const amounts = zeroRow();
+    const y = Math.floor(((profileMode ? profileEndMonth : balloonMonth) - 1) / 12) + 1;
+    if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += inp.repayment.balloon;
+    collectionsGrid.push({ id: "balloon", name: "Balloon", kind: "balloon", amounts });
+  }
+  if (residualAmount > 0 && residualMonth <= totalMonths) {
+    const amounts = zeroRow();
+    if (residualYear >= 1 && residualYear <= totalYearsForGrid) amounts[residualYear - 1] += residualAmount;
+    collectionsGrid.push({ id: "residual", name: "Residual", kind: "residual", amounts });
+  }
   let financing: import("./types.js").FinancingResult | null = null;
   if (finCfg) {
     const inflowsByMonth = monthly.map((row) => row.inflow);
@@ -512,19 +637,23 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   return {
     leveragedSolve: leveraged,
-    totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: tariffCollectionMode ? null : solvedPayment,
-    paymentCount: tariffCollectionMode ? null : slots.length, totalCollected: totalCollected,
+    totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: tariffCollectionMode || profileMode ? null : solvedPayment,
+    paymentCount: tariffCollectionMode || profileMode ? null : slots.length, totalCollected: totalCollected,
     netGain: totalCollected - totalCost, achievedIrr: achieved,
     paybackYears: paybackMonths === null ? null : paybackMonths / 12,
     lastCostYear: lastCostYear, repaymentStartYear: repaymentStartYear,
     monthly: monthly, yearly: yearly, lineTotals: lineTotals,
     signChanges: signChanges, irrAmbiguous: signChanges > 1,
     npvAtTarget: npvAtTarget, npvAtWacc: npvAtWacc,
-    firstPaymentMonth: firstCollectionMonth,
-    lastPaymentMonth: tariffCollectionMode ? lastTariffMonth : lastPaymentMonth,
+    firstPaymentMonth: profileMode ? profileFirstMonth : firstCollectionMonth,
+    lastPaymentMonth: profileMode
+      ? Math.max(profileEndMonth, residualAmount > 0 ? residualMonth : 0)
+      : tariffCollectionMode ? lastTariffMonth : lastPaymentMonth,
     operatingLines: operatingInfos, operatingTotal: operatingTotal,
     tariffYears: tariffInfos, tariffBaseUnitPrice: tariffBaseUnitPrice,
     financing: financing,
+    costGrid: costGrid,
+    collectionsGrid: collectionsGrid,
     npvCollectionsAtWacc: npvCollectionsAtWacc, npvCostsAtWacc: npvCostsAtWacc,
     profitabilityIndex: profitabilityIndex, discountedPaybackYears: discountedPaybackMonths === null ? null : discountedPaybackMonths / 12,
     mirr: mirr, goalMet: goalMet,

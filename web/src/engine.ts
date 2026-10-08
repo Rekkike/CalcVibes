@@ -17,20 +17,44 @@ export function percentForDisplay(rate: number | null, digits: number = 5): stri
 export const CURRENCIES_ENUM = ["SEK", "EUR", "USD", "GBP", "NOK", "DKK"] as const;
 export type CurrencyCode = (typeof CURRENCIES_ENUM)[number];
 
-export function moneyForDisplay(value: number, currency: CurrencyCode = "SEK"): string {
+export type EntryUnit = "ones" | "thousands" | "millions";
+export const ENTRY_UNITS: EntryUnit[] = ["ones", "thousands", "millions"];
+
+export function unitFactor(unit: EntryUnit): number {
+  return unit === "thousands" ? 1000 : unit === "millions" ? 1000000 : 1;
+}
+
+export function moneyForDisplay(value: number, currency: CurrencyCode = "SEK", unit: EntryUnit = "ones"): string {
   const negative = value < 0;
-  const abs = roundForDisplay(Math.abs(value));
+  const factor = unitFactor(unit);
+  const scaled = Math.abs(value) / factor;
+  const abs = roundForDisplay(scaled);
   const [intPart, decPart] = abs.toFixed(2).split(".");
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const body = `${grouped},${decPart}`;
-  const withCurrency =
-    currency === "SEK" ? `${body} kr` :
-    currency === "EUR" ? `€${body}` :
-    currency === "USD" ? `$${body}` :
-    currency === "GBP" ? `£${body}` :
-    currency === "NOK" ? `NOK ${body}` :
-    `DKK ${body}`;
+  let token = "";
+  if (unit === "thousands") token = " k";
+  else if (unit === "millions") token = " M";
+  if (currency === "SEK") {
+    const sekToken = unit === "thousands" ? " tkr" : unit === "millions" ? " Mkr" : " kr";
+    return negative ? `-${body}${sekToken}` : `${body}${sekToken}`;
+  }
+  const prefix =
+    currency === "EUR" ? "€" :
+    currency === "USD" ? "$" :
+    currency === "GBP" ? "£" :
+    currency === "NOK" ? "NOK " :
+    "DKK ";
+  const withCurrency = `${prefix}${body}${token}`;
   return negative ? `-${withCurrency}` : withCurrency;
+}
+
+export function entryToValue(entry: number, unit: EntryUnit): number {
+  return entry * unitFactor(unit);
+}
+
+export function valueToEntry(value: number, unit: EntryUnit): number {
+  return value / unitFactor(unit);
 }
 
 export function percentTwoForDisplay(rate: number): string {

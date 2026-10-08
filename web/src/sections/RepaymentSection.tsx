@@ -1,5 +1,6 @@
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { roundForDisplay } from "../engine.js";
+import { spreadFill } from "../state.js";
 
 export function RepaymentSection(props: {
   inputs: ModelInputs;
@@ -31,6 +32,51 @@ export function RepaymentSection(props: {
         <input data-field="firstCollectionYear" type="number" value={inputs.repayment.firstCollectionYear ?? ""} onChange={(e) =>
           setRepayment({ firstCollectionYear: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })} />
       </label>
+      <details data-testid="collections-editor">
+        <summary>Per-year collections profile (optional; overrides the solved stream)</summary>
+        <table data-testid="collections-rows">
+          <thead><tr><th>Year</th><th>Collected sum</th><th></th></tr></thead>
+          <tbody>
+            {Object.entries(inputs.repayment.collectionsOverrides ?? {}).map(([y, amount]) => (
+              <tr key={y} data-override-year={y}>
+                <td><input data-field="col-override-year" value={y} onChange={(e) => {
+                  const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
+                  delete next[Number(y)];
+                  next[parseFloat(e.target.value) || 0] = amount;
+                  setRepayment({ collectionsOverrides: next });
+                }} /></td>
+                <td><input data-field="col-override-amount" type="number" value={amount} onChange={(e) => {
+                  const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
+                  next[Number(y)] = parseFloat(e.target.value) || 0;
+                  setRepayment({ collectionsOverrides: next });
+                }} /></td>
+                <td><button data-action="remove-col-override" data-year={y} onClick={() => {
+                  const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
+                  delete next[Number(y)];
+                  setRepayment({ collectionsOverrides: next });
+                }}>Remove</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button data-action="add-col-override" onClick={() => {
+          const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
+          next[3] = next[3] ?? 0;
+          setRepayment({ collectionsOverrides: next });
+        }}>Add year</button>
+        <div data-testid="collections-spread">
+          <label>Spread total <input data-field="col-spread-total" type="number" defaultValue="" /></label>
+          <label>First year <input data-field="col-spread-first" type="number" defaultValue={3} /></label>
+          <label>Year count <input data-field="col-spread-count" type="number" defaultValue={1} /></label>
+          <button data-action="col-spread-fill" onClick={() => {
+            const root = document.querySelector('[data-testid="collections-editor"]') as HTMLElement;
+            const total = parseFloat((root.querySelector('[data-field="col-spread-total"]') as HTMLInputElement).value) || 0;
+            const firstYear = parseFloat((root.querySelector('[data-field="col-spread-first"]') as HTMLInputElement).value) || 1;
+            const yearCount = parseFloat((root.querySelector('[data-field="col-spread-count"]') as HTMLInputElement).value) || 1;
+            setRepayment({ collectionsOverrides: spreadFill(total, firstYear, yearCount) });
+          }}>Spread</button>
+        </div>
+      </details>
       <label>Term (years) <input data-field="termYears" type="number" value={r.termYears} onChange={num("termYears")} /></label>
       <label>Payments per year{" "}
         <select data-field="paymentsPerYear" value={r.paymentsPerYear} onChange={(e) => setRepayment({ paymentsPerYear: parseInt(e.target.value, 10) })}>

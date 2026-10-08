@@ -56,6 +56,21 @@ describe("Task A: application-wide design system (structural pins)", () => {
 });
 
 describe("Task C: carried observations", () => {
+  it("STALE-STRING: the main-view reason names XLSX and PDF only; print and present stay enabled", () => {
+    render(<App />);
+    fireEvent.click(byAction("load-demo"));
+    fireEvent.click(byNav("costs"));
+    const nameInput = document.querySelector('[data-line="c1"] [data-field="name"]') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "" } });
+    const reason = document.querySelector('[data-testid="export-disabled-reason"]');
+    expect(reason && reason.textContent).toContain("XLSX and PDF export are disabled");
+    expect(reason && reason.textContent).not.toContain("print");
+    expect((byAction("print-deck") as HTMLButtonElement).disabled).toBe(false);
+    expect((byAction("present") as HTMLButtonElement).disabled).toBe(false);
+    expect((byAction("export-xlsx") as HTMLButtonElement).disabled).toBe(true);
+    expect((byAction("download-pdf") as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("the presentation-mode PDF button shows a visible disabled reason", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));

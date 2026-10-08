@@ -16,6 +16,7 @@ export interface RepaymentParams {
   paymentEscalation: number;
   balloon: number;
   firstCollectionYear?: number | null;
+  collectionsOverrides?: Record<number, number>;
 }
 
 export interface ResidualParams {
@@ -92,6 +93,7 @@ export interface AppraisalParams {
 export interface ModelInputs {
   projectName: string;
   currency: string;
+  entryUnit?: string;
   targetIrr: number;
   costs: CostLine[];
   repayment: RepaymentParams;
@@ -100,6 +102,7 @@ export interface ModelInputs {
   maintenance?: MaintenanceConfig;
   tariff?: TariffConfig;
   financing?: FinancingConfig;
+  projectLengthYears?: number | null;
 }
 
 export interface MonthlyRow {
@@ -203,4 +206,13 @@ export interface ModelResult {
   tariffBaseUnitPrice: number | null;
   financing: FinancingResult | null;
   leveragedSolve: boolean;
+  costGrid: GridRow[];
+  collectionsGrid: GridRow[];
+}
+
+export interface GridRow {
+  id: string;
+  name: string;
+  kind: string;
+  amounts: number[];
 }

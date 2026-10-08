@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
+import type { EntryUnit } from "../engine.js";
 
-export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null }) {
-  const { inputs, result, onExit, startYear = null } = props;
+export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit }) {
+  const { inputs, result, onExit, startYear = null, entryUnit = "ones" } = props;
   const [slide, setSlide] = useState(0);
   const totalSlides = 5;
-  const deck = result !== null ? deckSlides(inputs, result, { startYear }) : null;
+  const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit }) : null;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

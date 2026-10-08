@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { computeModel, solveTerm, CURRENCIES_ENUM } from "./engine.js";
+import { computeModel, solveTerm, CURRENCIES_ENUM, ENTRY_UNITS } from "./engine.js";
+import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
 import { EngineInputError } from "../../core/src/validate.js";
@@ -14,9 +15,10 @@ import { ScenariosSection } from "./sections/ScenariosSection.js";
 import { OperatingSection } from "./sections/OperatingSection.js";
 import { TariffSection } from "./sections/TariffSection.js";
 import { FinancingSection } from "./sections/FinancingSection.js";
+import { YearlyDetailSection } from "./sections/YearlyDetailSection.js";
 import { Presentation } from "./presentation/Presentation.js";
 
-type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "financing" | "appraisal" | "results" | "scenarios";
+type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "financing" | "appraisal" | "results" | "scenarios" | "detail";
 
 export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
@@ -25,10 +27,12 @@ export function App() {
   const [mode, setMode] = useState<"A" | "B" | "C">("A");
   const [modePayment, setModePayment] = useState(400000);
   const [startYear, setStartYear] = useState<number | null>(null);
+  const [entryUnit, setEntryUnit] = useState<EntryUnit>("thousands");
   const [startYearError, setStartYearError] = useState<string | null>(null);
   const [scenarioTargets, setScenarioTargets] = useState<number[] | null>(null);
   const [scenarioTerms, setScenarioTerms] = useState<number[] | null>(null);
   const [scenarioBalloons, setScenarioBalloons] = useState<number[] | null>(null);
+
 
   const issues = useMemo(() => {
     const list = validateInputs(inputs);
@@ -78,6 +82,7 @@ export function App() {
   const setProjectName = (v: string) => setInputs((p) => ({ ...p, projectName: v }));
   const setCurrency = (v: string) => setInputs((p) => ({ ...p, currency: v }));
   const setTargetIrr = (v: string) => setInputs((p) => ({ ...p, targetIrr: parseFloat(v) || 0 }));
+  const setProjectLength = (v: number | null) => setInputs((p) => ({ ...p, projectLengthYears: v }));
   const setRepayment = (patch: Partial<ModelInputs["repayment"]>) =>
     setInputs((p) => ({ ...p, repayment: { ...p.repayment, ...patch } }));
   const setAppraisal = (patch: Partial<NonNullable<ModelInputs["appraisal"]>>) =>
@@ -106,7 +111,7 @@ export function App() {
     if (result === null) return;
     const { buildDeckPdf } = await import("./pdf.js");
     const { deckSlides } = await import("./deck.js");
-    const model = deckSlides(inputs, result, { startYear });
+    const model = deckSlides(inputs, result, { startYear, entryUnit });
     const doc = buildDeckPdf(model, inputs.projectName || "project");
     doc.save(`${inputs.projectName || "project"}.pdf`);
   };
@@ -131,7 +136,7 @@ export function App() {
   }, [issues]);
 
   if (presOpen) {
-    return <Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} />;
+    return <Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} />;
   }
 
   return (
@@ -139,7 +144,7 @@ export function App() {
       <header>
         <h1>{inputs.projectName || "Untitled project"}</h1>
         <nav>
-          {(["overview", "costs", "operating", "repayment", "tariff", "financing", "appraisal", "results", "scenarios"] as View[]).map((v) => (
+          {(["overview", "costs", "operating", "repayment", "tariff", "financing", "appraisal", "results", "scenarios", "detail"] as View[]).map((v) => (
             <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
               {v === "costs" ? "Cost model" : v[0].toUpperCase() + v.slice(1)}
             </button>
@@ -163,7 +168,12 @@ export function App() {
         <button data-action="export-xlsx" onClick={exportXlsx} disabled={result === null}>Export XLSX</button>
         <button data-action="print-deck" onClick={printDeck}>Print deck</button>
         <button data-action="download-pdf" onClick={downloadPdf} disabled={result === null}>Download PDF</button>
-        {result === null && <span data-testid="export-disabled-reason" className="muted">Exports, print, and PDF are disabled until the input issues are resolved.</span>}
+        {result === null && <span data-testid="export-disabled-reason" className="muted">XLSX and PDF export are disabled until the input issues are resolved.</span>}
+        <label>Entry unit{" "}
+          <select data-field="entryUnit" value={entryUnit} onChange={(e) => setEntryUnit(e.target.value as EntryUnit)}>
+            {ENTRY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </label>
       </header>
       {(issues.length > 0 || engineIssues.length > 0) && (
         <section data-testid="issues-summary" className="issues">
@@ -175,7 +185,7 @@ export function App() {
       )}
       <main>
         {view === "overview" && (
-          <OverviewSection inputs={inputs} result={result} setProjectName={setProjectName} setTargetIrr={setTargetIrr} />
+          <OverviewSection inputs={inputs} result={result} setProjectName={setProjectName} setTargetIrr={setTargetIrr} setProjectLength={setProjectLength} />
         )}
         {view === "costs" && (
           <CostModelSection
@@ -221,6 +231,9 @@ export function App() {
             <h2>Mode C — evaluation of the given payment</h2>
             <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} />
           </section>
+        )}
+        {view === "detail" && result !== null && (
+          <YearlyDetailSection inputs={inputs} result={result} startYear={startYear} />
         )}
         {view === "scenarios" && <ScenariosSection inputs={inputs} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} onScenarioTargetsChange={setScenarioTargets} onScenarioTermsChange={setScenarioTerms} onScenarioBalloonsChange={setScenarioBalloons} />}
         {view === "results" && result === null && <p>Resolve the input issues to see results.</p>}

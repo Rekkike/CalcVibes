@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "projectName": "Project Alpha",
   "targetIrr": 12,
   "costs": [
@@ -54,7 +54,8 @@
   },
   "settings": {
     "startYear": null,
-    "currency": "SEK"
+    "currency": "SEK",
+    "entryUnit": "thousands"
   },
   "tariff": {
     "mode": "off",
