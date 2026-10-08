@@ -18,9 +18,9 @@ export function ScenariosSection(props: { inputs: ModelInputs }) {
       <table data-testid="scenario-table">
         <thead><tr><th>Scenario</th><th>Payment</th><th>Total cost</th><th>Payments</th></tr></thead>
         <tbody>
-          <tr data-scenario="base"><td>Base</td><td data-stat="basePayment">{roundForDisplay(sc.base.paymentAmount)}</td><td>{roundForDisplay(sc.base.totalCost)}</td><td>{sc.base.paymentCount}</td></tr>
-          <tr data-scenario="optimistic"><td>Optimistic</td><td data-stat="optPayment">{roundForDisplay(sc.optimistic.paymentAmount)}</td><td>{roundForDisplay(sc.optimistic.totalCost)}</td><td>{sc.optimistic.paymentCount}</td></tr>
-          <tr data-scenario="pessimistic"><td>Pessimistic</td><td data-stat="pesPayment">{roundForDisplay(sc.pessimistic.paymentAmount)}</td><td>{roundForDisplay(sc.pessimistic.totalCost)}</td><td>{sc.pessimistic.paymentCount}</td></tr>
+          <tr data-scenario="base"><td>Base</td><td data-stat="basePayment">{sc.base.paymentAmount === null ? "—" : roundForDisplay(sc.base.paymentAmount)}</td><td>{roundForDisplay(sc.base.totalCost)}</td><td>{sc.base.paymentCount}</td></tr>
+          <tr data-scenario="optimistic"><td>Optimistic</td><td data-stat="optPayment">{sc.optimistic.paymentAmount === null ? "—" : roundForDisplay(sc.optimistic.paymentAmount)}</td><td>{roundForDisplay(sc.optimistic.totalCost)}</td><td>{sc.optimistic.paymentCount}</td></tr>
+          <tr data-scenario="pessimistic"><td>Pessimistic</td><td data-stat="pesPayment">{sc.pessimistic.paymentAmount === null ? "—" : roundForDisplay(sc.pessimistic.paymentAmount)}</td><td>{roundForDisplay(sc.pessimistic.totalCost)}</td><td>{sc.pessimistic.paymentCount}</td></tr>
         </tbody>
       </table>
       <h3>Tornado (payment sensitivity)</h3>
@@ -28,7 +28,7 @@ export function ScenariosSection(props: { inputs: ModelInputs }) {
         <thead><tr><th>Factor</th><th>Low</th><th>High</th></tr></thead>
         <tbody>
           {t.map((row) => (
-            <tr key={row.factor} data-factor={row.factor}><td>{row.factor}</td><td>{roundForDisplay(row.low)}</td><td>{roundForDisplay(row.high)}</td></tr>
+            <tr key={row.factor} data-factor={row.factor}><td>{row.factor}</td><td>{row.low === null ? "—" : roundForDisplay(row.low)}</td><td>{row.high === null ? "—" : roundForDisplay(row.high)}</td></tr>
           ))}
         </tbody>
       </table>
@@ -37,7 +37,7 @@ export function ScenariosSection(props: { inputs: ModelInputs }) {
         <thead><tr><th>Target / term</th>{terms.map((x) => <th key={x}>{x}</th>)}</tr></thead>
         <tbody>
           {targets.map((target, i) => (
-            <tr key={target}><td>{target}%</td>{terms.map((term, j) => <td key={term}>{roundForDisplay(twoWay[i][j])}</td>)}</tr>
+            <tr key={target}><td>{target}%</td>{terms.map((term, j) => <td key={term}>{twoWay[i][j] === null ? "—" : roundForDisplay(twoWay[i][j])}</td>)}</tr>
           ))}
         </tbody>
       </table>
@@ -46,7 +46,7 @@ export function ScenariosSection(props: { inputs: ModelInputs }) {
         <thead><tr><th>Term / balloon</th>{balloons.map((x) => <th key={x}>{x}</th>)}</tr></thead>
         <tbody>
           {terms.map((term, i) => (
-            <tr key={term}><td>{term}</td>{balloons.map((balloon, j) => <td key={balloon}>{roundForDisplay(bt[i][j])}</td>)}</tr>
+            <tr key={term}><td>{term}</td>{balloons.map((balloon, j) => <td key={balloon}>{bt[i][j] === null ? "—" : roundForDisplay(bt[i][j])}</td>)}</tr>
           ))}
         </tbody>
       </table>

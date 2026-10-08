@@ -31,6 +31,29 @@ export interface OperatingLine {
   escalation: number;
 }
 
+export interface TariffRow {
+  id: string;
+  label: string;
+  weight: number;
+  lifts: number[];
+}
+
+export interface TariffConfig {
+  mode: "off" | "decompose" | "stable" | "manual" | "fixed";
+  escalationPerYear: number;
+  rows: TariffRow[];
+  fixedAnnualAmount: number | null;
+  manualPrices: number[] | null;
+}
+
+export interface TariffYearInfo {
+  year: number;
+  required: number | null;
+  weightedVolume: number;
+  unitPrice: number | null;
+  revenue: number;
+}
+
 export interface MaintenanceConfig {
   mode: "off" | "percent" | "fixed";
   percentPerYear?: number;
@@ -61,6 +84,7 @@ export interface ModelInputs {
   appraisal?: AppraisalParams;
   operatingLines?: OperatingLine[];
   maintenance?: MaintenanceConfig;
+  tariff?: TariffConfig;
 }
 
 export interface MonthlyRow {
@@ -90,7 +114,7 @@ export interface LineTotal {
 export interface ModelResult {
   totalCost: number;
   costNpv: number;
-  paymentAmount: number;
+  paymentAmount: number | null;
   paymentCount: number;
   totalCollected: number;
   netGain: number;
@@ -115,4 +139,6 @@ export interface ModelResult {
   lastPaymentMonth: number;
   operatingLines: OperatingLineInfo[];
   operatingTotal: number;
+  tariffYears: TariffYearInfo[];
+  tariffBaseUnitPrice: number | null;
 }

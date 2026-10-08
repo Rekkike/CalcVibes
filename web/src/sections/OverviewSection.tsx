@@ -23,7 +23,7 @@ export function OverviewSection(props: {
         <dl data-testid="headline-stats">
           <dt>Total cost</dt><dd data-stat="totalCost">{roundForDisplay(result.totalCost)}</dd>
           <dt>Cost NPV at target</dt><dd data-stat="costNpv">{roundForDisplay(result.costNpv)}</dd>
-          <dt>Payment per period</dt><dd data-stat="paymentAmount">{roundForDisplay(result.paymentAmount)}</dd>
+          <dt>Payment per period</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : roundForDisplay(result.paymentAmount)}</dd>
           <dt>Payments</dt><dd data-stat="paymentCount">{result.paymentCount}</dd>
           <dt>Total collected</dt><dd data-stat="totalCollected">{roundForDisplay(result.totalCollected)}</dd>
           <dt>Net gain</dt><dd data-stat="netGain">{roundForDisplay(result.netGain)}</dd>

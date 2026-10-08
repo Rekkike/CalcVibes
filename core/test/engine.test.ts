@@ -60,7 +60,7 @@ describe("CP-2 baseline scenario (prototype defaults)", () => {
   });
 
   it("paymentAmount is 475,309.13407 within 0.01", () => {
-    expect(Math.abs(result.paymentAmount - 475309.13407)).toBeLessThan(0.01);
+    expect(Math.abs((result.paymentAmount as number) - 475309.13407)).toBeLessThan(0.01);
   });
 
   it("totalCollected is 13,308,655.75409 within 0.01", () => {
@@ -92,7 +92,7 @@ describe("CP-3 adaptation scenario (grace, monthly payments, escalation, balloon
   });
 
   it("paymentAmount is 242,934.21588 within 0.01", () => {
-    expect(Math.abs(result.paymentAmount - 242934.21588)).toBeLessThan(0.01);
+    expect(Math.abs((result.paymentAmount as number) - 242934.21588)).toBeLessThan(0.01);
   });
 
   it("totalCollected is 15,670,872.98786 within 0.01", () => {

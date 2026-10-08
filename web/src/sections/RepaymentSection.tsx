@@ -45,7 +45,7 @@ export function RepaymentSection(props: {
       <label>Balloon <input data-field="balloon" type="number" value={r.balloon} onChange={num("balloon")} /></label>
       {result !== null && (
         <dl data-testid="repayment-summary">
-          <dt>Solved payment</dt><dd data-stat="paymentAmount">{roundForDisplay(result.paymentAmount)}</dd>
+          <dt>Solved payment</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : roundForDisplay(result.paymentAmount)}</dd>
           <dt>Payment count</dt><dd data-stat="paymentCount">{result.paymentCount}</dd>
           <dt>First payment year</dt><dd data-stat="repaymentStartYear">{result.repaymentStartYear}</dd>
           <dt>Total collected</dt><dd data-stat="totalCollected">{roundForDisplay(result.totalCollected)}</dd>

@@ -72,6 +72,22 @@ export function validateInputs(inp: ModelInputs): string[] {
       issues.push("Maintenance must have exactly one active mode: percent or fixed.");
     }
   }
+  if (inp.tariff && inp.tariff.mode !== "off") {
+    const t = inp.tariff;
+    t.rows.forEach((row) => {
+      if (!row.label || row.label.trim() === "") issues.push(`Tariff row ${row.id} has an empty descriptor.`);
+      if (!(row.weight > 0)) issues.push(`Tariff row ${row.id} (${row.label}) has a weight at or below 0.`);
+      row.lifts.forEach((l, i) => {
+        if (!Number.isInteger(l) || l < 0) issues.push(`Tariff row ${row.id} (${row.label}) has a non-integer or negative lift count at column ${i + 1}.`);
+      });
+    });
+    if (t.mode === "stable" && !Number.isFinite(t.escalationPerYear)) {
+      issues.push("Tariff escalation per year must be finite.");
+    }
+    if (t.mode === "fixed" && (t.fixedAnnualAmount === null || t.fixedAnnualAmount < 0)) {
+      issues.push("Fixed annual amount must be a non-negative number in fixed mode.");
+    }
+  }
   if (inp.appraisal) {
     const a = inp.appraisal;
     if (!(a.wacc > -100)) issues.push("WACC must be greater than -100.");

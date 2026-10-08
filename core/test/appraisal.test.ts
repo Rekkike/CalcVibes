@@ -81,6 +81,6 @@ describe("Chunk 1: appraisal metrics (template, defaults)", () => {
   it("balloon whose discounted value reaches costNpv is a surfaced input error; 20,000,000 is not", () => {
     expect(() => computeModel({ ...templateLike(), repayment: { ...templateLike().repayment, balloon: 21000000 } })).toThrowError(EngineInputError);
     const ok = computeModel({ ...templateLike(), repayment: { ...templateLike().repayment, balloon: 20000000 } });
-    expect(Math.abs(ok.paymentAmount - 13840.43)).toBeLessThan(0.01);
+    expect(Math.abs((ok.paymentAmount as number) - 13840.43)).toBeLessThan(0.01);
   });
 });

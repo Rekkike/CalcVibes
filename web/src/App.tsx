@@ -12,9 +12,10 @@ import { ResultsSection } from "./sections/ResultsSection.js";
 import { AppraisalSection } from "./sections/AppraisalSection.js";
 import { ScenariosSection } from "./sections/ScenariosSection.js";
 import { OperatingSection } from "./sections/OperatingSection.js";
+import { TariffSection } from "./sections/TariffSection.js";
 import { Presentation } from "./presentation/Presentation.js";
 
-type View = "overview" | "costs" | "operating" | "repayment" | "appraisal" | "results" | "scenarios";
+type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "appraisal" | "results" | "scenarios";
 
 export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
@@ -23,6 +24,7 @@ export function App() {
   const [mode, setMode] = useState<"A" | "B" | "C">("A");
   const [modePayment, setModePayment] = useState(400000);
   const [startYear, setStartYear] = useState<number | null>(null);
+  const [startYearError, setStartYearError] = useState<string | null>(null);
 
   const issues = useMemo(() => validateInputs(inputs), [inputs]);
   const { result, engineIssues } = useMemo(() => {
@@ -52,6 +54,8 @@ export function App() {
     setInputs((p) => ({ ...p, operatingLines: lines }));
   const setMaintenance = (m: import("../../core/src/types.js").MaintenanceConfig) =>
     setInputs((p) => ({ ...p, maintenance: m }));
+  const setTariff = (t: import("../../core/src/types.js").TariffConfig) =>
+    setInputs((p) => ({ ...p, tariff: t }));
   const addCost = () => setInputs((p) => ({ ...p, costs: [...p.costs, blankCostLine(nextCostId(p.costs))] }));
   const removeCost = (id: string) => setInputs((p) => ({ ...p, costs: p.costs.filter((c) => c.id !== id) }));
   const updateCost = (id: string, patch: Partial<CostLine>) =>
@@ -72,7 +76,7 @@ export function App() {
   }, [issues]);
 
   if (presOpen) {
-    return <Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} />;
+    return <Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} />;
   }
 
   return (
@@ -80,7 +84,7 @@ export function App() {
       <header>
         <h1>{inputs.projectName || "Untitled project"}</h1>
         <nav>
-          {(["overview", "costs", "operating", "repayment", "appraisal", "results", "scenarios"] as View[]).map((v) => (
+          {(["overview", "costs", "operating", "repayment", "tariff", "appraisal", "results", "scenarios"] as View[]).map((v) => (
             <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
               {v === "costs" ? "Cost model" : v[0].toUpperCase() + v.slice(1)}
             </button>
@@ -93,8 +97,14 @@ export function App() {
           <input data-field="startYear" type="number" value={startYear ?? ""} onChange={(e) => {
             const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
             setStartYear(v !== null && !Number.isNaN(v) ? v : null);
+            if (v !== null && !Number.isNaN(v) && (v < 1900 || v > 2200)) {
+              setStartYearError("Project start year must be between 1900 and 2200.");
+            } else {
+              setStartYearError(null);
+            }
           }} />
         </label>
+        {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
       </header>
       {(issues.length > 0 || engineIssues.length > 0) && (
         <section data-testid="issues-summary" className="issues">
@@ -123,6 +133,9 @@ export function App() {
         )}
         {view === "operating" && (
           <OperatingSection inputs={inputs} result={result} setOperating={setOperating} setMaintenance={setMaintenance} />
+        )}
+        {view === "tariff" && (
+          <TariffSection inputs={inputs} result={result} setTariff={setTariff} startYear={startYear} />
         )}
         {view === "appraisal" && (
           <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} />

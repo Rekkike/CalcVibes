@@ -38,13 +38,14 @@ const inlineBaseline: ModelInputs = {
   appraisal: { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } },
   operatingLines: [],
   maintenance: { mode: "off" },
+  tariff: { mode: "off", escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null },
 };
 
 describe("Chunk 0.5: template project golden fixture", () => {
   it("scalar pins (12)", () => {
     expect(result.totalCost).toBe(7849860);
     expect(Math.abs(result.costNpv - 6632597.98344)).toBeLessThan(0.01);
-    expect(Math.abs(result.paymentAmount - 475309.13407)).toBeLessThan(0.01);
+    expect(Math.abs((result.paymentAmount as number) - 475309.13407)).toBeLessThan(0.01);
     expect(result.paymentCount).toBe(28);
     expect(Math.abs(result.totalCollected - 13308655.75409)).toBeLessThan(0.01);
     expect(Math.abs(result.netGain - 5458795.75409)).toBeLessThan(0.01);
@@ -116,13 +117,28 @@ describe("Chunk 0.5: template project golden fixture", () => {
   it("operating variant (schema v3 fields exercised): maintenance percent 0.5 pins the CP-1 MAINT figures", () => {
     const operatingVariant = { ...fileInputs, maintenance: { mode: "percent" as const, percentPerYear: 0.5 } };
     const r = computeModel(operatingVariant);
-    expect(Math.abs(r.paymentAmount - 475857.58728)).toBeLessThan(0.01);
+    expect(Math.abs((r.paymentAmount as number) - 475857.58728)).toBeLessThan(0.01);
     expect(r.signChanges).toBe(55);
     expect(r.irrAmbiguous).toBe(true);
     expect(r.firstPaymentMonth).toBe(36);
     expect(r.operatingTotal).toBe(15375);
     expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
     expect(r.goalMet).toBe(true);
+  });
+
+  it("tariff variant (schema v4 fields exercised): stable mode with the rows of record pins the CP-3 STABLE figures", () => {
+    const rows = [
+      { id: "r1", label: "Loaded 20-ft", weight: 1, lifts: [400, 800, 800, 800, 800, 800, 800, 600] },
+      { id: "r2", label: "Loaded 40-ft", weight: 2, lifts: [150, 300, 300, 300, 300, 300, 300, 225] },
+    ];
+    const tariffVariant = { ...fileInputs, tariff: { mode: "stable" as const, escalationPerYear: 2, rows, fixedAnnualAmount: null, manualPrices: null } };
+    const r = computeModel(tariffVariant);
+    expect(Math.abs((r.tariffBaseUnitPrice as number) - 1204.2392789)).toBeLessThan(1e-4);
+    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(r.goalMet).toBe(true);
+    expect(r.signChanges).toBe(1);
+    expect(Math.abs(r.totalCollected - 13143208.01)).toBeLessThan(0.01);
+    expect(r.paymentAmount).toBeNull();
   });
 
   it("file-model identity: the file and the inline anchor are the same model", () => {

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "projectName": "Project Alpha",
   "currency": "EUR",
   "targetIrr": 12,
@@ -55,5 +55,12 @@
   },
   "settings": {
     "startYear": null
+  },
+  "tariff": {
+    "mode": "off",
+    "escalationPerYear": 2,
+    "rows": [],
+    "fixedAnnualAmount": null,
+    "manualPrices": null
   }
 }

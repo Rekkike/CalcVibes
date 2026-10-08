@@ -14,6 +14,7 @@ export function templateLike(): ModelInputs {
     appraisal: { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } },
     operatingLines: [],
     maintenance: { mode: "off" },
+    tariff: { mode: "off", escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null },
   };
 }
 
@@ -33,6 +34,7 @@ export function assertTemplateIdentity(): void {
     appraisal: templateFile.appraisal,
     operatingLines: templateFile.operatingLines,
     maintenance: templateFile.maintenance,
+    tariff: templateFile.tariff,
   });
   if (inline !== canonical) {
     throw new Error("The inline template copy in test/_shared.ts has drifted from data/template-project.json.");

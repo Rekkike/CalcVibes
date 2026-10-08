@@ -75,6 +75,16 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const termMonths = Math.round(Math.max(0, inp.repayment.termYears) * 12);
   let totalMonths = Math.max(Math.ceil(lastCostYear * 12), repaymentStartYear * 12 + termMonths);
   if (residualAmount > 0) totalMonths = Math.max(totalMonths, residualYear * 12);
+  const tariffCfg0 = inp.tariff ?? { mode: "off" as const, escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null };
+  const gridFirstYear = repaymentStartYear;
+  const gridYears: number[] = [];
+  for (let k = 0; k < inp.repayment.termYears + 1; k++) gridYears.push(gridFirstYear + k);
+  const weightedVolumes: number[] = gridYears.map((_, k) =>
+    tariffCfg0.rows.reduce((acc, row) => acc + row.weight * (row.lifts[k] ?? 0), 0)
+  );
+  const tariffCollectionMode0 = tariffCfg0.mode === "stable" || tariffCfg0.mode === "manual" || tariffCfg0.mode === "fixed";
+  const lastTariffMonth = tariffCfg0.mode !== "off" ? gridYears[gridYears.length - 1] * 12 : -1;
+  if (lastTariffMonth > totalMonths) totalMonths = lastTariffMonth;
   const costM = new Array<number>(totalMonths).fill(0);
   costs.forEach((c) => {
     if (c.category === "capex") {
@@ -111,9 +121,13 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const residualDf = residualAmount > 0 && residualMonth <= totalMonths ? df(residualMonth) : 0;
   const firstCollectionMonth = repaymentStartYear * 12;
   const lastPaymentMonth = slots.length > 0 ? slots[slots.length - 1].monthIndex : firstCollectionMonth;
-  const lastInflowMonth = Math.max(lastPaymentMonth, residualAmount > 0 ? residualMonth : 0);
+  const lastInflowMonth = tariffCfg0.mode !== "off"
+    ? Math.max(lastTariffMonth, residualAmount > 0 ? residualMonth : 0)
+    : Math.max(lastPaymentMonth, residualAmount > 0 ? residualMonth : 0);
   const operatingLinesIn = inp.operatingLines ?? [];
   const maintenanceCfg = inp.maintenance ?? { mode: "off" };
+  const tariffCfg = tariffCfg0;
+  const tariffCollectionMode = tariffCollectionMode0;
   const capexTotal = inp.costs
     .filter((c) => c.category === "capex")
     .reduce((acc, c) => acc + c.amount, 0);
@@ -149,15 +163,83 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   const operatingTotal = operatingInfos.reduce((acc, o) => acc + o.total, 0);
   const costNpvWithOperating = costNpv + operatingNpv;
+
   let dfSumEsc = 0;
   slots.forEach((s) => { dfSumEsc += s.escFactor * df(s.monthIndex); });
-  const payment = opts && opts.fixedPayment !== undefined
+  const solvedPayment = opts && opts.fixedPayment !== undefined
     ? opts.fixedPayment
     : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf) / dfSumEsc : 0);
+  const payment = tariffCollectionMode ? 0 : solvedPayment;
+  const tariffEsc = tariffCfg.escalationPerYear / 100;
+  const tariffInfos: import("./types.js").TariffYearInfo[] = [];
+  let tariffBaseUnitPrice: number | null = null;
+  if (tariffCfg.mode !== "off") {
+    if (tariffCfg.mode === "decompose") {
+      for (let k = 0; k < gridYears.length; k++) {
+        const year = gridYears[k];
+        let required = 0;
+        for (const sl of slots) {
+          const slotYear = Math.floor((sl.monthIndex - 1) / 12) + 1;
+          if (slotYear === year) required += payment * sl.escFactor;
+        }
+        if (weightedVolumes[k] <= 0 && required > 0) {
+          throw new EngineInputError([`Grid year ${year} has zero weighted volume against a positive required collection.`]);
+        }
+        const unitPrice = required / weightedVolumes[k];
+        tariffInfos.push({ year, required, weightedVolume: weightedVolumes[k], unitPrice, revenue: required });
+      }
+    } else {
+      let revenues: number[] = [];
+      if (tariffCfg.mode === "stable") {
+        let volumeNpvWeight = 0;
+        for (let k = 0; k < gridYears.length; k++) {
+          const year = gridYears[k];
+          const eligible: number[] = [];
+          for (let m = (year - 1) * 12 + 1; m <= year * 12; m++) {
+            if (m >= firstCollectionMonth) eligible.push(m);
+          }
+          for (const m of eligible) {
+            volumeNpvWeight += weightedVolumes[k] * Math.pow(1 + tariffEsc, k) / Math.pow(1 + rM, m) / eligible.length;
+          }
+        }
+        if (volumeNpvWeight <= 0) {
+          throw new EngineInputError(["Stable tariff infeasible: all weighted volumes are zero, so no base unit price can recover the cost NPV."]);
+        }
+        const netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf;
+        const base = netRequirement / volumeNpvWeight;
+        tariffBaseUnitPrice = base;
+        revenues = gridYears.map((_, k) => (base * Math.pow(1 + tariffEsc, k)) * weightedVolumes[k]);
+      } else if (tariffCfg.mode === "manual") {
+        revenues = gridYears.map((_, k) => (tariffCfg.manualPrices?.[k] ?? 0) * weightedVolumes[k]);
+      } else {
+        revenues = gridYears.map(() => tariffCfg.fixedAnnualAmount ?? 0);
+      }
+      for (let k = 0; k < gridYears.length; k++) {
+        const year = gridYears[k];
+        const unitPrice = tariffCfg.mode === "manual" ? (tariffCfg.manualPrices?.[k] ?? null) : (tariffCfg.mode === "stable" ? (tariffBaseUnitPrice as number) * Math.pow(1 + tariffEsc, k) : null);
+        tariffInfos.push({ year, required: null, weightedVolume: weightedVolumes[k], unitPrice, revenue: revenues[k] });
+      }
+    }
+  }
+
   const inflowByMonth: Record<number, number> = {};
-  slots.forEach((s) => {
-    inflowByMonth[s.monthIndex] = (inflowByMonth[s.monthIndex] || 0) + payment * s.escFactor;
-  });
+  if (!tariffCollectionMode) {
+    slots.forEach((s) => {
+      inflowByMonth[s.monthIndex] = (inflowByMonth[s.monthIndex] || 0) + payment * s.escFactor;
+    });
+  } else {
+    for (let k = 0; k < gridYears.length; k++) {
+      const year = gridYears[k];
+      const eligible: number[] = [];
+      for (let m = (year - 1) * 12 + 1; m <= year * 12; m++) {
+        if (m >= firstCollectionMonth) eligible.push(m);
+      }
+      const monthly = tariffInfos[k].revenue / eligible.length;
+      for (const m of eligible) {
+        inflowByMonth[m] = (inflowByMonth[m] || 0) + monthly;
+      }
+    }
+  }
   if (inp.repayment.balloon > 0 && balloonMonth <= totalMonths) {
     inflowByMonth[balloonMonth] = (inflowByMonth[balloonMonth] || 0) + inp.repayment.balloon;
   }
@@ -202,7 +284,11 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   });
   const totalCost = lineTotals.reduce((a, l) => a + l.total, 0) + operatingTotal;
   let totalCollected = 0;
-  slots.forEach((s) => { totalCollected += payment * s.escFactor; });
+  if (!tariffCollectionMode) {
+    slots.forEach((s) => { totalCollected += payment * s.escFactor; });
+  } else {
+    for (const t of tariffInfos) totalCollected += t.revenue;
+  }
   if (inp.repayment.balloon > 0) totalCollected += inp.repayment.balloon;
   if (residualAmount > 0) totalCollected += residualAmount;
   const signChanges = countSignChanges(monthly.map((mm2) => mm2.net));
@@ -239,7 +325,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   const goalMet = achieved !== null && achieved >= target / 100 - 1e-9;
   return {
-    totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: payment,
+    totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: tariffCollectionMode ? null : solvedPayment,
     paymentCount: slots.length, totalCollected: totalCollected,
     netGain: totalCollected - totalCost, achievedIrr: achieved,
     paybackYears: paybackMonths === null ? null : paybackMonths / 12,
@@ -249,6 +335,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     npvAtTarget: npvAtTarget, npvAtWacc: npvAtWacc,
     firstPaymentMonth: firstCollectionMonth, lastPaymentMonth: lastPaymentMonth,
     operatingLines: operatingInfos, operatingTotal: operatingTotal,
+    tariffYears: tariffInfos, tariffBaseUnitPrice: tariffBaseUnitPrice,
     npvCollectionsAtWacc: npvCollectionsAtWacc, npvCostsAtWacc: npvCostsAtWacc,
     profitabilityIndex: profitabilityIndex, discountedPaybackYears: discountedPaybackMonths === null ? null : discountedPaybackMonths / 12,
     mirr: mirr, goalMet: goalMet,
@@ -268,7 +355,7 @@ function lastCostYearOf(inp: ModelInputsLike): number {
   return last === 0 ? 1 : last;
 }
 
-function costNpvOf(inp: ModelInputsLike, rM: number): number {
+function costNpvOf(inp: ModelInputsLike, rM: number, operatingWindowEnd: number | null = null): number {
   const lastCostYear = lastCostYearOf(inp);
   const totalMonths = Math.max(Math.ceil(lastCostYear * 12), (lastCostYear + inp.repayment.graceYears) * 12 + Math.round(Math.max(0, inp.repayment.termYears) * 12));
   const costM = new Array<number>(totalMonths).fill(0);
@@ -287,6 +374,32 @@ function costNpvOf(inp: ModelInputsLike, rM: number): number {
   });
   let costNpv = 0;
   for (let i = 0; i < totalMonths; i++) costNpv += costM[i] / Math.pow(1 + rM, i + 1);
+  if (operatingWindowEnd !== null) {
+    const startMonth = (inp.repayment.firstCollectionYear ?? lastCostYear + inp.repayment.graceYears) * 12;
+    const capexTotal = inp.costs
+      .filter((c) => c.category === "capex")
+      .reduce((acc, c) => acc + c.amount, 0);
+    const addLine = (line: { amount: number; startYear: number; yearCount: number; escalation: number }) => {
+      const nominalFirst = line.startYear * 12 - 11;
+      const nominalLast = (line.startYear + line.yearCount - 1) * 12;
+      const effFirst = Math.max(nominalFirst, startMonth);
+      const effLast = Math.min(nominalLast, operatingWindowEnd);
+      if (effFirst > effLast) return;
+      for (let m = effFirst; m <= effLast; m++) {
+        const yearOf = Math.floor((m - 1) / 12) + 1;
+        const yearIdx = yearOf - line.startYear;
+        const monthly = (line.amount * Math.pow(1 + line.escalation / 100, yearIdx)) / 12;
+        costNpv += monthly / Math.pow(1 + rM, m);
+      }
+    };
+    (inp.operatingLines ?? []).forEach(addLine);
+    if (inp.maintenance && inp.maintenance.mode !== "off") {
+      const annual = inp.maintenance.mode === "percent"
+        ? ((inp.maintenance.percentPerYear ?? 0) / 100) * capexTotal
+        : (inp.maintenance.fixedAnnualAmount ?? 0);
+      addLine({ amount: annual, startYear: Math.floor((startMonth - 1) / 12) + 1, yearCount: Math.ceil(operatingWindowEnd / 12), escalation: 0 });
+    }
+  }
   return costNpv;
 }
 
@@ -309,40 +422,60 @@ export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResul
   const appraisal = inp.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } };
   const residualAmount = appraisal.residual.amount;
   const residualYear = appraisal.residual.year;
-  const costNpvBase = costNpvOf(inp, rM);
   const overrideYear = inp.repayment.firstCollectionYear ?? null;
   const startMonth = overrideYear !== null ? overrideYear * 12 : (lastCostYearOf(inp) + inp.repayment.graceYears) * 12;
   const residualMonth = residualYear * 12;
   const residualDf = residualAmount > 0 ? 1 / Math.pow(1 + rM, Math.max(residualMonth, startMonth + 1)) : 0;
-  const balloonMonth = startMonth + Math.round(inp.repayment.termYears * 12);
-  const balloonDf = inp.repayment.balloon > 0 ? 1 / Math.pow(1 + rM, balloonMonth) : 0;
-  const targetNpv = costNpvBase - inp.repayment.balloon * balloonDf - residualAmount * residualDf;
   const esc = inp.repayment.paymentEscalation / 100;
+  const hasOperating = (inp.operatingLines && inp.operatingLines.length > 0) || (inp.maintenance && inp.maintenance.mode !== "off");
+  let n: number | null = null;
+  let windowEnd = startMonth;
+  let targetNpv = 0;
   let dfSum = 0;
-  let n = 0;
   let infeasible = false;
-  if (payment <= 0 || targetNpv <= 0 && payment <= 0) {
-    infeasible = payment <= 0;
-  }
-  for (let k = 0; !infeasible; k++) {
-    const escFactor = Math.pow(1 + esc, Math.floor(k / ppy));
-    const monthIndex = startMonth + k * spacing;
-    const d = payment * escFactor / Math.pow(1 + rM, monthIndex);
-    if (!isFinite(d) || d <= 0) { infeasible = true; break; }
-    if (dfSum + d >= targetNpv) {
-      dfSum += d;
-      n = k + 1;
+  for (let iter = 0; iter < 100; iter++) {
+    const balloonMonth = startMonth + Math.round(inp.repayment.termYears * 12);
+    const balloonDf = inp.repayment.balloon > 0 ? 1 / Math.pow(1 + rM, balloonMonth) : 0;
+    const costNpvBase = costNpvOf(inp, rM, hasOperating ? windowEnd : null);
+    targetNpv = costNpvBase - inp.repayment.balloon * balloonDf - residualAmount * residualDf;
+    let dfSumIter = 0;
+    let nIter: number | null = null;
+    let bad = false;
+    if (payment <= 0 || targetNpv <= 0) {
+      bad = payment <= 0;
+      if (bad) { infeasible = true; n = null; dfSum = dfSumIter; break; }
+    }
+    for (let k = 0; ; k++) {
+      const escFactor = Math.pow(1 + esc, Math.floor(k / ppy));
+      const monthIndex = startMonth + k * spacing;
+      const d = payment * escFactor / Math.pow(1 + rM, monthIndex);
+      if (!isFinite(d) || d <= 0) { bad = true; break; }
+      if (dfSumIter + d >= targetNpv) {
+        dfSumIter += d;
+        nIter = k + 1;
+        break;
+      }
+      dfSumIter += d;
+      if (targetNpv - dfSumIter < 1e-9 * targetNpv) { nIter = k + 1; break; }
+      if (d < 1e-12 * dfSumIter) { bad = true; break; }
+    }
+    if (bad) { infeasible = true; n = null; dfSum = dfSumIter; break; }
+    const solvedLast = startMonth + (nIter as number) * spacing;
+    if (solvedLast === windowEnd || !hasOperating) {
+      n = nIter;
+      dfSum = dfSumIter;
+      windowEnd = solvedLast;
       break;
     }
-    dfSum += d;
-    if (targetNpv - dfSum < 1e-9 * targetNpv) { n = k + 1; break; }
-    if (d < 1e-12 * dfSum) { infeasible = true; break; }
-    n = k + 1;
+    if (solvedLast > windowEnd && iter > 0 && solvedLast === windowEnd) break;
+    windowEnd = solvedLast;
+    n = nIter;
+    dfSum = dfSumIter;
+    if (iter === 99) { n = nIter; dfSum = dfSumIter; windowEnd = solvedLast; }
   }
-  if (infeasible) {
-    const maxDf = dfSum;
+  if (infeasible || n === null) {
     const result = computeModel({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears } });
-    return { paymentCount: null, termYears: null, lastPaymentMonth: null, shortfall: targetNpv - maxDf, result };
+    return { paymentCount: null, termYears: null, lastPaymentMonth: null, shortfall: targetNpv - dfSum, result };
   }
   const termYears = n / ppy;
   const lastPaymentMonth = startMonth + (n - 1) * spacing;

@@ -148,12 +148,12 @@ describe("INV-7 monotonicity probes", () => {
     const base = makeInputs(baselineCosts, 12, { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0 });
     const baseResult = computeModel(base);
     const withBalloon = computeModel({ ...base, repayment: { ...base.repayment, balloon: 500000 } });
-    expect(withBalloon.paymentAmount).toBeLessThan(baseResult.paymentAmount);
-    expect(Math.abs(withBalloon.paymentAmount - 463772.41644)).toBeLessThan(0.01);
+    expect((withBalloon.paymentAmount as number)).toBeLessThan(baseResult.paymentAmount as number);
+    expect(Math.abs((withBalloon.paymentAmount as number) - 463772.41644)).toBeLessThan(0.01);
 
     const withGrace = computeModel({ ...base, repayment: { ...base.repayment, graceYears: 2 } });
-    expect(withGrace.paymentAmount).toBeGreaterThan(baseResult.paymentAmount);
-    expect(Math.abs(withGrace.paymentAmount - 596227.77778)).toBeLessThan(0.01);
+    expect((withGrace.paymentAmount as number)).toBeGreaterThan(baseResult.paymentAmount as number);
+    expect(Math.abs((withGrace.paymentAmount as number) - 596227.77778)).toBeLessThan(0.01);
 
     const at40 = computeModel({ ...base, targetIrr: 40 });
     expect(at40.costNpv).toBeLessThan(baseResult.costNpv);
@@ -161,9 +161,9 @@ describe("INV-7 monotonicity probes", () => {
 
     const term15 = computeModel({ ...base, repayment: { ...base.repayment, termYears: 15 } });
     const term3 = computeModel({ ...base, repayment: { ...base.repayment, termYears: 3 } });
-    expect(term15.paymentAmount).toBeLessThan(term3.paymentAmount);
-    expect(Math.abs(term15.paymentAmount - 318490.43128)).toBeLessThan(0.01);
-    expect(Math.abs(term3.paymentAmount - 903142.19709)).toBeLessThan(0.01);
+    expect((term15.paymentAmount as number)).toBeLessThan(term3.paymentAmount as number);
+    expect(Math.abs((term15.paymentAmount as number) - 318490.43128)).toBeLessThan(0.01);
+    expect(Math.abs((term3.paymentAmount as number) - 903142.19709)).toBeLessThan(0.01);
   });
 });
 

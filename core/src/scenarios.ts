@@ -37,8 +37,8 @@ export function scenarioResults(inp: ModelInputs): Record<"base" | "optimistic" 
 
 export interface TornadoRow {
   factor: string;
-  low: number;
-  high: number;
+  low: number | null;
+  high: number | null;
 }
 
 export function tornado(inp: ModelInputs): TornadoRow[] {
@@ -58,7 +58,7 @@ export function tornado(inp: ModelInputs): TornadoRow[] {
   ];
 }
 
-export function paymentVsTermTargetTable(inp: ModelInputs, terms: number[], targets: number[]): number[][] {
+export function paymentVsTermTargetTable(inp: ModelInputs, terms: number[], targets: number[]): (number | null)[][] {
   return targets.map((t) =>
     terms.map((term) =>
       computeModel({ ...inp, targetIrr: t, repayment: { ...inp.repayment, termYears: term } }).paymentAmount
@@ -66,7 +66,7 @@ export function paymentVsTermTargetTable(inp: ModelInputs, terms: number[], targ
   );
 }
 
-export function paymentVsBalloonTermTable(inp: ModelInputs, balloons: number[], terms: number[]): number[][] {
+export function paymentVsBalloonTermTable(inp: ModelInputs, balloons: number[], terms: number[]): (number | null)[][] {
   return terms.map((term) =>
     balloons.map((balloon) =>
       computeModel({ ...inp, repayment: { ...inp.repayment, termYears: term, balloon } }).paymentAmount

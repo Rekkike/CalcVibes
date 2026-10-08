@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { roundForDisplay } from "../engine.js";
+import { yearHeader } from "../state.js";
 
-export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void }) {
-  const { inputs, result, onExit } = props;
+export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null }) {
+  const { inputs, result, onExit, startYear = null } = props;
   const [slide, setSlide] = useState(0);
   const totalSlides = 5;
 
@@ -38,8 +39,8 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
         {slide === 2 && result !== null && (
           <section data-slide-name="repayment">
             <h2>Repayment</h2>
-            <p>Solved payment: {roundForDisplay(result.paymentAmount)} {inputs.currency}</p>
-            <p>Payments: {result.paymentCount}, starting year {result.repaymentStartYear}</p>
+            <p>Solved payment: {result.paymentAmount === null ? "not applicable (collection mode)" : roundForDisplay(result.paymentAmount)} {inputs.currency}</p>
+            <p>Payments: {result.paymentCount}, starting {yearHeader(result.repaymentStartYear, startYear)}</p>
             <p>Total collected (nominal): {roundForDisplay(result.totalCollected)} {inputs.currency}</p>
           </section>
         )}

@@ -49,7 +49,7 @@ describe("Chunk 2: Modes B and C", () => {
   });
 
   it("directional: below the Mode A payment, Mode C IRR is strictly below target; Mode B IRR is at least the target", () => {
-    const modeA = computeModel(templateLike()).paymentAmount;
+    const modeA = computeModel(templateLike()).paymentAmount as number;
     const c = computeModel(templateLike(), { fixedPayment: modeA * 0.9 });
     expect((c.achievedIrr as number)).toBeLessThan(0.12);
     const b = solveTerm(templateLike(), modeA * 0.9);

@@ -8,7 +8,7 @@ const base = () => ({ ...templateLike(), appraisal: appraisal() });
 describe("CP-2 repayment start override", () => {
   it("OVR2 (firstCollectionYear 2): full pin set", () => {
     const r = computeModel({ ...base(), repayment: { ...base().repayment, firstCollectionYear: 2 } });
-    expect(Math.abs(r.paymentAmount - 424383.15542)).toBeLessThan(0.01);
+    expect(Math.abs((r.paymentAmount as number) - 424383.15542)).toBeLessThan(0.01);
     expect(Math.abs(r.npvAtTarget)).toBeLessThan(1e-6);
     expect(Math.abs(r.totalCollected - 11882728.35187)).toBeLessThan(0.01);
     expect(Math.abs(r.netGain - 4032868.35187)).toBeLessThan(0.01);
@@ -28,7 +28,7 @@ describe("CP-2 repayment start override", () => {
 
   it("OVR2+MAINT: full pin set; the maintenance window recomputes to the actual start", () => {
     const r = computeModel({ ...base(), repayment: { ...base().repayment, firstCollectionYear: 2 }, maintenance: { mode: "percent", percentPerYear: 0.5 } });
-    expect(Math.abs(r.paymentAmount - 424931.60863)).toBeLessThan(0.01);
+    expect(Math.abs((r.paymentAmount as number) - 424931.60863)).toBeLessThan(0.01);
     expect(r.totalCost).toBe(7865235);
     expect(r.operatingTotal).toBe(15375);
     expect(Math.abs(r.totalCollected - 11898085.04172)).toBeLessThan(0.01);
@@ -45,8 +45,8 @@ describe("CP-2 repayment start override", () => {
   });
 
   it("directional: an earlier start lowers the solved payment", () => {
-    const ovr = computeModel({ ...base(), repayment: { ...base().repayment, firstCollectionYear: 2 } }).paymentAmount;
-    const derived = computeModel(base()).paymentAmount;
+    const ovr = computeModel({ ...base(), repayment: { ...base().repayment, firstCollectionYear: 2 } }).paymentAmount as number;
+    const derived = computeModel(base()).paymentAmount as number;
     expect(ovr).toBeLessThan(derived);
   });
 

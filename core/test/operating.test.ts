@@ -19,7 +19,7 @@ describe("CP-0 byte identity", () => {
 describe("CP-1 operating lines and maintenance", () => {
   it("MAINT (percent 0.5 of CAPEX): full pin set", () => {
     const r = computeModel({ ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 } });
-    expect(Math.abs(r.paymentAmount - 475857.58728)).toBeLessThan(0.01);
+    expect(Math.abs((r.paymentAmount as number) - 475857.58728)).toBeLessThan(0.01);
     expect(r.totalCost).toBe(7865235);
     expect(r.operatingTotal).toBe(15375);
     expect(Math.abs(r.totalCollected - 13324012.44394)).toBeLessThan(0.01);
@@ -41,7 +41,7 @@ describe("CP-1 operating lines and maintenance", () => {
 
   it("MAINT+RENT (rent 120,000/yr years 3-10): full pin set", () => {
     const r = computeModel({ ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 }, operatingLines: [{ id: "o1", label: "Rent", amount: 120000, startYear: 3, yearCount: 8, escalation: 0 }] });
-    expect(Math.abs(r.paymentAmount - 505108.42510)).toBeLessThan(0.01);
+    expect(Math.abs((r.paymentAmount as number) - 505108.42510)).toBeLessThan(0.01);
     expect(r.totalCost).toBe(8685235);
     expect(r.operatingTotal).toBe(835375);
     expect(Math.abs(r.totalCollected - 14143035.90267)).toBeLessThan(0.01);
@@ -64,7 +64,7 @@ describe("CP-1 operating lines and maintenance", () => {
 
   it("MAINT-FIXED (5,000/yr): pins", () => {
     const r = computeModel({ ...base(), maintenance: { mode: "fixed", fixedAnnualAmount: 5000 } });
-    expect(Math.abs(r.paymentAmount - 476527.91898)).toBeLessThan(0.01);
+    expect(Math.abs((r.paymentAmount as number) - 476527.91898)).toBeLessThan(0.01);
     expect(Math.abs(r.totalCost - 7884026.66667)).toBeLessThan(0.01);
     expect(Math.abs(r.operatingTotal - 34166.66667)).toBeLessThan(0.01);
     expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
@@ -73,11 +73,11 @@ describe("CP-1 operating lines and maintenance", () => {
   });
 
   it("directional: operating cost raises the solved payment; a further line raises it further; the start never moves", () => {
-    const plain = computeModel(base()).paymentAmount;
+    const plain = computeModel(base()).paymentAmount as number;
     const maint = computeModel({ ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 } });
     const rent = computeModel({ ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 }, operatingLines: [{ id: "o1", label: "Rent", amount: 120000, startYear: 3, yearCount: 8, escalation: 0 }] });
-    expect(maint.paymentAmount).toBeGreaterThan(plain);
-    expect(rent.paymentAmount).toBeGreaterThan(maint.paymentAmount);
+    expect((maint.paymentAmount as number)).toBeGreaterThan(plain as number);
+    expect((rent.paymentAmount as number)).toBeGreaterThan(maint.paymentAmount as number);
     expect(maint.firstPaymentMonth).toBe(36);
     expect(rent.firstPaymentMonth).toBe(36);
   });
