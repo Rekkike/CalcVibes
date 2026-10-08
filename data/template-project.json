@@ -1,7 +1,6 @@
 {
   "schemaVersion": 6,
   "projectName": "Project Alpha",
-  "currency": "EUR",
   "targetIrr": 12,
   "costs": [
     {

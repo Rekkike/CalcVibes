@@ -77,6 +77,14 @@ export function App() {
     a.click();
     URL.revokeObjectURL(url);
   };
+  const downloadPdf = async () => {
+    if (result === null) return;
+    const { buildDeckPdf } = await import("./pdf.js");
+    const { deckSlides } = await import("./deck.js");
+    const model = deckSlides(inputs, result, { startYear });
+    const doc = buildDeckPdf(model, inputs.projectName || "project");
+    doc.save(`${inputs.projectName || "project"}.pdf`);
+  };
   const printDeck = () => { window.print(); };
   const addCost = () => setInputs((p) => ({ ...p, costs: [...p.costs, blankCostLine(nextCostId(p.costs))] }));
   const removeCost = (id: string) => setInputs((p) => ({ ...p, costs: p.costs.filter((c) => c.id !== id) }));
@@ -127,8 +135,10 @@ export function App() {
           }} />
         </label>
         {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
-        <button data-action="export-xlsx" onClick={exportXlsx} disabled={result === null} title={result === null ? "Resolve the input issues to export" : "Export XLSX"}>Export XLSX</button>
-        <button data-action="print-deck" onClick={printDeck} disabled={result === null} title={result === null ? "Resolve the input issues to print" : "Print deck"}>Print deck</button>
+        <button data-action="export-xlsx" onClick={exportXlsx} disabled={result === null}>Export XLSX</button>
+        <button data-action="print-deck" onClick={printDeck} disabled={result === null}>Print deck</button>
+        <button data-action="download-pdf" onClick={downloadPdf} disabled={result === null}>Download PDF</button>
+        {result === null && <span data-testid="export-disabled-reason" className="muted">Exports, print, and PDF are disabled until the input issues are resolved.</span>}
       </header>
       {(issues.length > 0 || engineIssues.length > 0) && (
         <section data-testid="issues-summary" className="issues">

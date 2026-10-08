@@ -21,12 +21,55 @@ export async function buildWorkbook(
   inputsWs.addRow(["Item", "Value"]);
   bold(inputsWs.getRow(1).getCell(1));
   bold(inputsWs.getRow(1).getCell(2));
-  inputsWs.addRow(["Project name", inputs.projectName]);
-  inputsWs.addRow(["Currency", inputs.currency]);
-  inputsWs.addRow(["Target IRR (%)", inputs.targetIrr]);
-  inputsWs.addRow(["Payments per year", inputs.repayment.paymentsPerYear]);
-  inputsWs.addRow(["Term (years)", inputs.repayment.termYears]);
-  width(inputsWs, 24);
+  const flatInputs: [string, string | number | boolean | null][] = [
+    ["projectName", inputs.projectName],
+    ["currency", inputs.currency],
+    ["targetIrr", inputs.targetIrr],
+    ["repayment.graceYears", inputs.repayment.graceYears],
+    ["repayment.termYears", inputs.repayment.termYears],
+    ["repayment.paymentsPerYear", inputs.repayment.paymentsPerYear],
+    ["repayment.paymentEscalation", inputs.repayment.paymentEscalation],
+    ["repayment.balloon", inputs.repayment.balloon],
+    ["repayment.firstCollectionYear", inputs.repayment.firstCollectionYear ?? null],
+  ];
+  if (inputs.appraisal) {
+    flatInputs.push(
+      ["appraisal.wacc", inputs.appraisal.wacc],
+      ["appraisal.financeRate", inputs.appraisal.financeRate],
+      ["appraisal.reinvestmentRate", inputs.appraisal.reinvestmentRate],
+      ["appraisal.residual.amount", inputs.appraisal.residual.amount],
+      ["appraisal.residual.year", inputs.appraisal.residual.year],
+    );
+  }
+  if (inputs.maintenance) {
+    flatInputs.push(["maintenance.mode", inputs.maintenance.mode]);
+    if (inputs.maintenance.mode === "percent") flatInputs.push(["maintenance.percentPerYear", inputs.maintenance.percentPerYear ?? null]);
+    if (inputs.maintenance.mode === "fixed") flatInputs.push(["maintenance.fixedAnnualAmount", inputs.maintenance.fixedAnnualAmount ?? null]);
+  }
+  flatInputs.push(["operatingLines.count", (inputs.operatingLines ?? []).length]);
+  if (inputs.tariff) {
+    flatInputs.push(
+      ["tariff.mode", inputs.tariff.mode],
+      ["tariff.escalationPerYear", inputs.tariff.escalationPerYear],
+      ["tariff.rowCount", inputs.tariff.rows.length],
+      ["tariff.fixedAnnualAmount", inputs.tariff.fixedAnnualAmount],
+      ["tariff.manualPricesCount", inputs.tariff.manualPrices === null ? null : inputs.tariff.manualPrices.length],
+    );
+  }
+  if (inputs.financing) {
+    flatInputs.push(
+      ["financing.enabled", inputs.financing.enabled],
+      ["financing.sharePct", inputs.financing.sharePct],
+      ["financing.debtRatePct", inputs.financing.debtRatePct],
+      ["financing.termYears", inputs.financing.termYears],
+      ["financing.graceYears", inputs.financing.graceYears],
+      ["financing.serviceStartYear", inputs.financing.serviceStartYear],
+      ["financing.amortization", inputs.financing.amortization],
+      ["financing.leveragedSolve", inputs.financing.leveragedSolve],
+    );
+  }
+  for (const [k, v] of flatInputs) inputsWs.addRow([k, v]);
+  width(inputsWs, 30);
 
   const costsWs = wb.addWorksheet("Cost lines");
   costsWs.addRow(["Category", "Name", "Amount", "Start year", "Duration", "Escalation", "Nominal total"]);
@@ -55,28 +98,61 @@ export async function buildWorkbook(
   const metricsWs = wb.addWorksheet("Metrics");
   metricsWs.addRow(["Metric", "Value", "Unit"]);
   metricsWs.getRow(1).eachCell(bold);
-  const metrics: [string, number | string | null, string, string?][] = [
-    ["paymentAmount", result.paymentAmount, "money"],
-    ["totalCollected", result.totalCollected, "money"],
+  const metrics: [string, number | string | null, string][] = [
     ["totalCost", result.totalCost, "money"],
-    ["netGain", result.netGain, "money"],
     ["costNpv", result.costNpv, "money"],
-    ["npvAtWacc", result.npvAtWacc, "money"],
+    ["paymentAmount", result.paymentAmount, "money"],
+    ["paymentCount", result.paymentCount, "count"],
+    ["totalCollected", result.totalCollected, "money"],
+    ["netGain", result.netGain, "money"],
     ["npvAtTarget", result.npvAtTarget, "money"],
-    ["achievedIrr", result.achievedIrr, "rate"],
+    ["npvAtWacc", result.npvAtWacc, "money"],
+    ["npvCollectionsAtWacc", result.npvCollectionsAtWacc, "money"],
+    ["npvCostsAtWacc", result.npvCostsAtWacc, "money"],
+    ["profitabilityIndex", result.profitabilityIndex, "ratio"],
     ["paybackYears", result.paybackYears, "years"],
     ["discountedPaybackYears", result.discountedPaybackYears, "years"],
     ["mirr", result.mirr, "rate"],
-    ["profitabilityIndex", result.profitabilityIndex, "ratio"],
-    ["signChanges", result.signChanges, "count"],
+    ["achievedIrr", result.achievedIrr, "rate"],
     ["goalMet", result.goalMet ? "true" : "false", "flag"],
-    ["paymentCount", result.paymentCount, "count"],
+    ["signChanges", result.signChanges, "count"],
+    ["irrAmbiguous", result.irrAmbiguous ? "true" : "false", "flag"],
+    ["leveragedSolve", result.leveragedSolve ? "true" : "false", "flag"],
+    ["lastCostYear", result.lastCostYear, "count"],
+    ["repaymentStartYear", result.repaymentStartYear, "count"],
+    ["firstPaymentMonth", result.firstPaymentMonth, "count"],
+    ["lastPaymentMonth", result.lastPaymentMonth, "count"],
+    ["operatingTotal", result.operatingTotal, "money"],
+    ["tariffBaseUnitPrice", result.tariffBaseUnitPrice, "money"],
   ];
-  for (const [name, value, unit] of metrics) {
-    metricsWs.addRow([name, value, unit]);
+  if (result.financing !== null) {
+    const f = result.financing;
+    metrics.push(
+      ["financing.drawnTotal", f.drawnTotal, "money"],
+      ["financing.idc", f.idc, "money"],
+      ["financing.serviceStartBalance", f.serviceStartBalance, "money"],
+      ["financing.serviceStartMonth", f.serviceStartMonth, "count"],
+      ["financing.totalInterest", f.totalInterest, "money"],
+      ["financing.totalService", f.totalService, "money"],
+      ["financing.amortizationType", f.amortizationType, "flag"],
+      ["financing.minDscrValue", f.minDscr === null ? null : f.minDscr.value, "ratio"],
+      ["financing.minDscrYear", f.minDscr === null ? null : f.minDscr.year, "count"],
+      ["equity.outlay", f.equity.outlay, "money"],
+      ["equity.npvAtWacc", f.equity.npvAtWacc, "money"],
+      ["equity.npvAtTarget", f.equity.npvAtTarget, "money"],
+      ["equity.payback", f.equity.payback, "years"],
+      ["equity.signChanges", f.equity.signChanges, "count"],
+      ["equity.irr", f.equity.irr, "rate"],
+      ["equity.irrAmbiguous", f.equity.irrAmbiguous ? "true" : "false", "flag"],
+      ["equity.zeroOutlay", f.equity.zeroOutlay ? "true" : "false", "flag"],
+    );
   }
-  metricsWs.getColumn(2).numFmt = "#,##0.00";
-  width(metricsWs, 24);
+  for (const [name, value, unit] of metrics) {
+    const row = metricsWs.addRow([name, value === null ? null : value, unit]);
+    const fmt = unit === "money" ? "#,##0.00" : unit === "rate" ? "0.00%" : unit === "years" || unit === "ratio" ? "0.00" : undefined;
+    if (fmt) row.getCell(2).numFmt = fmt;
+  }
+  width(metricsWs, 26);
 
   if (result.financing !== null) {
     const finWs = wb.addWorksheet("Financing");
@@ -102,17 +178,50 @@ export async function buildWorkbook(
     for (const ty of result.tariffYears) {
       tarWs.addRow([ty.year, ty.weightedVolume, ty.unitPrice ?? null, ty.revenue]);
     }
-    const firstCharges = result.tariffYears[0]?.perRowCharges;
-    if (firstCharges) {
-      tarWs.addRow([]);
-      tarWs.addRow(["Per-row charges (first grid year)"]);
-      for (const row of inputs.tariff?.rows ?? []) {
-        tarWs.addRow([row.label, firstCharges[row.id]]);
+    const chargesHeader: (string | number)[] = ["Row", ...result.tariffYears.map((ty) => yearHeader(ty.year, opts.startYear))];
+    tarWs.addRow([]);
+    tarWs.addRow(chargesHeader);
+    chargesHeader.slice(1).forEach((_, i) => { const c = tarWs.getRow(tarWs.rowCount).getCell(i + 2); bold(c); });
+    for (const row of inputs.tariff?.rows ?? []) {
+      const chargesRow: (string | number | null)[] = [row.label];
+      for (const ty of result.tariffYears) {
+        chargesRow.push(ty.perRowCharges?.[row.id] ?? null);
       }
+      const added = tarWs.addRow(chargesRow);
+      for (let i = 1; i < chargesRow.length; i++) added.getCell(i + 1).numFmt = "#,##0.00";
     }
     tarWs.getColumn(3).numFmt = "#,##0.00";
     tarWs.getColumn(4).numFmt = "#,##0.00";
     width(tarWs, 20);
+  }
+
+  if (result.operatingLines.length > 0 || (inputs.maintenance && inputs.maintenance.mode !== "off")) {
+    const opWs = wb.addWorksheet("Operating lines");
+    opWs.addRow(["Label", "Amount", "Start year", "Count", "Escalation", "Nominal span start", "Nominal span end", "Effective window start", "Effective window end", "Total"]);
+    opWs.getRow(1).eachCell(bold);
+    for (const o of result.operatingLines) {
+      const configLine = (inputs.operatingLines ?? []).find((l) => l.id === o.id);
+      opWs.addRow([
+        o.label,
+        configLine?.amount ?? null,
+        configLine?.startYear ?? null,
+        configLine?.yearCount ?? null,
+        configLine?.escalation ?? null,
+        o.nominalSpan[0], o.nominalSpan[1],
+        o.effectiveWindow[0], o.effectiveWindow[1],
+        o.total,
+      ] as (string | number | null)[]);
+    }
+    if (inputs.maintenance && inputs.maintenance.mode !== "off") {
+      const basis = inputs.maintenance.mode === "percent"
+        ? `${inputs.maintenance.percentPerYear}% of total CAPEX`
+        : "fixed annual amount";
+      opWs.addRow([]);
+      opWs.addRow(["Maintenance basis", basis]);
+      opWs.addRow(["Operating total", result.operatingTotal]);
+    }
+    opWs.getColumn(10).numFmt = "#,##0.00";
+    width(opWs, 22);
   }
 
   return wb.xlsx.writeBuffer();

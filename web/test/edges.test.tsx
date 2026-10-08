@@ -21,8 +21,8 @@ describe("EX-5 edges", () => {
     const printBtn = byAction("print-deck") as HTMLButtonElement;
     expect(xlsx.disabled).toBe(true);
     expect(printBtn.disabled).toBe(true);
-    expect((xlsx as HTMLElement).title).toContain("Resolve the input issues");
-    expect((printBtn as HTMLElement).title).toContain("Resolve the input issues");
+    const reason = document.querySelector('[data-testid="export-disabled-reason"]');
+    expect(reason && reason.textContent).toContain("Exports, print, and PDF are disabled until the input issues are resolved");
   });
 
   it("an unrecognized legacy currency string surfaces as an issue, collect-all", () => {
@@ -55,5 +55,17 @@ describe("EX-4 route A: print stylesheet", () => {
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toContain("@media print");
     expect(css).toContain("page-break-after: always");
+  });
+});
+
+describe("Task F: template legacy currency field removed", () => {
+  it("demoProject().currency is SEK before and after (behavior unchanged)", async () => {
+    const { demoProject } = await import("../src/state.js");
+    expect(demoProject().currency).toBe("SEK");
+    const fs = await import("fs");
+    const raw = JSON.parse(fs.readFileSync("../data/template-project.json", "utf8"));
+    expect(raw.currency).toBeUndefined();
+    expect(raw.settings.currency).toBe("SEK");
+    expect(raw.schemaVersion).toBe(6);
   });
 });

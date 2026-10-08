@@ -33,7 +33,7 @@ export function yearHeader(k: number, startYear: number | null): string {
 export function demoProject(): ModelInputs {
   return {
     projectName: templateFile.projectName,
-    currency: ((templateFile as { settings?: { currency?: string } }).settings?.currency ?? templateFile.currency),
+    currency: ((templateFile as { settings?: { currency?: string } }).settings?.currency ?? (templateFile as { currency?: string }).currency ?? "SEK"),
     targetIrr: templateFile.targetIrr,
     costs: templateFile.costs.map((c) => ({
       ...c,

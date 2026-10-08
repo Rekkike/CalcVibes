@@ -3,7 +3,7 @@ import type { ModelInputs } from "../src/types.js";
 export function templateLike(): ModelInputs {
   return {
     projectName: "Project Alpha",
-    currency: "EUR",
+    currency: "SEK",
     targetIrr: 12,
     costs: [
       { id: "c1", name: "Development team", category: "recurring", amount: 1800000, startYear: 1, durationYears: 3, escalation: 3 },
@@ -28,7 +28,7 @@ export function assertTemplateIdentity(): void {
   const inline = JSON.stringify(templateLike());
   const canonical = JSON.stringify({
     projectName: templateFile.projectName,
-    currency: templateFile.currency,
+    currency: (templateFile as { settings?: { currency?: string } }).settings?.currency ?? (templateFile as { currency?: string }).currency,
     targetIrr: templateFile.targetIrr,
     costs: templateFile.costs,
     repayment: templateFile.repayment,

@@ -6,7 +6,7 @@ import type { CostLine, ModelInputs } from "../src/types.js";
 function fromFile(file: typeof templateFile): ModelInputs {
   return {
     projectName: file.projectName,
-    currency: file.currency,
+    currency: (file as { settings?: { currency?: string } }).settings?.currency ?? (file as { currency?: string }).currency ?? "SEK",
     targetIrr: file.targetIrr,
     costs: file.costs.map((c) => ({
       ...c,
