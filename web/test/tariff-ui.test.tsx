@@ -83,7 +83,7 @@ describe("chunk 7: carried fixes", () => {
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(document.querySelector('[data-slide-name="repayment"]')!.textContent).toContain("starting 2028");
+    expect(document.querySelector('[data-slide-name="recovery"]')!.textContent).toContain("First collection2028");
   });
 
   it("the results table uses the shared helper (covered in v0.3.1) and the deck does too; unset start gives Year-k", () => {
@@ -92,7 +92,7 @@ describe("chunk 7: carried fixes", () => {
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(document.querySelector('[data-slide-name="repayment"]')!.textContent).toContain("starting Year 3");
+    expect(document.querySelector('[data-slide-name="recovery"]')!.textContent).toContain("First collectionYear 3");
   });
 
   it("an out-of-range start year surfaces a validation message", () => {

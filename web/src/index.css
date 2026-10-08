@@ -1,0 +1,9 @@
+
+
+@media print {
+  body * { visibility: hidden; }
+  [data-testid="presentation"], [data-testid="presentation"] * { visibility: visible; }
+  [data-testid="presentation"] .deck-slide { page-break-after: always; }
+  [data-testid="presentation"] header, [data-testid="presentation"] footer { display: none; }
+  [data-testid="presentation"] button { display: none; }
+}

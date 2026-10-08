@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "projectName": "Project Alpha",
   "currency": "EUR",
   "targetIrr": 12,
@@ -54,7 +54,8 @@
     "mode": "off"
   },
   "settings": {
-    "startYear": null
+    "startYear": null,
+    "currency": "SEK"
   },
   "tariff": {
     "mode": "off",

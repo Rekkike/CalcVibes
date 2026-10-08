@@ -6,7 +6,7 @@ export const CURRENCIES = ["EUR", "USD", "GBP", "SEK", "NOK", "DKK"] as const;
 export function blankProject(): ModelInputs {
   return {
     projectName: "",
-    currency: "EUR",
+    currency: "SEK",
     targetIrr: 12,
     costs: [],
     repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0 },
@@ -15,6 +15,7 @@ export function blankProject(): ModelInputs {
 
 export interface ProjectSettings {
   startYear: number | null;
+  currency?: string;
 }
 
 export function blankOperatingLine(id: string): OperatingLine {
@@ -32,7 +33,7 @@ export function yearHeader(k: number, startYear: number | null): string {
 export function demoProject(): ModelInputs {
   return {
     projectName: templateFile.projectName,
-    currency: templateFile.currency,
+    currency: ((templateFile as { settings?: { currency?: string } }).settings?.currency ?? templateFile.currency),
     targetIrr: templateFile.targetIrr,
     costs: templateFile.costs.map((c) => ({
       ...c,

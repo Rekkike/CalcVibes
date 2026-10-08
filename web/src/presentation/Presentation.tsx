@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
-import { roundForDisplay } from "../engine.js";
-import { yearHeader } from "../state.js";
+import { deckSlides } from "../deck.js";
 
 export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null }) {
   const { inputs, result, onExit, startYear = null } = props;
   const [slide, setSlide] = useState(0);
   const totalSlides = 5;
+  const deck = result !== null ? deckSlides(inputs, result, { startYear }) : null;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -18,8 +18,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
     return () => window.removeEventListener("keydown", handler);
   }, [onExit]);
 
-  const pct = (v: number | null) => (v === null ? "—" : roundForDisplay(v * 100, 2) + "%");
-
+  
   return (
     <div data-testid="presentation" data-slide={slide}>
       <header>
@@ -27,41 +26,40 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
         <button data-action="exit-presentation" onClick={onExit}>Exit presentation (Esc)</button>
       </header>
       <main>
-        {slide === 0 && <h1>{inputs.projectName || "Untitled project"}</h1>}
-        {slide === 1 && result !== null && (
-          <section data-slide-name="investment">
-            <h2>Investment</h2>
-            <p>Total cost (nominal): {roundForDisplay(result.totalCost)} {inputs.currency}</p>
-            <p>Cost NPV at target (discounted): {roundForDisplay(result.costNpv)} {inputs.currency}</p>
-            <ul>{result.lineTotals.map((l) => <li key={l.id}>{l.name}: {roundForDisplay(l.total)}</li>)}</ul>
-          </section>
-        )}
-        {slide === 2 && result !== null && (
-          <section data-slide-name="repayment">
-            <h2>Repayment</h2>
-            <p>Solved payment: {result.paymentAmount === null ? "not applicable (collection mode)" : roundForDisplay(result.paymentAmount)} {inputs.currency}</p>
-            <p>Payments: {result.paymentCount}, starting {yearHeader(result.repaymentStartYear, startYear)}</p>
-            <p>Total collected (nominal): {roundForDisplay(result.totalCollected)} {inputs.currency}</p>
-          </section>
-        )}
-        {slide === 3 && result !== null && (
-          <section data-slide-name="returns">
-            <h2>Returns</h2>
-            <p>Achieved IRR: {pct(result.achievedIrr)} (target {roundForDisplay(inputs.targetIrr, 2)}%)</p>
-            {result !== null && result.irrAmbiguous && (
-              <p className="warning">Warning: the net flow has {result.signChanges} sign changes; the IRR may not be unique.</p>
-            )}
-            <p>Payback: {result.paybackYears === null ? "—" : roundForDisplay(result.paybackYears, 2) + " years (nominal)"}</p>
-            <p>Net gain (nominal): {roundForDisplay(result.netGain)} {inputs.currency}</p>
-          </section>
-        )}
-        {slide === 4 && result !== null && (
-          <section data-slide-name="summary">
-            <h2>Summary</h2>
-            <p>Total cost {roundForDisplay(result.totalCost)}, total collected {roundForDisplay(result.totalCollected)}, net gain {roundForDisplay(result.netGain)} — all nominal.</p>
-            <p>Achieved IRR {pct(result.achievedIrr)} against target {roundForDisplay(inputs.targetIrr, 2)}%.</p>
-          </section>
-        )}
+        {deck === null && <p data-testid="deck-placeholder">No result to present.</p>}
+        {deck !== null && deck.slides.map((sl, i) => (
+          slide === i && (
+            <section key={sl.name} data-slide-name={sl.name} className="deck-slide">
+              {i === 0 ? <h1>{sl.title}</h1> : <h2>{sl.title}</h2>}
+              {sl.body.map((f, j) => (
+                <p key={j} className="deck-figure">
+                  <span className="deck-figure-label">{f.label}</span>
+                  <span className="deck-figure-value">{f.value}</span>
+                  {f.disclosure !== undefined && <span className="deck-disclosure">{f.disclosure}</span>}
+                </p>
+              ))}
+              {sl.disclosures.map((d, j) => (
+                <p key={j} className="warning deck-disclosure">{d}</p>
+              ))}
+              {i === 1 && result !== null && (
+                <svg data-testid="composition-bar" width="600" height="120" role="img" aria-label="Cost composition">
+                  {(() => {
+                    const total = result.lineTotals.reduce((a, l) => a + l.total, 0);
+                    let x = 0;
+                    return result.lineTotals.map((l, k) => {
+                      const w = (l.total / total) * 600;
+                      const rect = <rect key={k} x={x} y={40} width={w} height={40} fill={k % 2 === 0 ? "#6366f1" : "#10b981"} />;
+                      const label = <text key={k + "t"} x={x + 4} y={100} fontSize="12">{l.name}</text>;
+                      x += w;
+                      return [rect, label];
+                    });
+                  })()}
+                  <line x1="0" y1="80" x2="600" y2="80" stroke="#333" />
+                </svg>
+              )}
+            </section>
+          )
+        ))}
       </main>
       <footer>
         <button data-action="prev-slide" onClick={() => setSlide((s) => Math.max(s - 1, 0))}>← Previous</button>

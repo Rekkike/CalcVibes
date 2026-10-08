@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { computeModel, solveTerm } from "./engine.js";
+import { computeModel, solveTerm, CURRENCIES_ENUM } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
 import { EngineInputError } from "../../core/src/validate.js";
@@ -27,7 +27,13 @@ export function App() {
   const [startYear, setStartYear] = useState<number | null>(null);
   const [startYearError, setStartYearError] = useState<string | null>(null);
 
-  const issues = useMemo(() => validateInputs(inputs), [inputs]);
+  const issues = useMemo(() => {
+    const list = validateInputs(inputs);
+    if (!CURRENCIES_ENUM.includes(inputs.currency as (typeof CURRENCIES_ENUM)[number])) {
+      list.push(`Currency "${inputs.currency}" is not a recognized currency (SEK, EUR, USD, GBP, NOK, DKK).`);
+    }
+    return list;
+  }, [inputs]);
   const { result, engineIssues } = useMemo(() => {
     if (issues.length > 0) return { result: null, engineIssues: [] as string[] };
     try {
@@ -59,6 +65,19 @@ export function App() {
     setInputs((p) => ({ ...p, tariff: t }));
   const setFinancing = (fc: import("../../core/src/types.js").FinancingConfig) =>
     setInputs((p) => ({ ...p, financing: fc }));
+  const exportXlsx = async () => {
+    if (result === null) return;
+    const { buildWorkbook } = await import("./xlsx.js");
+    const buffer = await buildWorkbook(inputs, result, { startYear });
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${inputs.projectName || "project"}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const printDeck = () => { window.print(); };
   const addCost = () => setInputs((p) => ({ ...p, costs: [...p.costs, blankCostLine(nextCostId(p.costs))] }));
   const removeCost = (id: string) => setInputs((p) => ({ ...p, costs: p.costs.filter((c) => c.id !== id) }));
   const updateCost = (id: string, patch: Partial<CostLine>) =>
@@ -108,6 +127,8 @@ export function App() {
           }} />
         </label>
         {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
+        <button data-action="export-xlsx" onClick={exportXlsx} disabled={result === null} title={result === null ? "Resolve the input issues to export" : "Export XLSX"}>Export XLSX</button>
+        <button data-action="print-deck" onClick={printDeck} disabled={result === null} title={result === null ? "Resolve the input issues to print" : "Print deck"}>Print deck</button>
       </header>
       {(issues.length > 0 || engineIssues.length > 0) && (
         <section data-testid="issues-summary" className="issues">

@@ -38,6 +38,7 @@ export function assertTemplateIdentity(): void {
     tariff: templateFile.tariff,
     financing: templateFile.financing,
   });
+  void templateFile.settings;
   if (inline !== canonical) {
     throw new Error("The inline template copy in test/_shared.ts has drifted from data/template-project.json.");
   }
