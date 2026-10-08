@@ -1,5 +1,13 @@
 import { computeModel } from "./engine.js";
+import { EngineInputError } from "./validate.js";
 import type { ModelInputs, ModelResult } from "./types.js";
+
+function assertNoCollectionsProfile(inp: ModelInputs): void {
+  const profile = inp.repayment.collectionsOverrides;
+  if (profile && Object.keys(profile).length > 0) {
+    throw new EngineInputError(["The payment sensitivity tables require the solved payment stream; they do not apply while a collections profile is present (SCE-PROFILE)."]);
+  }
+}
 
 export interface ScenarioShift {
   burnMultiplier: number;
@@ -59,6 +67,7 @@ export function tornado(inp: ModelInputs): TornadoRow[] {
 }
 
 export function paymentVsTermTargetTable(inp: ModelInputs, terms: number[], targets: number[]): (number | null)[][] {
+  assertNoCollectionsProfile(inp);
   return targets.map((t) =>
     terms.map((term) =>
       computeModel({ ...inp, targetIrr: t, repayment: { ...inp.repayment, termYears: term } }).paymentAmount
@@ -67,6 +76,7 @@ export function paymentVsTermTargetTable(inp: ModelInputs, terms: number[], targ
 }
 
 export function paymentVsBalloonTermTable(inp: ModelInputs, balloons: number[], terms: number[]): (number | null)[][] {
+  assertNoCollectionsProfile(inp);
   return terms.map((term) =>
     balloons.map((balloon) =>
       computeModel({ ...inp, repayment: { ...inp.repayment, termYears: term, balloon } }).paymentAmount

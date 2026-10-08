@@ -195,10 +195,11 @@ export function App() {
             addCost={addCost}
             removeCost={removeCost}
             updateCost={updateCost}
+            result={result}
           />
         )}
         {view === "repayment" && (
-          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} />
+          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} startYear={startYear} />
         )}
         {view === "operating" && (
           <OperatingSection inputs={inputs} result={result} setOperating={setOperating} setMaintenance={setMaintenance} />

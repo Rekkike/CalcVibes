@@ -750,6 +750,10 @@ export interface SolveTermResult {
 }
 
 export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResult {
+  const profileGuard = inp.repayment.collectionsOverrides;
+  if (profileGuard && Object.keys(profileGuard).length > 0) {
+    throw new EngineInputError(["The payment sensitivity tables require the solved payment stream; they do not apply while a collections profile is present (SCE-PROFILE)."]);
+  }
   const target = inp.targetIrr;
   const rM = Math.pow(1 + target / 100, 1 / 12) - 1;
   const ppy = [1, 2, 4, 12].indexOf(inp.repayment.paymentsPerYear) >= 0 ? inp.repayment.paymentsPerYear : 1;

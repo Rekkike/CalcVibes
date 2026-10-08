@@ -1,5 +1,6 @@
 import type { CostLine, ModelInputs } from "../../../core/src/types.js";
 import { CURRENCIES, spreadFill } from "../state.js";
+import { CompositionDonut } from "../charts.js";
 
 
 export function CostModelSection(props: {
@@ -9,8 +10,9 @@ export function CostModelSection(props: {
   addCost: () => void;
   removeCost: (id: string) => void;
   updateCost: (id: string, patch: Partial<CostLine>) => void;
+  result: import("../../../core/src/types.js").ModelResult | null;
 }) {
-  const { inputs, issueByLine, setCurrency, addCost, removeCost, updateCost } = props;
+  const { inputs, issueByLine, setCurrency, addCost, removeCost, updateCost, result } = props;
   return (
     <section data-testid="costs">
       <h2>Cost model</h2>
@@ -117,6 +119,11 @@ export function CostModelSection(props: {
         </tbody>
       </table>
       <button data-action="add-cost" onClick={addCost}>Add cost line</button>
+      {result !== null && (
+        <div className="scroll" data-testid="composition-donut-wrap">
+          <CompositionDonut lineTotals={result.lineTotals} />
+        </div>
+      )}
     </section>
   );
 }

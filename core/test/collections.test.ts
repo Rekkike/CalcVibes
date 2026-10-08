@@ -164,6 +164,21 @@ describe("COL-VALID", () => {
     expect(() => computeModel({ ...base(), tariff: { mode: "fixed", escalationPerYear: 2, rows: [], fixedAnnualAmount: 600000, manualPrices: null }, repayment: { ...base().repayment, collectionsOverrides: profile } })).toThrowError(/COL-TARIFF-CONFLICT/);
     expect(() => computeModel({ ...base(), financing: { ...fin(), leveragedSolve: true }, repayment: { ...base().repayment, collectionsOverrides: profile } })).toThrowError(/FIN-LEVERAGED-PROFILE/);
   });
+
+  it("the tables and solveTerm refuse under a profile (the fifth construct, SCE-PROFILE)", async () => {
+    const { paymentVsTermTargetTable, paymentVsBalloonTermTable } = await import("../src/scenarios.js");
+    const { solveTerm } = await import("../src/engine.js");
+    const msg = "The payment sensitivity tables require the solved payment stream; they do not apply while a collections profile is present (SCE-PROFILE).";
+    expect(() => paymentVsTermTargetTable(withProfile(), [5, 7, 9], [8, 12, 16])).toThrowError(/SCE-PROFILE/);
+    expect(() => paymentVsBalloonTermTable(withProfile(), [0, 1000000], [5, 7, 9])).toThrowError(/SCE-PROFILE/);
+    expect(() => solveTerm(withProfile(), 400000)).toThrowError(/SCE-PROFILE/);
+    const msgTable = (() => { try { paymentVsTermTargetTable(withProfile(), [5], [8]); return ""; } catch (e) { return (e as Error).message; } })();
+    expect(msgTable).toContain(msg);
+    // unchanged: the named scenario sets and the tornado keep working under profile mode
+    const { scenarioResults, tornado } = await import("../src/scenarios.js");
+    expect(() => scenarioResults(withProfile())).not.toThrow();
+    expect(() => tornado(withProfile())).not.toThrow();
+  });
 });
 
 describe("PROJ-LEN battery", () => {

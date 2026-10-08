@@ -39,8 +39,20 @@ export function ScenariosSection(props: { inputs: ModelInputs; scenarioTargets?:
   const targets = scenarioTargets ?? [8, 12, 16];
   const balloons = scenarioBalloons ?? [0, 1000000, 2000000];
   const profileActive = inputs.repayment.collectionsOverrides !== undefined && Object.keys(inputs.repayment.collectionsOverrides).length > 0;
-  const twoWay = profileActive ? [] : paymentVsTermTargetTable(inputs, terms, targets);
-  const bt = profileActive ? [] : paymentVsBalloonTermTable(inputs, balloons, terms);
+  let engineRefusal: string | null = null;
+  let twoWay: (number | null)[][] = [];
+  let bt: (number | null)[][] = [];
+  if (profileActive) {
+    try {
+      twoWay = paymentVsTermTargetTable(inputs, terms, targets);
+      bt = paymentVsBalloonTermTable(inputs, balloons, terms);
+    } catch (e) {
+      engineRefusal = (e as Error).message;
+    }
+  } else {
+    twoWay = paymentVsTermTargetTable(inputs, terms, targets);
+    bt = paymentVsBalloonTermTable(inputs, balloons, terms);
+  }
   return (
     <section data-testid="scenarios">
       <h2>Scenarios and sensitivity</h2>
@@ -67,7 +79,7 @@ export function ScenariosSection(props: { inputs: ModelInputs; scenarioTargets?:
           ))}
         </tbody>
       </table>
-      {profileActive && <p data-testid="sce-profile-note" className="warning">The payment sensitivity tables require the solved payment stream; they do not apply while a collections profile is present (SCE-PROFILE).</p>}
+      {profileActive && <p data-testid="sce-profile-note" className="warning">{engineRefusal ?? "The payment sensitivity tables require the solved payment stream; they do not apply while a collections profile is present (SCE-PROFILE)."}</p>}
       <h3>Payment vs term at each target IRR</h3>
       <table data-testid="term-target-table" style={{ display: profileActive ? "none" : undefined }}>
         <thead><tr><th>Target / term</th>{terms.map((x) => <th key={x}>{x}</th>)}</tr></thead>

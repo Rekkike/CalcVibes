@@ -13,11 +13,17 @@ export interface DeckFigure {
   disclosure?: string;
 }
 
+export interface DeckChartSlot {
+  kind: "donut" | "bars";
+  data: { label: string; value: number }[];
+}
+
 export interface DeckSlide {
   name: string;
   title: string;
   body: DeckFigure[];
   disclosures: string[];
+  chart?: DeckChartSlot;
 }
 
 export interface DeckModel {
@@ -64,6 +70,7 @@ export function deckSlides(
     title: `We invest ${money(result.totalCost)} nominal across ${lineCount} cost lines`,
     body: investmentBody,
     disclosures: [],
+    chart: { kind: "donut", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
   });
 
   // Slide 2 — recovery
@@ -120,7 +127,18 @@ export function deckSlides(
     recoveryBody.push({ label: "Mode", value: "evaluated, not solved", kind: "text", rawValue: null });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   }
-  slides.push({ name: "recovery", title: recoveryTitle, body: recoveryBody, disclosures: leveraged ? ["Collections solved so the equity earns the target (leveraged solve)"] : [] });
+  const yearsCount = result.yearly.length;
+  const inflowByYear = new Array<number>(yearsCount).fill(0);
+  for (const row of result.collectionsGrid) {
+    for (let k = 0; k < Math.min(yearsCount, row.amounts.length); k++) inflowByYear[k] += row.amounts[k];
+  }
+  slides.push({
+    name: "recovery",
+    title: recoveryTitle,
+    body: recoveryBody,
+    disclosures: leveraged ? ["Collections solved so the equity earns the target (leveraged solve)"] : [],
+    chart: { kind: "bars", data: inflowByYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })) },
+  });
 
   // Slide 3 — returns
   const returnsDisclosures: string[] = [];

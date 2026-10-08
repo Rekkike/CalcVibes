@@ -197,19 +197,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Warnings distinct from disclosures (v0.5.2 observation 1) */
-.app-root .warning {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  border-left: 3px solid var(--accent);
-  padding: var(--space-1) var(--space-2);
-  font-size: 0.9em;
-}
-
 .app-root .muted,
 .app-root .deck-disclosure,
 .app-root .caveat {
-  color: var(--muted);
+  color: var(--mut);
   font-size: 0.85em;
 }
 
@@ -258,4 +249,369 @@
   .app-root label {
     width: 100%;
   }
+}
+
+
+/* ===== v0.5.4: Port of Gothenburg app theme ===== */
+:root {
+  --bg: #f7f7fa;
+  --card: #ffffff;
+  --tint: #f2f2f5;
+  --line: #e5e5ea;
+  --ink: #343434;
+  --mut: #717273;
+  --navy: #103558;
+  --accent: #0074ba;
+  --accent-tint: #cce9ff;
+  --ok: #059669;
+  --bad: #e11d48;
+  --warn: #b45309;
+}
+
+.app-root {
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+.app-root section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 53, 88, 0.05);
+  padding: var(--space-4);
+}
+
+.app-root .card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 53, 88, 0.05);
+}
+
+.app-root .stat-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 53, 88, 0.05);
+  padding: var(--space-3);
+}
+
+.app-root .stat-card .stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+}
+
+.app-root .stat-card .stat-value {
+  font-size: 21px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.app-root .stat-card .stat-sub {
+  font-size: 12px;
+  color: var(--mut);
+}
+
+.app-root .tone-ok { color: var(--ok); }
+.app-root .tone-bad { color: var(--bad); }
+
+.app-root .badge {
+  display: inline-block;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--mut);
+  padding: 2px 10px;
+}
+
+.app-root button {
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+}
+
+.app-root button.primary,
+.app-root button.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.app-root button.btn-ghost {
+  background: transparent;
+  color: var(--mut);
+  border-color: transparent;
+}
+
+.app-root button.btn-outline {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.app-root button.btn-danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--bad);
+}
+
+.app-root header.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+  padding: var(--space-2) 0;
+}
+
+.app-root label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mut);
+}
+
+.app-root input,
+.app-root select {
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-root input:focus,
+.app-root select:focus {
+  outline: 2px solid var(--accent-tint);
+  border-color: var(--accent);
+}
+
+.app-root table {
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.app-root table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.app-root table td {
+  border-bottom: 1px solid var(--tint);
+}
+
+.app-root .scroll {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: auto;
+}
+
+.app-root .scroll table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--tint);
+  z-index: 5;
+}
+
+.app-root h2 {
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.app-root .lead {
+  font-size: 13px;
+  color: var(--mut);
+}
+
+.app-root .note {
+  font-size: 12px;
+  color: var(--mut);
+}
+
+/* Yearly detail: sticky name column and horizontal scroll (the nominal classes, now real) */
+.app-root .yearly-grid .grid-scroll {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.app-root .yearly-grid .sticky-col {
+  position: sticky;
+  left: 0;
+  background: var(--card);
+  z-index: 4;
+}
+
+.app-root .yearly-grid thead .sticky-col {
+  background: var(--tint);
+}
+
+.app-root .yearly-grid tfoot td {
+  background: var(--tint);
+  font-weight: 600;
+}
+
+/* Semantic states: warnings distinct from disclosures */
+.app-root .warning {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 8%, var(--card));
+  border-left: 3px solid var(--bad);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.9em;
+}
+
+.app-root .muted,
+.app-root .deck-disclosure,
+.app-root .caveat {
+  color: var(--mut);
+  font-size: 0.85em;
+}
+
+
+/* ===== v0.5.4 Task C: the deck stage (Port of Gothenburg navy) ===== */
+[data-testid="presentation"] {
+  --stage: #081c33;
+  position: fixed;
+  inset: 0;
+  background: var(--stage);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 70% -10%, rgba(0, 116, 186, 0.20), transparent),
+    radial-gradient(ellipse 60% 50% at 10% 110%, rgba(204, 233, 255, 0.06), transparent);
+  color: #ffffff;
+  overflow: auto;
+}
+
+[data-testid="presentation"] h1 {
+  font-size: 52px;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+[data-testid="presentation"] h2 {
+  font-size: 30px;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+[data-testid="presentation"] .deck-sub {
+  font-size: 15px;
+  color: #9db4cc;
+}
+
+[data-testid="presentation"] .kicker {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: #cce9ff;
+}
+
+[data-testid="presentation"] .deck-slide-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #5b7ba0;
+}
+
+[data-testid="presentation"] .deck-slide-footer {
+  color: #5b7ba0;
+  font-size: 0.8rem;
+}
+
+[data-testid="presentation"] button {
+  background: rgba(9, 26, 47, 0.7);
+  border: 1px solid #1d3a5f;
+  color: #ffffff;
+  border-radius: 9px;
+  padding: var(--space-1) var(--space-2);
+}
+
+[data-testid="presentation"] .deck-figure {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid #1d3a5f;
+  border-radius: 12px;
+  padding: var(--space-2) var(--space-3);
+  color: #e2e8f0;
+}
+
+[data-testid="presentation"] .deck-figure .deck-figure-value {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-testid="presentation"] .deck-disclosure {
+  color: #94a3b8;
+  font-size: 0.85em;
+}
+
+[data-testid="presentation"] .warning {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid #1d3a5f;
+  border-radius: 12px;
+}
+
+[data-testid="presentation"] .deck-slide {
+  animation: deckfade 0.35s ease-out;
+}
+
+@keyframes deckfade {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+[data-testid="presentation"] .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #475569;
+}
+
+[data-testid="presentation"] .dot.active {
+  width: 24px;
+  background: var(--accent, #0074ba);
+}
+
+@media print {
+  [data-testid="presentation"] {
+    position: static;
+    background: #ffffff;
+    background-image: none;
+    color: var(--ink, #343434);
+  }
+  [data-testid="presentation"] h1,
+  [data-testid="presentation"] h2 {
+    color: var(--ink, #343434);
+  }
+  [data-testid="presentation"] .deck-figure .deck-figure-value {
+    color: var(--ink, #343434);
+  }
+  [data-testid="presentation"] .deck-slide {
+    animation: none;
+  }
+}
+
+/* v0.5.4: standalone muted rule (the compound selector split for token clarity) */
+.app-root .muted {
+  color: var(--mut);
+  font-size: 0.85em;
+}
+
+.app-root .deck-disclosure,
+.app-root .caveat {
+  color: var(--mut);
+  font-size: 0.85em;
 }

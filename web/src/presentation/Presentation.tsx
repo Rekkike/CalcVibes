@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
+import { yearHeader } from "../state.js";
+import { CompositionDonut, RecoveryBars } from "../charts.js";
 import type { EntryUnit } from "../engine.js";
 
 export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit }) {
@@ -49,6 +51,16 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             {sl.disclosures.map((d, j) => (
               <p key={j} className="warning deck-disclosure">{d}</p>
             ))}
+            {i === 1 && result !== null && (
+              <div data-testid="deck-chart-slot" data-slide-chart="investment">
+                <CompositionDonut lineTotals={result.lineTotals} />
+              </div>
+            )}
+            {i === 2 && result !== null && (
+              <div data-testid="deck-chart-slot" data-slide-chart="recovery">
+                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} />
+              </div>
+            )}
             {i === 1 && result !== null && (
               <svg data-testid="composition-bar" width="600" height="120" role="img" aria-label="Cost composition">
                 {(() => {

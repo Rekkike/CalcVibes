@@ -1,6 +1,7 @@
 import type { ModelResult } from "../../../core/src/types.js";
 import { percentForDisplay, roundForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
+import { YearlyChart } from "../charts.js";
 
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null }) {
   const { result, targetIrr, currency, startYear = null } = props;
@@ -18,6 +19,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         )}
       </p>
       <h3>Yearly schedule</h3>
+      <YearlyChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} />
       <table data-testid="yearly-table">
         <thead>
           <tr><th>Year</th><th>Cost (nominal)</th><th>Collections (nominal)</th><th>Net (nominal)</th><th>Cumulative net (nominal)</th></tr>

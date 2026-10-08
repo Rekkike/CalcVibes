@@ -1,6 +1,6 @@
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { roundForDisplay } from "../engine.js";
-import { spreadFill } from "../state.js";
+import { spreadFill, yearHeader } from "../state.js";
 
 export function RepaymentSection(props: {
   inputs: ModelInputs;
@@ -10,8 +10,9 @@ export function RepaymentSection(props: {
   setMode: (m: "A" | "B" | "C") => void;
   modePayment: number;
   setModePayment: (p: number) => void;
+  startYear?: number | null;
 }) {
-  const { inputs, result, setRepayment, mode, setMode, modePayment, setModePayment } = props;
+  const { inputs, result, setRepayment, mode, setMode, modePayment, setModePayment, startYear = null } = props;
   const r = inputs.repayment;
   const num = (key: keyof ModelInputs["repayment"]) => (e: { target: { value: string } }) =>
     setRepayment({ [key]: parseFloat(e.target.value) || 0 } as Partial<ModelInputs["repayment"]>);
@@ -38,7 +39,7 @@ export function RepaymentSection(props: {
           <thead><tr><th>Year</th><th>Collected sum</th><th></th></tr></thead>
           <tbody>
             {Object.entries(inputs.repayment.collectionsOverrides ?? {}).map(([y, amount]) => (
-              <tr key={y} data-override-year={y}>
+              <tr key={y} data-override-year={y} data-calendar-label={yearHeader(Number(y), startYear)}>
                 <td><input data-field="col-override-year" value={y} onChange={(e) => {
                   const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
                   delete next[Number(y)];

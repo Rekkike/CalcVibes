@@ -25,6 +25,7 @@ export function OverviewSection(props: {
         <input data-field="projectLength" type="number" value={inputs.projectLengthYears ?? ""} onChange={(e) =>
           setProjectLength(e.target.value === "" ? null : parseFloat(e.target.value) || 0)} />
       </label>
+      <p data-testid="length-hint" className="note">Derived horizon: {result !== null ? `${result.monthly.length} months (${result.yearly.length} years)` : "not computed"}</p>
       {result !== null ? (
         <dl data-testid="headline-stats">
           <dt>Total cost</dt><dd data-stat="totalCost">{roundForDisplay(result.totalCost)}</dd>

@@ -25,10 +25,9 @@ describe("Task A: application-wide design system (structural pins)", () => {
 
   it("warnings are visually distinct from disclosures (a flip back to muted goes red)", () => {
     const css = fs.readFileSync("src/index.css", "utf8");
-    expect(css).toMatch(/\.app-root \.warning\s*\{[^}]*border-left:\s*3px solid var\(--accent\)/);
-    expect(css).toMatch(/\.app-root \.warning\s*\{[^}]*background:/);
-    expect(css).toMatch(/\.app-root \.warning\s*\{[^}]*color:\s*var\(--ink\)/);
-    expect(css).toMatch(/\.app-root \.muted[^{]*\{[^}]*color:\s*var\(--muted\)/);
+    expect(css).toMatch(/\.app-root \.warning\s*\{[^}]*border-left:\s*3px solid var\(--bad\)/);
+    expect(css).toMatch(/\.app-root \.warning\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--bad\) 8%/);
+    expect(css).toMatch(/\.app-root \.muted\s*\{[^}]*color:\s*var\(--mut\)/);
   });
 
   it("the viewport meta and a responsive rule are pinned", () => {
