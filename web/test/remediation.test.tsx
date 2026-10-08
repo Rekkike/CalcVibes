@@ -104,17 +104,17 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(model, "Project Alpha", trace);
     const tracedDeal = trace.drawnFigures[4].join("|");
-    const donut = model.slides[4].summaryCharts?.[0];
+    const rows = model.slides[4].summaryCharts?.[0];
     const bars = model.slides[4].summaryCharts?.[1];
-    expect(donut?.kind).toBe("donut");
+    expect(rows?.kind).toBe("rows");
     expect(bars?.kind).toBe("bars");
     expect(bars?.data.length).toBe(result.yearly.length);
     for (const d of bars?.data ?? []) {
       expect(tracedDeal).toContain(d.label);
     }
-    const donutTotal = Math.max(1e-12, (donut?.data ?? []).reduce((a, d) => a + d.value, 0));
-    for (const d of donut?.data ?? []) {
-      const sharePct = Math.round((d.value / donutTotal) * 100);
+    const rowsTotal = Math.max(1e-12, (rows?.data ?? []).reduce((a, d) => a + d.value, 0));
+    for (const d of rows?.data ?? []) {
+      const sharePct = Math.round((d.value / rowsTotal) * 100);
       expect(tracedDeal).toContain(`${d.label} ${sharePct}%`);
     }
   });
@@ -168,16 +168,18 @@ describe("Task R1: TILE-GRID / TONE-RENDER / STAGE-CHART-LEGIBILITY / RESPONSIVE
     expect(badTile.className).toContain("tone-bad");
   });
 
-  it("STAGE-CHART-LEGIBILITY: the stage donut renders its labels and center total near-white", () => {
+  it("STAGE-CHART-LEGIBILITY (re-anchored to the composition rows per v0.5.6): the row names and shares render near-white", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const donut = document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]') as SVGElement;
-    const label = donut.querySelector('[data-testid="donut-segment-label"]') as SVGTextElement;
-    expect(label.getAttribute("fill")).toBe("#e2e8f0");
-    const center = donut.querySelector('[data-testid="donut-center-total"]') as SVGTextElement;
-    expect(center.getAttribute("fill")).toBe("#e2e8f0");
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
+    const name = rows.querySelector('[data-row-label="name"]') as HTMLElement;
+    expect(name.className).toContain("row-name");
+    const share = rows.querySelector('[data-row-label="share"]') as HTMLElement;
+    expect(share.textContent).toMatch(/%$/);
+    const css = fs.readFileSync("src/index.css", "utf8");
+    expect(css).toMatch(/\[data-testid="presentation"\] \.composition-row \.row-name\s*\{[^}]*color:\s*#e2e8f0/);
   });
 
   it("RESPONSIVE: the charts are width-constrained and the donut labels sit inside the SVG bounds", () => {
@@ -193,19 +195,11 @@ describe("Task R1: TILE-GRID / TONE-RENDER / STAGE-CHART-LEGIBILITY / RESPONSIVE
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    const donut = document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]') as SVGElement;
-    const vb = donut.getAttribute("viewBox");
-    expect(vb).toBeTruthy();
-    const vbW = Number((vb as string).split(" ")[2]);
-    const labels = donut.querySelectorAll('[data-testid="donut-segment-label"]');
-    for (const lb of Array.from(labels)) {
-      const x = Number(lb.getAttribute("x"));
-      expect(x).toBeLessThan(vbW);
-      expect((lb as SVGTextElement).textContent?.length ?? 0).toBeGreaterThan(0);
-    }
-    expect(donut.getAttribute("width")).toBeNull();
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
+    expect(rows.querySelectorAll("[data-composition-row]").length).toBeGreaterThan(0);
     for (const svg of Array.from(document.querySelectorAll('[data-testid="presentation"] svg'))) {
       expect(svg.getAttribute("width")).toBeNull();
+      expect(svg.querySelector("text")).toBeNull();
     }
   });
 });
@@ -252,14 +246,16 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const investmentDonut = document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]');
-    expect(investmentDonut?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("WHERE THE MONEY GOES");
-    expect(investmentDonut?.querySelectorAll('[data-testid="donut-segment-label"]').length).toBe(3);
-    expect(investmentDonut?.querySelector('[data-testid="donut-center-total"]')?.textContent).toBe(moneyForDisplay(result.totalCost, "SEK", unit));
+    const investmentRows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
+    expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Where the money goes");
+    expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(3);
+    const firstRow = investmentRows?.querySelector("[data-composition-row]");
+    expect(firstRow?.querySelector('[data-row-label="name"]')?.textContent).toBe(result.lineTotals[0].name);
+    expect(firstRow?.querySelector('[data-row-label="value"]')?.textContent).toBe(moneyForDisplay(result.lineTotals[0].total, "SEK", unit));
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const recoveryBars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]');
-    expect(recoveryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("WHEN THE INFLOWS ARRIVE");
+    expect(recoveryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("When the inflows arrive");
     expect(recoveryBars?.querySelectorAll('[data-testid="bar-year-label"]').length).toBe(10);
     expect(recoveryBars?.querySelector('[data-testid="peak-label"]')).toBeTruthy();
 
@@ -267,8 +263,8 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const summaryDonut = document.querySelector('[data-summary-chart="donut"]');
     const summaryBars = document.querySelector('[data-summary-chart="bars"]');
-    expect(summaryDonut?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("WHERE THE MONEY GOES");
-    expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("WHEN THE INFLOWS ARRIVE");
+    expect(summaryDonut?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Where the money goes");
+    expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("When the inflows arrive");
   });
 
   it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force", async () => {
@@ -280,7 +276,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    const peak = document.querySelector('[data-testid="peak-label"]') as SVGTextElement;
+    const peak = Array.from(document.querySelectorAll('[data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
     const peakValue = Math.max(...result.collectionsGrid.reduce((acc, row) => {
       for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
       return acc;
@@ -290,6 +286,6 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
 
   it("PEAK-PRINT: the print stylesheet carries the peak-label ink variant", () => {
     const css = fs.readFileSync("src/index.css", "utf8");
-    expect(css).toMatch(/@media print[\s\S]*?\[data-testid="presentation"\] \[data-testid="peak-label"\]\s*\{[^}]*fill:\s*#343434/);
+    expect(css).toMatch(/@media print[\s\S]*?\[data-testid="presentation"\] \.peak-label\s*\{[^}]*color:\s*#343434/);
   });
 });

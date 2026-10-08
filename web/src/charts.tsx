@@ -4,6 +4,7 @@ export const CHART_COLORS = {
   costBar: "#fb7185",
   inflowBar: "#34d399",
   cumulative: "#0074ba",
+  accentBar: "#0074ba",
 };
 
 export const STAGE_CHART_COLORS = {
@@ -121,39 +122,61 @@ export function CompositionDonut(props: { lineTotals: LineTotal[]; stage?: boole
   );
 }
 
-export function RecoveryBars(props: { collectionsGrid: GridRow[]; years: number; labelFor: (year: number) => string; peakFor?: (value: number) => string; kicker?: string }) {
+export function CompositionRows(props: {
+  lineTotals: LineTotal[];
+  valueFor: (total: number) => string;
+  kicker?: string;
+}) {
+  const { lineTotals, valueFor, kicker } = props;
+  const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
+  const rows = lineTotals.map((l) => ({ ...l, sharePct: l.total / total }));
+  return (
+    <div data-testid="composition-rows" className="chart-block">
+      {kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{kicker}</p>}
+      {rows.map((r) => (
+        <div key={r.id} data-composition-row={r.id} className="composition-row">
+          <span data-row-label="name" className="row-name">{r.name}</span>
+          <span data-row-label="share" className="row-share">{Math.round(r.sharePct * 100)}%</span>
+          <div className="row-bar-track">
+            <svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" className="row-bar-svg">
+              <rect x={0} y={0} width={100 * r.sharePct} height={8} fill={CHART_COLORS.accentBar} rx={2} />
+            </svg>
+          </div>
+          <span data-row-label="value" className="row-value">{valueFor(r.total)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function RecoveryBars(props: {
+  collectionsGrid: GridRow[];
+  years: number;
+  labelFor: (year: number) => string;
+  peakFor: (value: number) => string;
+  kicker?: string;
+}) {
   const { collectionsGrid, years, labelFor, peakFor, kicker } = props;
   const inflows = new Array<number>(years).fill(0);
   for (const row of collectionsGrid) {
     for (let k = 0; k < Math.min(years, row.amounts.length); k++) inflows[k] += row.amounts[k];
   }
-  const W = 780, H = 270, padL = 74, padB = 34;
   const max = Math.max(1, ...inflows);
-  const plotW = W - padL - 16;
-  const groupW = plotW / Math.max(1, years);
-  const barW = Math.min(28, groupW / 2);
-  const yFor = (v: number) => H - padB - (v / max) * (H - padB - 20);
+  const peakIdx = inflows.indexOf(Math.max(...inflows));
   return (
-    <svg data-testid="recovery-bars" viewBox={`0 0 ${W} ${H + (kicker !== undefined ? 18 : 0)}`} role="img" aria-label="Yearly collections">
-      {kicker !== undefined && (
-        <text data-testid="chart-kicker" x={padL} y={12} fontSize="11" fontWeight="700" letterSpacing="0.08em" fill="#cce9ff">{kicker.toUpperCase()}</text>
-      )}
-      {[0, 0.5, 1].map((f) => (
-        <line key={f} x1={padL} x2={W - 8} y1={yFor(max * f)} y2={yFor(max * f)} stroke={STAGE_CHART_COLORS.gridline} />
-      ))}
-      <line x1={padL} x2={W - 8} y1={yFor(0)} y2={yFor(0)} stroke={STAGE_CHART_COLORS.zeroLine} />
-      {(() => {
-        const peakIdx = inflows.indexOf(Math.max(...inflows));
-        return inflows.map((v, k) => (
-          <g key={k}>
-            <rect data-chart-bar="collection" x={padL + k * groupW + groupW / 2 - barW / 2} y={yFor(v)} width={barW} height={yFor(0) - yFor(v)} fill={CHART_COLORS.inflowBar} rx={3} />
-            {k === peakIdx && v > 0 && (
-              <text data-testid="peak-label" x={padL + k * groupW + groupW / 2} y={yFor(v) - 6} fontSize="10" textAnchor="middle" fill="#e2e8f0">{peakFor !== undefined ? peakFor(v) : (v >= 1000 ? (v / 1000).toFixed(0) + "k" : String(v))}</text>
-            )}
-            <text data-testid="bar-year-label" x={padL + k * groupW + groupW / 2} y={H - 14} fontSize="10" textAnchor="middle" fill={STAGE_CHART_COLORS.axisText}>{labelFor(k + 1)}</text>
-          </g>
-        ));
-      })()}
-    </svg>
+    <div data-testid="recovery-bars" className="chart-block">
+      {kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{kicker}</p>}
+      <div className="recovery-grid">
+        {inflows.map((v, k) => (
+          <div key={k} data-recovery-column={k} className="recovery-column">
+            <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? peakFor(v) : "\u00a0"}</span>
+            <svg viewBox={`0 0 10 ${Math.max(1, Math.round((v / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
+              <rect x={0} y={0} width={10} height={Math.max(1, Math.round((v / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
+            </svg>
+            <span data-testid="bar-year-label" className="bar-year-label">{labelFor(k + 1)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

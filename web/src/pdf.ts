@@ -123,7 +123,27 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     if (slide.summaryCharts !== undefined) {
       for (const sc of slide.summaryCharts) {
         if (y + 45 > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
-        if (sc.kind === "donut" && sc.data.length > 0) {
+        if (sc.kind === "rows" && sc.data.length > 0) {
+          const chartTotal = Math.max(1e-12, sc.data.reduce((a, d) => a + d.value, 0));
+          let rowY = y;
+          sc.data.forEach((d, di) => {
+            const sharePct = Math.round((d.value / chartTotal) * 100);
+            const valText = moneyForDisplay(d.value, model.currency ?? "SEK", model.unit ?? "ones");
+            doc.setFontSize(7);
+            doc.setTextColor(50, 50, 50);
+            doc.text(`${d.label} ${sharePct}%`, 24, rowY);
+            doc.setFillColor(0, 116, 186);
+            doc.rect(120, rowY - 3, Math.max(0.5, 100 * (d.value / chartTotal)), 4, "F");
+            doc.setTextColor(0, 0, 0);
+            doc.text(valText, 216, rowY, { align: "right" });
+            if (trace) {
+              trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${d.label} ${sharePct}%`);
+              trace.drawnFigures[trace.drawnFigures.length - 1]?.push(valText);
+            }
+            rowY += 7;
+          });
+          y = rowY + 2;
+        } else if (sc.kind === "donut" && sc.data.length > 0) {
           const chartTotal = Math.max(1e-12, sc.data.reduce((a, d) => a + d.value, 0));
           const colors = ["#0074ba", "#34d399", "#fb7185", "#b45309", "#717273", "#103558"];
           let xAcc = 20;
@@ -170,7 +190,27 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       }
     }
     doc.setFontSize(10);
-    if (slide.chart && slide.chart.kind === "donut" && slide.chart.data.length > 0) {
+    if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0) {
+      const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
+      let rowY = y;
+      slide.chart.data.forEach((d) => {
+        const sharePct = Math.round((d.value / chartTotal) * 100);
+        const valText = moneyForDisplay(d.value, model.currency ?? "SEK", model.unit ?? "ones");
+        doc.setFontSize(7);
+        doc.setTextColor(50, 50, 50);
+        doc.text(`${d.label} ${sharePct}%`, 24, rowY);
+        doc.setFillColor(0, 116, 186);
+        doc.rect(120, rowY - 3, Math.max(0.5, 100 * (d.value / chartTotal)), 4, "F");
+        doc.setTextColor(0, 0, 0);
+        doc.text(valText, 216, rowY, { align: "right" });
+        if (trace) {
+          trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${d.label} ${sharePct}%`);
+          trace.drawnFigures[trace.drawnFigures.length - 1]?.push(valText);
+        }
+        rowY += 7;
+      });
+      y = rowY + 2;
+    } else if (slide.chart && slide.chart.kind === "donut" && slide.chart.data.length > 0) {
       let accY = y;
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
       let acc = 0;

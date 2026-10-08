@@ -14,7 +14,7 @@ export interface DeckFigure {
 }
 
 export interface DeckChartSlot {
-  kind: "donut" | "bars";
+  kind: "donut" | "bars" | "rows";
   data: { label: string; value: number }[];
 }
 
@@ -93,7 +93,7 @@ export function deckSlides(
     title: `We invest ${money(result.totalCost)} nominal across ${lineCount} cost lines`,
     body: investmentBody,
     disclosures: [],
-    chart: { kind: "donut", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
+    chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
   });
 
   // Slide 2 — recovery
@@ -239,7 +239,7 @@ export function deckSlides(
     }
   }
   const summaryCharts: DeckChartSlot[] = [
-    { kind: "donut", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
+    { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
     { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },
   ];
   slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts });

@@ -30,13 +30,13 @@ describe("Task B: CHART-LABEL / ONE-COMPOSITION / PEAK-LABEL", () => {
     expect(center && center.textContent).toContain("7 849 860");
   });
 
-  it("the deck investment slide carries exactly one composition figure (the bar is retired)", () => {
+  it("the deck investment slide carries exactly one composition figure (the donut retired per v0.5.6)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(document.querySelector('[data-testid="composition-bar"]')).toBeNull();
-    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]')).toBeTruthy();
   });
 
   it("the recovery chart labels its peak value", () => {
@@ -168,9 +168,9 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 4; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const summary = document.querySelector('[data-testid="summary-charts"]') as HTMLElement;
-    expect(summary.querySelector('[data-summary-chart="donut"] [data-testid="composition-donut"]')).toBeTruthy();
+    expect(summary.querySelector('[data-summary-chart="donut"] [data-testid="composition-rows"]')).toBeTruthy();
     expect(summary.querySelector('[data-summary-chart="bars"] [data-testid="recovery-bars"]')).toBeTruthy();
-    expect(summary.querySelectorAll('[data-testid="donut-segment-label"]').length).toBe(3);
+    expect(summary.querySelectorAll('[data-testid="composition-rows"] [data-composition-row]').length).toBe(3);
   });
 
   it("SUMMARY-EDGES: the blank project renders honest zeros and empty chart states, never fabricated figures", async () => {

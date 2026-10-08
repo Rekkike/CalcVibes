@@ -119,9 +119,9 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     fireEvent.click(byAction("present"));
     const investmentSlot = document.querySelector('[data-slide-chart="investment"]') as HTMLElement;
     const recoverySlot = document.querySelector('[data-slide-chart="recovery"]') as HTMLElement;
-    expect(investmentSlot.querySelector('[data-testid="composition-donut"]')).toBeTruthy();
+    expect(investmentSlot.querySelector('[data-testid="composition-rows"]')).toBeTruthy();
     expect(recoverySlot.querySelector('[data-testid="recovery-bars"]')).toBeTruthy();
-    const bars = recoverySlot.querySelectorAll('[data-chart-bar="collection"]');
+    const bars = recoverySlot.querySelectorAll('[data-recovery-column]');
     expect(bars.length).toBe(10);
   });
 
@@ -150,7 +150,7 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     const { buildDeckPdf } = await import("../src/pdf.js");
     const result = computeModel(demoProject());
     const model = deckSlides(demoProject(), result, { startYear: null });
-    expect(model.slides[1].chart?.kind).toBe("donut");
+    expect(model.slides[1].chart?.kind).toBe("rows");
     expect(model.slides[2].chart?.kind).toBe("bars");
     const doc = buildDeckPdf(model, "Project Alpha");
     expect(doc.getNumberOfPages()).toBe(5);

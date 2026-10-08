@@ -31,15 +31,15 @@ describe("Task B: full-deck print rendering", () => {
   });
 });
 
-describe("Task E: composition, one figure (re-anchored to the donut per v0.5.5 Task B)", () => {
-  it("the deck investment slide carries exactly one composition figure: the labeled donut", () => {
+describe("Task E: composition, one figure (re-anchored to the composition rows per v0.5.6)", () => {
+  it("the deck investment slide carries exactly one composition figure: the labeled rows", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(document.querySelector('[data-testid="composition-bar"]')).toBeNull();
-    const donut = document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]');
-    expect(donut).toBeTruthy();
-    expect((donut as SVGElement).querySelectorAll("[data-donut-segment]").length).toBe(3);
+    expect(document.querySelector('[data-testid="composition-donut"]')).toBeNull();
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
+    expect(rows).toBeTruthy();
+    expect((rows as HTMLElement).querySelectorAll("[data-composition-row]").length).toBe(3);
   });
 });

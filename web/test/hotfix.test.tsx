@@ -28,23 +28,16 @@ describe("Task H3: NO-TAUTOLOGY / PEAK-PDF-FORMAT", () => {
   });
 });
 
-describe("Task H2: DONUT-WHOLE", () => {
-  it("the viewBox width sits at or above the computed label-column bound for the model's line names", async () => {
-    const { demoProject } = await import("../src/state.js");
-    const { computeModel } = await import("../src/engine.js");
-    const charts = await import("../src/charts.js");
-    const result = computeModel(demoProject());
-    const labels = charts.donutLabels(result.lineTotals);
-    const widest = labels.reduce((w, lb) => Math.max(w, lb.name.length), 0);
-    const charW = 0.6 * charts.DONUT_LABEL_FONT_SIZE;
-    const bound = 170 + (widest + " 100%".length) * charW + 8;
-    const vb = charts.donutViewBoxWidth(result.lineTotals);
-    expect(vb).toBeGreaterThanOrEqual(Math.ceil(bound));
-    expect(vb).toBeGreaterThanOrEqual(260);
-    for (const lb of labels) {
-      const labelEnd = 170 + (lb.name.length + ` ${lb.sharePct}%`.length) * charW;
-      expect(labelEnd).toBeLessThanOrEqual(vb);
-    }
+describe("Task H2: DONUT-WHOLE (retired with the donut per v0.5.6; the deck carries no circle chart)", () => {
+  it("the deck scope contains no composition donut element", async () => {
+    const { render: r2 } = await import("@testing-library/react");
+    const { App } = await import("../src/App.js");
+    const { fireEvent } = await import("@testing-library/react");
+    const byAction2 = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
+    r2(<App />);
+    fireEvent.click(byAction2("load-demo"));
+    fireEvent.click(byAction2("present"));
+    expect(document.querySelector('[data-testid="presentation"] [data-testid="composition-donut"]')).toBeNull();
   });
 });
 
