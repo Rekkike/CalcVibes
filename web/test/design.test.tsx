@@ -37,7 +37,7 @@ describe("Task G: the deck design system (structural pins)", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slides = document.querySelectorAll('[data-testid="presentation"] .deck-slide');
-    expect(slides.length).toBe(5);
+    expect(slides.length).toBe(6);
     for (const s of slides) {
       expect((s as HTMLElement).querySelector(".deck-slide-header")).toBeTruthy();
       expect((s as HTMLElement).querySelector(".deck-slide-footer")).toBeTruthy();

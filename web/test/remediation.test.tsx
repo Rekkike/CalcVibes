@@ -14,7 +14,7 @@ describe("Task R4: VERDICT-NO / TOGGLE-POSITION / NO-DEAD-RULE", () => {
     fireEvent.change(document.querySelector('[data-field="tariffMode"]') as HTMLElement, { target: { value: "fixed" } });
     fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100000" } });
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 4; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const verdict = document.querySelector('[data-testid="deck-verdict"]');
     expect(verdict && verdict.textContent).toContain("This deal falls short");
   });
@@ -50,7 +50,7 @@ describe("Task R3: FIN-TILES / NO-DEAD-BODY", () => {
     const inputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const result = computeModel(inputs);
     const deck = deckSlides(inputs, result, { startYear: null });
-    const tiles = deck.slides[4].tiles ?? [];
+    const tiles = deck.slides[5].tiles ?? [];
     expect(tiles.length).toBe(15);
     const labels = tiles.map((t) => t.label);
     expect(labels).toEqual([
@@ -85,13 +85,13 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
-    const tracedDeal = trace.drawnFigures[4].join("|");
-    const tiles = model.slides[4].tiles ?? [];
+    const tracedDeal = trace.drawnFigures[5].join("|");
+    const tiles = model.slides[5].tiles ?? [];
     expect(tiles.length).toBe(10);
     for (const t of tiles) {
       expect(tracedDeal).toContain(t.value);
     }
-    expect(doc.getNumberOfPages()).toBe(5);
+    expect(doc.getNumberOfPages()).toBe(6);
   });
 
   it("PDF-SUMMARY-CHARTS: both mini charts are drawn with their labels and the peak", async () => {
@@ -103,20 +103,17 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(model, "Project Alpha", trace);
-    const tracedDeal = trace.drawnFigures[4].join("|");
-    const rows = model.slides[4].summaryCharts?.[0];
-    const bars = model.slides[4].summaryCharts?.[1];
-    expect(rows?.kind).toBe("rows");
+    const tracedDeal = trace.drawnFigures[5].join("|");
+    const hurdle = model.slides[5].summaryCharts?.[0];
+    const bars = model.slides[5].summaryCharts?.[1];
+    expect(hurdle?.kind).toBe("hurdle");
     expect(bars?.kind).toBe("bars");
     expect(bars?.data.length).toBe(result.yearly.length);
     for (const d of bars?.data ?? []) {
       expect(tracedDeal).toContain(d.label);
     }
-    const rowsTotal = Math.max(1e-12, (rows?.data ?? []).reduce((a, d) => a + d.value, 0));
-    for (const d of rows?.data ?? []) {
-      const sharePct = Math.round((d.value / rowsTotal) * 100);
-      expect(tracedDeal).toContain(`${d.label} ${sharePct}%`);
-    }
+    expect(tracedDeal).toContain(`Target ${hurdle?.data[0].value.toFixed(2)}%`);
+    expect(tracedDeal).toContain(`Achieved ${hurdle?.data[1].value.toFixed(2)}%`);
   });
 
   it("TILE-TRACE (the EX-1 repair): every base-demo deal tile value equals its engine field through the display formatters", async () => {
@@ -127,7 +124,7 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null });
-    const tiles = deck.slides[4].tiles ?? [];
+    const tiles = deck.slides[5].tiles ?? [];
     const byLabel = (l: string) => tiles.find((t) => t.label === l);
     const unit = "ones";
     expect(byLabel("Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", unit));
@@ -247,7 +244,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const investmentRows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
-    expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Where the money goes");
+    expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Development team dominates the cost base");
     expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(3);
     const firstRow = investmentRows?.querySelector("[data-composition-row]");
     expect(firstRow?.querySelector('[data-row-label="name"]')?.textContent).toBe(result.lineTotals[0].name);
@@ -255,16 +252,16 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const recoveryBars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]');
-    expect(recoveryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("When the inflows arrive");
+    expect(recoveryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Even payments spread the recovery");
     expect(recoveryBars?.querySelectorAll('[data-testid="bar-year-label"]').length).toBe(10);
     expect(recoveryBars?.querySelector('[data-testid="peak-label"]')).toBeTruthy();
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const summaryDonut = document.querySelector('[data-summary-chart="donut"]');
+    const summaryHurdle = document.querySelector('[data-summary-chart="hurdle"]');
     const summaryBars = document.querySelector('[data-summary-chart="bars"]');
-    expect(summaryDonut?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Where the money goes");
-    expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("When the inflows arrive");
+    expect(summaryHurdle?.querySelector('[data-testid="hurdle-target-dot"]')).toBeTruthy();
+    expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Even payments spread the recovery");
   });
 
   it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force", async () => {

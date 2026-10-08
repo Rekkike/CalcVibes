@@ -45,7 +45,7 @@ describe("chunk 7: section parity and presentation", () => {
     expect(screen.queryByTestId("irr-ambiguity-warning")).toBeNull();
   });
 
-  it("presentation mode navigates five slides by keyboard and exits on Escape", () => {
+  it("presentation mode navigates six slides by keyboard and exits on Escape", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -58,7 +58,9 @@ describe("chunk 7: section parity and presentation", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("4");
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("4");
+    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("5");
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("5");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("presentation")).toBeNull();
     expect(byStat("paymentAmount")).toBeTruthy();

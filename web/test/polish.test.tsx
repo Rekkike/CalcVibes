@@ -64,7 +64,7 @@ describe("Task C: PRINT-DESIGN / PDF-DESIGN", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
-    expect(doc.getNumberOfPages()).toBe(5);
+    expect(doc.getNumberOfPages()).toBe(6);
     expect(model.slides[1].chart?.data.length).toBe(3);
     expect(model.slides[2].chart?.data.length).toBe(10);
   });
@@ -102,7 +102,7 @@ describe("Task D: INSIGHT-BREAKEVEN / INSIGHT-NULL / VERDICT / GLOSSES", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 4; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const verdict = document.querySelector('[data-testid="deck-verdict"]');
     expect(verdict && verdict.textContent).toContain("This is a good deal");
     const glosses = document.querySelectorAll('[data-testid="term-gloss"]');
@@ -152,7 +152,7 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 4; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const tiles = document.querySelectorAll('[data-testid="summary-tiles"] [data-tile]');
     const labels = Array.from(tiles).map((t) => (t as HTMLElement).getAttribute("data-tile"));
     expect(labels).toEqual([
@@ -165,11 +165,11 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 4; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const summary = document.querySelector('[data-testid="summary-charts"]') as HTMLElement;
-    expect(summary.querySelector('[data-summary-chart="donut"] [data-testid="composition-rows"]')).toBeTruthy();
+    expect(summary.querySelector('[data-summary-chart="hurdle"] [data-testid="hurdle-plot"]')).toBeTruthy();
     expect(summary.querySelector('[data-summary-chart="bars"] [data-testid="recovery-bars"]')).toBeTruthy();
-    expect(summary.querySelectorAll('[data-testid="composition-rows"] [data-composition-row]').length).toBe(3);
+    expect(summary.querySelectorAll('[data-testid="hurdle-plot"] [data-testid="hurdle-target-dot"]').length).toBe(1);
   });
 
   it("SUMMARY-EDGES: the blank project renders honest zeros and empty chart states, never fabricated figures", async () => {
@@ -178,7 +178,7 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(blankProject());
     const deck = deckSlides(blankProject(), result, { startYear: null });
-    const tiles = deck.slides[4].tiles ?? [];
+    const tiles = deck.slides[5].tiles ?? [];
     expect(tiles.find((t) => t.label === "Total cost")?.value).toBe("0 kr");
     expect(tiles.find((t) => t.label === "Break-even year")?.value).toBe("not within the horizon");
   });

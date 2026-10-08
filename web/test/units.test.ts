@@ -49,14 +49,14 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
   it("the deck titles re-anchor at the template's thousands default through the deck display class", () => {
     expect(deck.slides[1].title).toBe(`We invest ${deckMoneyForDisplay(result.totalCost, "SEK", "thousands")} nominal across 3 cost lines`);
     expect(deck.slides[2].title).toBe(`${result.paymentCount} payments of ${deckMoneyForDisplay(result.paymentAmount as number, "SEK", "thousands")} recover the full requirement`);
-    expect(deck.slides[4].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "thousands")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "thousands")} back`);
+    expect(deck.slides[5].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "thousands")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "thousands")} back`);
   });
 
   it("the financing variant at thousands", () => {
     const finInputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const finResult = computeModel(finInputs);
     const finDeck = deckSlides(finInputs, finResult, { startYear: null, entryUnit: "thousands" });
-    expect(finDeck.slides[4].title).toBe(`Equity earns 20.01% on ${deckMoneyForDisplay(finResult.financing!.equity.outlay, "SEK", "thousands")} outlaid`);
+    expect(finDeck.slides[5].title).toBe(`Equity earns 20.01% on ${deckMoneyForDisplay(finResult.financing!.equity.outlay, "SEK", "thousands")} outlaid`);
   });
 
   it("the stable variant at thousands", () => {

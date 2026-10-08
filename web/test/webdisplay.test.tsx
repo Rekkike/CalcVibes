@@ -92,7 +92,7 @@ describe("Task F1/F2: DECK-MONEY-CLASS / DECK-YEARS-CLASS", () => {
     const result = computeModel(demo);
     const unit = "thousands";
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: unit as never });
-    const moneyTiles = deck.slides[4].tiles ?? [];
+    const moneyTiles = deck.slides[5].tiles ?? [];
     for (const t of moneyTiles) {
       if (t.label.includes("IRR") || t.label.includes("MIRR") || t.label.includes("index") || t.label.includes("Break-even")) continue;
       expect(t.value).not.toMatch(/,\d/);
@@ -108,7 +108,7 @@ describe("Task F1/F2: DECK-MONEY-CLASS / DECK-YEARS-CLASS", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null });
-    const tiles = deck.slides[4].tiles ?? [];
+    const tiles = deck.slides[5].tiles ?? [];
     expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
     expect(tiles.find((t) => t.label === "Payback (discounted)")?.value).toBe(result.discountedPaybackYears === null ? "—" : deckYearsForDisplay(result.discountedPaybackYears));
     expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toMatch(/\.1 years$|\.0 years$|\.\d years$/);

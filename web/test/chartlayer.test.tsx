@@ -63,7 +63,7 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
 
 describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
   it("ACTION-TITLES: every deck kicker states a message in words and carries no figures", async () => {
-    const kickers: string[] = ["Where the money goes", "When the inflows arrive"];
+    const kickers: string[] = ["Development team dominates the cost base", "Even payments spread the recovery"];
     for (const k of kickers) {
       expect(k).toMatch(/[a-z]/);
       expect(k).not.toMatch(/\d/);
@@ -72,8 +72,8 @@ describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const rendered = Array.from(document.querySelectorAll('[data-testid="presentation"] [data-testid="chart-kicker"]')).map((k) => k.textContent);
-    expect(rendered).toContain("Where the money goes");
-    expect(rendered).toContain("When the inflows arrive");
+    expect(rendered).toContain("Development team dominates the cost base");
+    expect(rendered).toContain("Even payments spread the recovery");
   });
 
   it("DECLUTTER: the chart layer carries no gridline or tick noise; the recovery bars are zero-based", async () => {

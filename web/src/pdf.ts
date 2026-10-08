@@ -123,7 +123,25 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     if (slide.summaryCharts !== undefined) {
       for (const sc of slide.summaryCharts) {
         if (y + 45 > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
-        if (sc.kind === "rows" && sc.data.length > 0) {
+        if (sc.kind === "hurdle" && sc.data.length >= 2) {
+          const t = sc.data[0].value;
+          const a = sc.data[1].value;
+          doc.setFontSize(7);
+          doc.setTextColor(50, 50, 50);
+          doc.text(`Target ${t.toFixed(2)}%`, 24, y);
+          doc.setTextColor(0, 0, 0);
+          doc.text(a >= t ? "clears the hurdle" : "below the hurdle", 120, y);
+          doc.text(`Achieved ${a.toFixed(2)}%`, 216, y, { align: "right" });
+          doc.setFillColor(0, 116, 186);
+          doc.circle(40 + (t / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");
+          doc.setFillColor(a >= t ? 5 : 225, a >= t ? 150 : 29, a >= t ? 105 : 72);
+          doc.circle(40 + (a / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");
+          if (trace) {
+            trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`Target ${t.toFixed(2)}%`);
+            trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`Achieved ${a.toFixed(2)}%`);
+          }
+          y += 14;
+        } else if (sc.kind === "rows" && sc.data.length > 0) {
           const chartTotal = Math.max(1e-12, sc.data.reduce((a, d) => a + d.value, 0));
           let rowY = y;
           sc.data.forEach((d, di) => {
@@ -190,7 +208,32 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       }
     }
     doc.setFontSize(10);
-    if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0) {
+    if (slide.chart && slide.chart.kind === "coverage" && slide.chart.data.length > 0) {
+      const covData = slide.chart.data;
+      const chartMax = Math.max(1, ...covData.map((d) => Math.abs(d.value)));
+      const zeroY = y + 30;
+      doc.setDrawColor(229, 229, 234);
+      doc.line(20, zeroY, 220, zeroY);
+      doc.setDrawColor(0, 116, 186);
+      covData.forEach((d, di) => {
+        const x = 20 + (di / Math.max(1, covData.length - 1)) * 200;
+        const yy = zeroY - (d.value / chartMax) * 22;
+        if (di > 0) {
+          const prev = covData[di - 1];
+          const px = 20 + ((di - 1) / Math.max(1, covData.length - 1)) * 200;
+          const py = zeroY - (prev.value / chartMax) * 22;
+          doc.line(px, py, x, yy);
+        }
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
+      });
+      doc.setFontSize(6);
+      doc.setTextColor(113, 114, 115);
+      covData.forEach((d, di) => {
+        const x = 20 + (di / Math.max(1, covData.length - 1)) * 200;
+        doc.text(d.label, x, y + 36, { align: "center", maxWidth: 20 });
+      });
+      y += 44;
+    } else if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0) {
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
       let rowY = y;
       slide.chart.data.forEach((d) => {

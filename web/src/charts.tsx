@@ -137,3 +137,88 @@ export function RecoveryBars(props: {
     </div>
   );
 }
+
+export function CoverageCurve(props: {
+  yearly: YearlyRow[];
+  labelFor: (year: number) => string;
+  valueFor: (v: number) => string;
+}) {
+  const { yearly, labelFor, valueFor } = props;
+  const values = yearly.map((y) => y.cumulative);
+  const max = Math.max(...values, 0);
+  const min = Math.min(...values, 0);
+  const span = Math.max(1e-12, max - min);
+  const xFor = (i: number) => yearly.length > 1 ? (i / (yearly.length - 1)) * 100 : 50;
+  const yFor = (v: number) => 100 - ((v - min) / span) * 100;
+  const zeroCrossIdx = values.findIndex((v, i) => i > 0 && values[i - 1] < 0 && v >= 0);
+  const points = values.map((v, i) => `${xFor(i).toFixed(2)},${yFor(v).toFixed(2)}`).join(" ");
+  return (
+    <div data-testid="coverage-curve" className="chart-block">
+      <div className="line-points">
+        <span data-testid="coverage-start" className="line-endpoint">{valueFor(values[0] ?? 0)}</span>
+        <span data-testid="coverage-end" className="line-endpoint">{valueFor(values[values.length - 1] ?? 0)}</span>
+      </div>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" className="cumulative-svg">
+        <line data-testid="coverage-zero-baseline" x1={0} x2={100} y1={yFor(0).toFixed(2)} y2={yFor(0).toFixed(2)} stroke="rgba(148,163,184,0.45)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <polyline data-testid="coverage-polyline" points={points} fill="none" stroke={CHART_COLORS.cumulative} strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="line-years">
+        <span data-testid="coverage-first-year" className="column-year-label">{labelFor(yearly[0]?.year ?? 1)}</span>
+        {zeroCrossIdx > 0 && (
+          <span data-testid="coverage-crossing" className="column-year-label">zero at {labelFor(yearly[zeroCrossIdx].year)}</span>
+        )}
+        <span data-testid="coverage-last-year" className="column-year-label">{labelFor(yearly[yearly.length - 1]?.year ?? yearly.length)}</span>
+      </div>
+    </div>
+  );
+}
+
+export function CostWaterfall(props: {
+  lineTotals: LineTotal[];
+  total: number;
+  valueFor: (v: number) => string;
+}) {
+  const { lineTotals, total, valueFor } = props;
+  const cap = Math.max(1e-12, total);
+  let acc = 0;
+  return (
+    <div data-testid="cost-waterfall" className="chart-block">
+      <div className="waterfall-track">
+        {lineTotals.map((l) => {
+          const frac = l.total / cap;
+          const seg = (
+            <div key={l.id} data-waterfall-segment={l.id} className="waterfall-segment" style={{ left: `${(acc / cap) * 100}%`, width: `${frac * 100}%` }}>
+              <span data-testid="waterfall-label" className="waterfall-label">{l.name} {valueFor(l.total)}</span>
+            </div>
+          );
+          acc += l.total;
+          return seg;
+        })}
+        <div data-testid="waterfall-cap" className="waterfall-cap" style={{ width: "100%" }} />
+      </div>
+    </div>
+  );
+}
+
+export function HurdlePlot(props: {
+  target: number;
+  achieved: number;
+  goalMet: boolean;
+}) {
+  const { target, achieved, goalMet } = props;
+  const bound = Math.max(target, achieved) * 1.15;
+  const scale = Math.max(1e-12, bound);
+  return (
+    <div data-testid="hurdle-plot" className="chart-block">
+      <div className="hurdle-track">
+        <span data-testid="hurdle-target-dot" data-hurdle="target" className="hurdle-dot" style={{ left: `${(target / scale) * 100}%` }} />
+        <span data-testid="hurdle-achieved-dot" data-hurdle="achieved" className={"hurdle-dot " + (goalMet ? "tone-ok" : "tone-bad")} style={{ left: `${(achieved / scale) * 100}%` }} />
+      </div>
+      <div className="hurdle-labels">
+        <span data-testid="hurdle-target-label" className="column-year-label">Target {target.toFixed(2)}%</span>
+        <span data-testid="hurdle-margin-label" className="column-year-label">{goalMet ? "clears the hurdle" : "below the hurdle"}</span>
+        <span data-testid="hurdle-achieved-label" className="column-year-label">Achieved {achieved.toFixed(2)}%</span>
+      </div>
+    </div>
+  );
+}

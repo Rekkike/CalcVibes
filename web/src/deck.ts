@@ -14,7 +14,7 @@ export interface DeckFigure {
 }
 
 export interface DeckChartSlot {
-  kind: "donut" | "bars" | "rows";
+  kind: "donut" | "bars" | "rows" | "coverage" | "hurdle";
   data: { label: string; value: number }[];
 }
 
@@ -178,6 +178,25 @@ export function deckSlides(
   if (result.irrAmbiguous) {
     returnsDisclosures.push(`The net flow has ${result.signChanges} sign changes; the IRR may not be unique.`);
   }
+  // Slide 3 — coverage
+  const coverageBody: DeckFigure[] = [
+    { label: "Break-even year", value: result.paybackYears === null ? "not within the horizon" : yearHeader(Math.ceil(result.paybackYears), startYear), kind: "text", rawValue: null },
+    { label: "Nominal payback", value: result.paybackYears === null ? "not within the horizon" : deckYearsForDisplay(result.paybackYears), kind: "years", rawValue: result.paybackYears },
+  ];
+  if (result.discountedPaybackYears !== null) {
+    coverageBody.push({ label: "Discounted payback (at WACC)", value: deckYearsForDisplay(result.discountedPaybackYears), kind: "years", rawValue: result.discountedPaybackYears });
+  }
+  const coverageTitle = result.paybackYears === null
+    ? "The requirement is not covered within the horizon"
+    : `The outlay is recovered in ${yearHeader(Math.ceil(result.paybackYears), startYear)}`;
+  slides.push({
+    name: "coverage",
+    title: coverageTitle,
+    body: coverageBody,
+    disclosures: [],
+    chart: { kind: "coverage", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.cumulative })) },
+  });
+
   slides.push({
     name: "returns",
     title: `The project earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the ${percentTwoForDisplay(inputs.targetIrr / 100)} target`,
@@ -219,9 +238,9 @@ export function deckSlides(
   const tiles: DeckTile[] = [
     { label: "Total cost", value: money(result.totalCost) },
     { label: "Total collected", value: money(result.totalCollected) },
-    { label: "Net gain", value: money(result.netGain) },
+    { label: "Net gain", value: money(result.netGain), tone: result.netGain >= 0 ? "ok" : "bad" },
     { label: "Achieved IRR", value: `${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad" },
-    { label: "NPV at WACC", value: money(result.npvAtWacc) },
+    { label: "NPV at WACC", value: money(result.npvAtWacc), tone: result.npvAtWacc >= 0 ? "ok" : "bad" },
     { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears) },
     { label: "Payback (discounted)", value: result.discountedPaybackYears === null ? "—" : deckYearsForDisplay(result.discountedPaybackYears) },
     { label: "Break-even year", value: result.paybackYears === null ? "not within the horizon" : yearHeader(Math.ceil(result.paybackYears), startYear) },
@@ -235,11 +254,14 @@ export function deckSlides(
     tiles.push({ label: "Equity NPV at WACC (discounted)", value: money(eq.npvAtWacc) });
     tiles.push({ label: "Drawn (nominal)", value: money(result.financing.drawnTotal) });
     if (result.financing.minDscr !== null) {
-      tiles.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}` });
+      tiles.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), tone: result.financing.minDscr.value >= 1.0 ? "ok" : "bad", disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}` });
     }
   }
   const summaryCharts: DeckChartSlot[] = [
-    { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
+    { kind: "hurdle", data: [
+      { label: "Target", value: inputs.targetIrr },
+      { label: "Achieved", value: (result.achievedIrr ?? 0) * 100 },
+    ] },
     { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },
   ];
   slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts });

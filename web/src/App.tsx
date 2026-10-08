@@ -143,39 +143,22 @@ export function App() {
   return (
     <div className="app-root" data-theme={theme}>
       <header className="app-header">
-        <h1>{inputs.projectName || "Untitled project"}</h1>
-        <nav>
-          {(["overview", "costs", "operating", "repayment", "tariff", "financing", "appraisal", "results", "scenarios", "detail"] as View[]).map((v) => (
-            <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
-              {v === "costs" ? "Cost model" : v[0].toUpperCase() + v.slice(1)}
-            </button>
-          ))}
-        </nav>
-        <button data-action="load-demo" onClick={() => setInputs(demoProject())}>Load demo project (Project Alpha)</button>
-        <button data-action="new-project" onClick={() => setInputs(blankProject())}>New project</button>
-        <button data-action="present" onClick={() => setPresOpen(true)}>Present results</button>
-        <label>Project start year (optional, 1900–2200){" "}
-          <input data-field="startYear" type="number" value={startYear ?? ""} onChange={(e) => {
-            const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
-            setStartYear(v !== null && !Number.isNaN(v) ? v : null);
-            if (v !== null && !Number.isNaN(v) && (v < 1900 || v > 2200)) {
-              setStartYearError("Project start year must be between 1900 and 2200.");
-            } else {
-              setStartYearError(null);
-            }
-          }} />
-        </label>
-        {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
-        <button data-action="export-xlsx" onClick={exportXlsx} disabled={result === null}>Export XLSX</button>
-        <button data-action="print-deck" onClick={printDeck}>Print deck</button>
-        <button data-action="download-pdf" onClick={downloadPdf} disabled={result === null}>Download PDF</button>
-        {result === null && <span data-testid="export-disabled-reason" className="muted">XLSX and PDF export are disabled until the input issues are resolved.</span>}
-        <label>Entry unit{" "}
-          <select data-field="entryUnit" value={entryUnit} onChange={(e) => setEntryUnit(e.target.value as EntryUnit)}>
-            {ENTRY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </label>
+        <div className="toolbar-left">
+          <h1>{inputs.projectName || "Untitled project"}</h1>
+          <button data-action="new-project" onClick={() => setInputs(blankProject())}>New project</button>
+          <button data-action="load-demo" onClick={() => setInputs(demoProject())}>Load demo project (Project Alpha)</button>
+        </div>
         <div data-testid="header-controls" className="header-controls">
+          <button data-action="present" onClick={() => setPresOpen(true)}>Present results</button>
+          <button data-action="download-pdf" onClick={downloadPdf} disabled={result === null}>Download PDF</button>
+          <button data-action="print-deck" onClick={printDeck}>Print deck</button>
+          <button data-action="export-xlsx" onClick={exportXlsx} disabled={result === null}>Export XLSX</button>
+          {result === null && <span data-testid="export-disabled-reason" className="muted">XLSX and PDF export are disabled until the input issues are resolved.</span>}
+          <label>Entry unit{" "}
+            <select data-field="entryUnit" value={entryUnit} onChange={(e) => setEntryUnit(e.target.value as EntryUnit)}>
+              {ENTRY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </label>
           <label>Theme{" "}
             <select data-field="theme" value={theme} onChange={(e) => setTheme(e.target.value as "light" | "dark")}>
               <option value="light">light</option>
@@ -184,6 +167,38 @@ export function App() {
           </label>
           <span data-testid="version" className="muted">{VERSION}</span>
         </div>
+        <nav data-testid="nav-groups" className="nav-groups">
+          <div data-nav-group="model" className="nav-group">
+            <span className="nav-group-label">Model</span>
+            <div className="nav-group-views">
+              {(["overview", "costs", "operating", "repayment", "tariff"] as View[]).map((v) => (
+                <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
+                  {v === "costs" ? "Cost model" : v[0].toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div data-nav-group="finance" className="nav-group">
+            <span className="nav-group-label">Finance</span>
+            <div className="nav-group-views">
+              {(["financing", "appraisal"] as View[]).map((v) => (
+                <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
+                  {v[0].toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div data-nav-group="read" className="nav-group">
+            <span className="nav-group-label">Read</span>
+            <div className="nav-group-views">
+              {(["results", "scenarios", "detail"] as View[]).map((v) => (
+                <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
+                  {v[0].toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </nav>
       </header>
       {(issues.length > 0 || engineIssues.length > 0) && (
         <section data-testid="issues-summary" className="issues">
@@ -195,7 +210,14 @@ export function App() {
       )}
       <main>
         {view === "overview" && (
-          <OverviewSection inputs={inputs} result={result} setProjectName={setProjectName} setTargetIrr={setTargetIrr} setProjectLength={setProjectLength} />
+          <OverviewSection inputs={inputs} result={result} startYear={startYear} setStartYear={(v) => {
+            setStartYear(v);
+            if (v !== null && (v < 1900 || v > 2200)) {
+              setStartYearError("Project start year must be between 1900 and 2200.");
+            } else {
+              setStartYearError(null);
+            }
+          }} startYearError={startYearError} setProjectName={setProjectName} setTargetIrr={setTargetIrr} setProjectLength={setProjectLength} />
         )}
         {view === "costs" && (
           <CostModelSection

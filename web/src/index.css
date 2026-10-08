@@ -615,6 +615,230 @@
 
 
 
+
+
+
+/* ===== v0.5.8 Task C: the deck charts (waterfall, coverage, hurdle) ===== */
+[data-testid="presentation"] .waterfall-track {
+  position: relative;
+  height: 44px;
+  width: 100%;
+  margin: var(--space-2) 0;
+}
+
+[data-testid="presentation"] .waterfall-segment {
+  position: absolute;
+  top: 10px;
+  height: 24px;
+  background: rgba(0, 116, 186, 0.75);
+  border-right: 2px solid var(--stage, #081c33);
+  border-radius: 4px 0 0 4px;
+}
+
+[data-testid="presentation"] .waterfall-segment:last-of-type {
+  border-radius: 4px;
+}
+
+[data-testid="presentation"] .waterfall-cap {
+  position: absolute;
+  top: 0;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+}
+
+[data-testid="presentation"] .waterfall-label {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  font-size: 10px;
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+[data-testid="presentation"] .hurdle-track {
+  position: relative;
+  height: 36px;
+  width: 100%;
+  margin: var(--space-3) 0 var(--space-1);
+  border-bottom: 2px solid rgba(148,163,184,0.45);
+}
+
+[data-testid="presentation"] .hurdle-dot {
+  position: absolute;
+  top: 14px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--accent, #0074ba);
+  transform: translateX(-6px);
+}
+
+[data-testid="presentation"] .hurdle-dot.tone-ok {
+  background: var(--ok);
+}
+
+[data-testid="presentation"] .hurdle-dot.tone-bad {
+  background: var(--bad);
+}
+
+[data-testid="presentation"] .hurdle-labels {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* ===== v0.5.8 Task B: the Results page answer-first ===== */
+.app-root .answer-band {
+  border-left: 4px solid var(--accent);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-3) 0;
+  background: color-mix(in srgb, var(--accent) 6%, var(--card));
+  border-radius: 8px;
+}
+
+.app-root .answer-band.tone-ok {
+  border-left-color: var(--ok);
+}
+
+.app-root .answer-band.tone-bad {
+  border-left-color: var(--bad);
+}
+
+.app-root .answer-statement {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+
+.app-root .kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.app-root .kpi-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.app-root .kpi-card .kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mut);
+}
+
+.app-root .kpi-card .kpi-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.app-root .kpi-card.tone-ok .kpi-value {
+  color: var(--ok);
+}
+
+.app-root .kpi-card.tone-bad .kpi-value {
+  color: var(--bad);
+}
+
+.app-root .kpi-card .kpi-chip {
+  font-size: 0.8em;
+  color: var(--mut);
+}
+
+.app-root .figure-band {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+  align-items: baseline;
+}
+
+.app-root .figure-band .figure-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-root .figure-band .figure-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mut);
+}
+
+.app-root .figure-band .figure-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-root .figure-band .caveat {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.app-root [data-testid="coverage-chart"] .cumulative-svg {
+  height: 100px;
+}
+
+/* ===== v0.5.8 Task A: the shell regrouped ===== */
+.app-root header.app-header .toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.app-root header.app-header .header-controls {
+  margin-left: auto;
+  margin-top: var(--space-1);
+}
+
+.app-root .nav-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.app-root .nav-group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.app-root .nav-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mut);
+  min-width: 5.5em;
+}
+
+.app-root .nav-group-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
 /* ===== v0.5.7 Task A2/A4: the honest app charts ===== */
 .app-root .paired-columns {
   display: flex;

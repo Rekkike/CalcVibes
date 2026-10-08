@@ -17,16 +17,16 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
   const result = computeModel(demoProject());
   const deck = deckSlides(demoProject(), result);
 
-  it("structural pins: five slides with the names of record", () => {
-    expect(deck.slides.length).toBe(5);
-    expect(deck.slides.map((s) => s.name)).toEqual(["title", "investment", "recovery", "returns", "deal"]);
+  it("structural pins: six slides with the names of record (the coverage slide per v0.5.8)", () => {
+    expect(deck.slides.length).toBe(6);
+    expect(deck.slides.map((s) => s.name)).toEqual(["title", "investment", "recovery", "coverage", "returns", "deal"]);
   });
 
   it("exact title pins", () => {
     expect(deck.slides[1].title).toBe(`We invest ${deckMoneyForDisplay(result.totalCost, "SEK", "ones")} nominal across 3 cost lines`);
     expect(deck.slides[2].title).toBe(`${result.paymentCount} payments of ${deckMoneyForDisplay(result.paymentAmount as number, "SEK", "ones")} recover the full requirement`);
-    expect(deck.slides[3].title).toBe("The project earns 12.00% against the 12.00% target");
-    expect(deck.slides[4].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "ones")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "ones")} back`);
+    expect(deck.slides[4].title).toBe("The project earns 12.00% against the 12.00% target");
+    expect(deck.slides[5].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "ones")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "ones")} back`);
   });
 
   it("slide 0 subtitle", () => {
@@ -46,11 +46,11 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
     const recovery = deck.slides[2].body;
     expect(recovery.find((f) => f.label === "Payment per period")!.rawValue).toBe(result.paymentAmount);
     expect(recovery.find((f) => f.label === "Total collected (nominal)")!.rawValue).toBe(result.totalCollected);
-    const returns = deck.slides[3].body;
+    const returns = deck.slides[4].body;
     expect(returns.find((f) => f.label === "Achieved IRR")!.rawValue).toBe(result.achievedIrr);
     expect(returns.find((f) => f.label === "NPV at WACC (discounted)")!.rawValue).toBe(result.npvAtWacc);
     expect(returns.find((f) => f.label === "Payback (nominal)")!.rawValue).toBe(result.paybackYears);
-    const dealTiles = deck.slides[4].tiles ?? [];
+    const dealTiles = deck.slides[5].tiles ?? [];
     expect(dealTiles.length).toBe(10);
   });
 });
@@ -61,8 +61,8 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   const deck = deckSlides(inputs, result);
 
   it("slide 4 title and tile pins (the financing fold extends the grid to fifteen tiles)", () => {
-    expect(deck.slides[4].title).toBe(`Equity earns ${(result.financing!.equity.irr! * 100).toFixed(2)}% on ${deckMoneyForDisplay(result.financing!.equity.outlay, "SEK", "ones")} outlaid`);
-    const tiles = deck.slides[4].tiles ?? [];
+    expect(deck.slides[5].title).toBe(`Equity earns ${(result.financing!.equity.irr! * 100).toFixed(2)}% on ${deckMoneyForDisplay(result.financing!.equity.outlay, "SEK", "ones")} outlaid`);
+    const tiles = deck.slides[5].tiles ?? [];
     const byLabel = (label: string) => tiles.find((t) => t.label === label);
     expect(tiles.length).toBe(15);
     expect(byLabel("Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "ones"));
@@ -71,28 +71,28 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   });
 
   it("the financing variant keeps its DSCR among the deal disclosures and the equity metrics reach the tiles", () => {
-    const tiles = deck.slides[4].tiles ?? [];
+    const tiles = deck.slides[5].tiles ?? [];
     expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
-    expect(deck.slides[4].disclosures.join(" ")).toContain("56 sign changes");
-    expect(deck.slides[4].summaryCharts?.length).toBe(2);
+    expect(deck.slides[5].disclosures.join(" ")).toContain("56 sign changes");
+    expect(deck.slides[5].summaryCharts?.length).toBe(2);
   });
 
   it("the ambiguity disclosure carries the count 56", () => {
-    expect(deck.slides[4].disclosures.join(" ")).toContain("56 sign changes");
+    expect(deck.slides[5].disclosures.join(" ")).toContain("56 sign changes");
   });
 
   it("traceability on the financing variant (the equity figures reach the verdict and the tile grid)", () => {
-    expect(deck.slides[4].title).toContain(deckMoneyForDisplay(result.financing!.equity.outlay, "SEK", "ones"));
-    expect(deck.slides[4].verdict).toContain("20.01%");
-    expect(deck.slides[4].tiles?.find((t) => t.label === "NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", "ones"));
+    expect(deck.slides[5].title).toContain(deckMoneyForDisplay(result.financing!.equity.outlay, "SEK", "ones"));
+    expect(deck.slides[5].verdict).toContain("20.01%");
+    expect(deck.slides[5].tiles?.find((t) => t.label === "NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", "ones"));
   });
 
   it("share-100 variant: the zero-outlay note replaces the equity IRR figure", () => {
     const inputs100 = { ...demoProject(), financing: fin({ sharePct: 100 }) };
     const result100 = computeModel(inputs100);
     const deck100 = deckSlides(inputs100, result100);
-    expect(deck100.slides[4].title).toBe(`Equity earns nothing on ${deckMoneyForDisplay(0, "SEK", "ones")} outlaid`);
-    expect(deck100.slides[4].verdict).toContain("This is a good deal");
+    expect(deck100.slides[5].title).toBe(`Equity earns nothing on ${deckMoneyForDisplay(0, "SEK", "ones")} outlaid`);
+    expect(deck100.slides[5].verdict).toContain("This is a good deal");
   });
 });
 
@@ -135,14 +135,14 @@ describe("EX-1 red proofs (input-level perturbations)", () => {
     const r = computeModel(shifted);
     const d = deckSlides(shifted, r);
     expect(d.slides[0].body[0].value).toBe("Target 13.00% IRR over a 7-year term");
-    expect(d.slides[3].title).toContain("13.00% target");
+    expect(d.slides[4].title).toContain("13.00% target");
   });
 
   it("the debt share 60 -> 65 flips the slide-4 financing title", () => {
     const inputs = { ...demoProject(), financing: fin({ sharePct: 65 }) };
     const r = computeModel(inputs);
     const d = deckSlides(inputs, r);
-    expect(d.slides[4].title).not.toBe(`Equity earns 20.01% on ${deckMoneyForDisplay(3139944, "SEK", "ones")} outlaid`);
+    expect(d.slides[5].title).not.toBe(`Equity earns 20.01% on ${deckMoneyForDisplay(3139944, "SEK", "ones")} outlaid`);
   });
 
   it("the currency SEK -> EUR flips every money string", () => {

@@ -4,11 +4,14 @@ import { roundForDisplay } from "../engine.js";
 export function OverviewSection(props: {
   inputs: ModelInputs;
   result: ModelResult | null;
+  startYear: number | null;
+  setStartYear: (v: number | null) => void;
+  startYearError: string | null;
   setProjectName: (v: string) => void;
   setTargetIrr: (v: string) => void;
   setProjectLength: (v: number | null) => void;
 }) {
-  const { inputs, result, setProjectName, setTargetIrr, setProjectLength } = props;
+  const { inputs, result, startYear, setStartYear, startYearError, setProjectName, setTargetIrr, setProjectLength } = props;
   return (
     <section data-testid="overview">
       <h2>Overview</h2>
@@ -25,6 +28,14 @@ export function OverviewSection(props: {
         <input data-field="projectLength" type="number" value={inputs.projectLengthYears ?? ""} onChange={(e) =>
           setProjectLength(e.target.value === "" ? null : parseFloat(e.target.value) || 0)} />
       </label>
+      <label>
+        Project start year (optional, 1900–2200){" "}
+        <input data-field="startYear" type="number" value={startYear ?? ""} onChange={(e) => {
+          const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+          setStartYear(v !== null && !Number.isNaN(v) ? v : null);
+        }} />
+      </label>
+      {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
       <p data-testid="length-hint" className="note">Derived horizon: {result !== null ? `${result.monthly.length} months (${result.yearly.length} years)` : "not computed"}</p>
       {result !== null ? (
         <dl data-testid="headline-stats">

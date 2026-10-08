@@ -159,7 +159,7 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     expect(model.slides[1].chart?.kind).toBe("rows");
     expect(model.slides[2].chart?.kind).toBe("bars");
     const doc = buildDeckPdf(model, "Project Alpha");
-    expect(doc.getNumberOfPages()).toBe(5);
+    expect(doc.getNumberOfPages()).toBe(6);
     const bytes = doc.output("arraybuffer");
     expect(bytes.byteLength).toBeGreaterThan(1000);
   });

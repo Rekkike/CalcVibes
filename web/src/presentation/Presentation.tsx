@@ -3,15 +3,30 @@ import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
 import { deckMoneyForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionRows, RecoveryBars } from "../charts.js";
+import { CompositionRows, RecoveryBars, CoverageCurve, CostWaterfall, HurdlePlot } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit }) {
   const { inputs, result, onExit, startYear = null, entryUnit = "ones" } = props;
   const [slide, setSlide] = useState(0);
-  const totalSlides = 5;
+  const totalSlides = 6;
   const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit }) : null;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
+
+  const dominantLine = result !== null && result.lineTotals.length > 0
+    ? result.lineTotals.reduce((b, l) => (l.total > b.total ? l : b), result.lineTotals[0])
+    : null;
+  const investmentKicker = dominantLine !== null ? `${dominantLine.name} dominates the cost base` : "The cost base";
+  const recoveryKicker = inputs.tariff !== undefined && inputs.tariff.mode !== "off"
+    ? inputs.tariff.mode === "decompose"
+      ? "Per-lift prices set the yearly recovery"
+      : inputs.tariff.mode === "stable"
+        ? "An escalating tariff ramps the inflows"
+        : "The inflows follow the modelled profile"
+    : result !== null && result.paymentAmount !== null
+      ? "Even payments spread the recovery"
+      : "The inflows follow the modelled profile";
+
   const peakFor = (v: number) => deckMoneyForDisplay(v, currency, entryUnit);
 
   useEffect(() => {
@@ -56,8 +71,8 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.summaryCharts !== undefined && result !== null && (
               <div data-testid="summary-charts" className="summary-charts">
-                <div data-summary-chart="donut"><CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker="Where the money goes" /></div>
-                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker="When the inflows arrive" /></div>
+                <div data-summary-chart="hurdle"><HurdlePlot target={inputs.targetIrr} achieved={(result.achievedIrr ?? 0) * 100} goalMet={result.goalMet} /></div>
+                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} /></div>
               </div>
             )}
             {sl.body.map((f, j) => (
@@ -76,17 +91,23 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             {sl.disclosures.map((d, j) => (
               <p key={j} className="warning deck-disclosure">{d}</p>
             ))}
-            {i === 4 && deck?.glosses !== undefined && deck.glosses.map((g, j) => (
+            {i === 5 && deck?.glosses !== undefined && deck.glosses.map((g, j) => (
               <p key={"gl-" + j} data-testid="term-gloss" className="deck-disclosure"><strong>{g.term}</strong>: {g.gloss}</p>
             ))}
             {i === 1 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="investment">
-                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker="Where the money goes" />
+                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker={investmentKicker} />
+                <CostWaterfall lineTotals={result.lineTotals} total={result.totalCost} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
+              </div>
+            )}
+            {i === 3 && result !== null && (
+              <div data-testid="deck-chart-slot" data-slide-chart="coverage">
+                <CoverageCurve yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency, entryUnit)} />
               </div>
             )}
             {i === 2 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="recovery">
-                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker="When the inflows arrive" />
+                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} />
               </div>
             )}
             

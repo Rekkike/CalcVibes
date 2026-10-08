@@ -2,26 +2,56 @@ import type { ModelResult } from "../../../core/src/types.js";
 import { percentForDisplay, roundForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
 import { CostInflowColumns, CumulativeLine } from "../charts.js";
-import { deckMoneyForDisplay } from "../engine.js";
+import { deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } from "../engine.js";
 
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null }) {
   const { result, targetIrr, currency, startYear = null } = props;
   return (
     <section data-testid="results">
       <h2>Results</h2>
-      <p data-testid="goal-check">
-        Goal check: the solved structure achieves an IRR of{" "}
-        {percentForDisplay(result.achievedIrr, 2)} against a target of{" "}
-        {roundForDisplay(targetIrr, 2)}% — {result.goalMet ? "target achieved" : "target not achieved"}.
-        {result.irrAmbiguous && (
-          <span data-testid="irr-ambiguity-warning" className="warning">
-            {" "}Warning: the net flow has {result.signChanges} sign changes; the IRR may not be unique.
-          </span>
-        )}
-      </p>
+      <div data-testid="answer-band" className={"answer-band " + (result.goalMet ? "tone-ok" : "tone-bad")}>
+        <p data-testid="goal-check" className="answer-statement">
+          {result.goalMet
+            ? `The project meets its target: the solved structure achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(targetIrr, 2)}% — target achieved.`
+            : `The project falls short: the solved structure achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(targetIrr, 2)}% — target not achieved.`}
+          {result.irrAmbiguous && (
+            <span data-testid="irr-ambiguity-warning" className="warning">
+              {" "}Warning: the net flow has {result.signChanges} sign changes; the IRR may not be unique.
+            </span>
+          )}
+        </p>
+      </div>
+      <div data-testid="kpi-row" className="kpi-row">
+        <div className={"kpi-card " + (result.goalMet ? "tone-ok" : "tone-bad")}>
+          <span className="kpi-label">Achieved IRR</span>
+          <span className="kpi-value">{result.achievedIrr === null ? "—" : percentForDisplay(result.achievedIrr, 2)}</span>
+          <span className="kpi-chip">vs {roundForDisplay(targetIrr, 2)}% target</span>
+        </div>
+        <div className={"kpi-card " + (result.npvAtWacc >= 0 ? "tone-ok" : "tone-bad")}>
+          <span className="kpi-label">NPV at WACC</span>
+          <span className="kpi-value">{deckMoneyForDisplay(result.npvAtWacc, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span>
+          <span className="kpi-chip">{result.npvAtWacc >= 0 ? "positive at the benchmark" : "negative at the benchmark"}</span>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Payback (nominal)</span>
+          <span className="kpi-value">{result.paybackYears === null ? "not within the horizon" : deckYearsForDisplay(result.paybackYears)}</span>
+        </div>
+        <div className={"kpi-card " + (result.financing !== null && result.financing.minDscr !== null ? (result.financing.minDscr.value >= 1.0 ? "tone-ok" : "tone-bad") : "")}>
+          <span className="kpi-label">Min DSCR</span>
+          <span className="kpi-value">{result.financing === null || result.financing.minDscr === null ? "not applicable" : dscrTwoForDisplay(result.financing.minDscr.value)}</span>
+          {result.financing !== null && result.financing.minDscr !== null && (
+            <span className="kpi-chip">in {yearHeader(result.financing.minDscr.year, startYear)}</span>
+          )}
+        </div>
+      </div>
+      <div data-testid="figure-band" className="figure-band">
+        <span className="figure-item"><span className="figure-label">Total cost</span> <span className="figure-value">{deckMoneyForDisplay(result.totalCost, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span></span>
+        <span className="figure-item"><span className="figure-label">Total collected</span> <span className="figure-value">{deckMoneyForDisplay(result.totalCollected, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span></span>
+        <span className="figure-item"><span className="figure-label">Net gain</span> <span className="figure-value">{deckMoneyForDisplay(result.netGain, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span></span>
+        <p className="caveat">Nominal figures are undiscounted; the cost NPV and achieved IRR are discounted.</p>
+      </div>
       <h3>Yearly schedule</h3>
       <CostInflowColumns yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
-      <CumulativeLine yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
       <table data-testid="yearly-table">
         <thead>
           <tr><th>Year</th><th>Cost (nominal)</th><th>Collections (nominal)</th><th>Net (nominal)</th><th>Cumulative net (nominal)</th></tr>
@@ -103,6 +133,10 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
           )}
         </>
       )}
+          <h3>Coverage</h3>
+      <div data-testid="coverage-chart">
+        <CumulativeLine yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
+      </div>
     </section>
   );
 }
