@@ -36,6 +36,8 @@ export interface DeckSlide {
   verdict?: string;
   tiles?: DeckTile[];
   summaryCharts?: DeckChartSlot[];
+  titleMetrics?: { label: string; value: string }[];
+  kickerNumber?: string;
 }
 
 export const TERM_GLOSSES: { term: string; gloss: string }[] = [
@@ -75,6 +77,11 @@ export function deckSlides(
       { label: "Subtitle", value: `Target ${percentTwoForDisplay(inputs.targetIrr / 100)} IRR over a ${inputs.repayment.termYears}-year term`, kind: "text", rawValue: null },
     ],
     disclosures: [],
+    titleMetrics: [
+      { label: "Project cost", value: money(result.totalCost) },
+      { label: "Target IRR", value: percentTwoForDisplay(inputs.targetIrr / 100) },
+      { label: "Investment term", value: `${inputs.repayment.termYears} years` },
+    ],
   });
 
   // Slide 1 — investment
@@ -189,7 +196,7 @@ export function deckSlides(
   }
   const coverageTitle = result.paybackYears === null
     ? "The requirement is not covered within the horizon"
-    : `The outlay is recovered in ${yearHeader(Math.ceil(result.paybackYears), startYear)}`;
+    : "The outlay is recovered and the project turns cash-positive";
   slides.push({
     name: "coverage",
     title: coverageTitle,
@@ -267,6 +274,14 @@ export function deckSlides(
   ];
   slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts });
 
+  const kickerNumbers = ["01", "02", "03", "04", "05"];
+  let kickerIdx = 0;
+  for (const sl of slides) {
+    if (sl.name !== "title") {
+      sl.kickerNumber = kickerNumbers[kickerIdx] ?? "";
+      kickerIdx++;
+    }
+  }
   return { slides, glosses: TERM_GLOSSES, currency, unit };
 }
 

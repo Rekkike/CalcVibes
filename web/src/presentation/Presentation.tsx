@@ -3,7 +3,7 @@ import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
 import { deckMoneyForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionRows, RecoveryBars, CoverageCurve, CostWaterfall, HurdlePlot } from "../charts.js";
+import { CompositionRows, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit }) {
@@ -57,7 +57,20 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
         {deck !== null && deck.slides.map((sl, i) => (
           <section key={sl.name} data-slide-name={sl.name} data-slide-index={i} data-slide-active={slide === i ? "true" : "false"} className="deck-slide deck-slide-print">
             <header className="deck-slide-header">{inputs.projectName || "Untitled project"}</header>
+            {i !== 0 && sl.kickerNumber !== undefined && (
+              <p data-testid="slide-kicker" className="slide-kicker">{sl.kickerNumber} — {sl.name}</p>
+            )}
             {i === 0 ? <h1>{sl.title}</h1> : <h2>{sl.title}</h2>}
+            {i === 0 && sl.titleMetrics !== undefined && (
+              <div data-testid="title-metrics" className="title-metrics">
+                {sl.titleMetrics.map((m, j) => (
+                  <div key={"tm-" + j} data-title-metric={m.label} className="title-metric">
+                    <span className="metric-label">{m.label}</span>
+                    <span className="metric-value">{m.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {sl.tiles !== undefined && (
               <div data-testid="summary-tiles" className="summary-tiles">
                 {sl.tiles.map((t, j) => (
@@ -102,7 +115,12 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {i === 3 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="coverage">
-                <CoverageCurve yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency, entryUnit)} />
+                <StageReturnsChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} />
+                <p data-testid="crossing-caption" className="stage-crossing-caption">
+                  {result.paybackYears === null
+                    ? "The cumulative line stays below the axis: the collections never cover the outlay within the horizon."
+                    : "The gold line is the cumulative net: it dips while the project pays for itself and crosses the axis where the outlay is covered."}
+                </p>
               </div>
             )}
             {i === 2 && result !== null && (
@@ -118,10 +136,10 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
           </section>
         ))}
       </main>
-      <footer>
-        <button data-action="prev-slide" onClick={() => setSlide((s) => Math.max(s - 1, 0))}>← Previous</button>
-        <span>{[...Array(totalSlides)].map((_, i) => <span key={i} data-dot={i} className={i === slide ? "dot active" : "dot"}>·</span>)}</span>
-        <button data-action="next-slide" onClick={() => setSlide((s) => Math.min(s + 1, totalSlides - 1))}>Next →</button>
+      <footer className="stage-nav">
+        <button data-action="prev-slide" className="stage-nav-button" onClick={() => setSlide((s) => Math.max(s - 1, 0))}>← Previous</button>
+        <span className="stage-dots">{[...Array(totalSlides)].map((_, i) => <span key={i} data-dot={i} className={i === slide ? "stage-dot stage-dot-active" : "stage-dot"}>·</span>)}</span>
+        <button data-action="next-slide" className="stage-nav-button" onClick={() => setSlide((s) => Math.min(s + 1, totalSlides - 1))}>Next →</button>
       </footer>
     </div>
   );

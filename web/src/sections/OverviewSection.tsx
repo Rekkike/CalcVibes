@@ -1,5 +1,7 @@
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
-import { roundForDisplay } from "../engine.js";
+import { roundForDisplay, percentForDisplay, deckMoneyForDisplay, deckYearsForDisplay } from "../engine.js";
+import { SignedCashflowChart } from "../charts.js";
+import { yearHeader } from "../state.js";
 
 export function OverviewSection(props: {
   inputs: ModelInputs;
@@ -47,6 +49,31 @@ export function OverviewSection(props: {
           </ul>
         </div>
       )}
+      {result !== null && (
+        <div data-testid="overview-summary">
+          <div data-testid="metric-cards" className="metric-cards">
+            <div className="metric-card" data-metric="totalCost">
+              <span className="metric-label">Total project cost</span>
+              <span className="metric-value">{deckMoneyForDisplay(result.totalCost, (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK")}</span>
+            </div>
+            <div className="metric-card" data-metric="requiredPayment">
+              <span className="metric-label">Required payment</span>
+              <span className="metric-value">{result.paymentAmount === null ? "not applicable (collection mode)" : deckMoneyForDisplay(result.paymentAmount, (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK")}</span>
+            </div>
+            <div className={"metric-card " + (result.goalMet ? "tone-ok" : "tone-bad")} data-metric="achievedIrr">
+              <span className="metric-label">Achieved IRR (against the {roundForDisplay(inputs.targetIrr, 2)}% goal)</span>
+              <span className="metric-value">{result.achievedIrr === null ? "\u2014" : percentForDisplay(result.achievedIrr, 2)}</span>
+            </div>
+            <div className="metric-card" data-metric="payback">
+              <span className="metric-label">Payback</span>
+              <span className="metric-value">{result.paybackYears === null ? "not within the horizon" : deckYearsForDisplay(result.paybackYears)}</span>
+            </div>
+          </div>
+          <div data-testid="overview-cashflow-chart">
+            <SignedCashflowChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK")} />
+          </div>
+        </div>
+      )}
       {result !== null ? (
         <dl data-testid="headline-stats">
           <dt>Total cost</dt><dd data-stat="totalCost">{roundForDisplay(result.totalCost)}</dd>
@@ -68,7 +95,10 @@ export function OverviewSection(props: {
           </dd>
         </dl>
       ) : (
-        <p data-testid="overview-placeholder">Add cost lines and resolve any issues to see headline statistics.</p>
+        <>
+          <p data-testid="overview-placeholder">Add cost lines and resolve any issues to see headline statistics.</p>
+          <p data-testid="overview-summary-empty" className="muted">The cashflow summary renders once the model computes.</p>
+        </>
       )}
     </section>
   );

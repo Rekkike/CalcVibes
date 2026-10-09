@@ -11,7 +11,7 @@
   max-width: var(--content-width);
   margin: 0 auto;
   padding: var(--space-5) var(--space-4);
-}
+  min-height: 70vh;}
 
 [data-testid="presentation"] .deck-slide-header {
   color: var(--mut);
@@ -221,6 +221,12 @@
 }
 
 /* Responsive: single-column usable layout on the iPhone of record */
+@media (max-width: 360px) {
+  .app-root .editor-scroll table { min-width: 720px; }
+  .app-root .editor-scroll table th:first-child, .app-root .editor-scroll table td:first-child { min-width: 110px; }
+  .app-root .editor-scroll input[type="number"], .app-root .editor-scroll select { width: 100%; min-width: 0; }
+  .app-root .donut-geometry { width: 160px; height: 160px; }
+}
 @media (max-width: 480px) {
   .app-root {
     padding: var(--space-3) var(--space-2);
@@ -625,6 +631,17 @@
 [data-testid="presentation"] .waterfall-segment:last-of-type {  border-top: none;}
 [data-testid="presentation"] .waterfall-cap {  position: absolute;  background: #e2e8f0;  border-radius: 2px;}
 [data-testid="presentation"] .waterfall-label {  font-size: 10px;  color: #e2e8f0;  white-space: nowrap;}
+[data-testid="presentation"] .stage-returns-svg {  display: block;  width: 100%;  height: 150px;}
+[data-testid="presentation"] .stage-crossing-caption {  font-size: 12px;  color: #cce9ff;  margin: var(--space-1) 0 0;}
+[data-testid="presentation"] .slide-kicker {  font-size: 12px;  text-transform: uppercase;  letter-spacing: 0.18em;  color: #cce9ff;  margin: var(--space-1) 0 0;}
+[data-testid="presentation"] .title-metrics {  display: flex;  flex-wrap: wrap;  gap: var(--space-3);  margin: var(--space-3) 0;}
+[data-testid="presentation"] .title-metric .metric-label {  display: block;  font-size: 11px;  font-weight: 400;  text-transform: uppercase;  letter-spacing: 0.12em;  color: #cce9ff;}
+[data-testid="presentation"] .title-metric .metric-value {  display: block;  font-size: 30px;  font-weight: 700;  color: #ffffff;  margin-top: var(--space-1);}
+[data-testid="presentation"] footer.stage-nav {  display: flex;  align-items: center;  justify-content: center;  gap: var(--space-3);  padding: var(--space-2);}
+[data-testid="presentation"] .stage-nav-button {  background: rgba(30,41,59,0.6);  color: #e2e8f0;  border: 1px solid #1d3a5f;  border-radius: 999px;  padding: 6px 16px;  font-size: 12px;  cursor: pointer;}
+[data-testid="presentation"] .stage-dots {  display: inline-flex;  gap: 6px;}
+[data-testid="presentation"] .stage-dot {  color: rgba(148,163,184,0.5);  font-size: 18px;  line-height: 1;}
+[data-testid="presentation"] .stage-dot-active {  color: #e8b84b;}
 [data-testid="presentation"] .hurdle-track {
   position: relative;
   height: 36px;
@@ -808,6 +825,33 @@
   gap: var(--space-1);
 }
 
+/* ===== v0.6R Task E: the editor bounds hygiene (no column unreachable at any viewport) ===== */
+.app-root .editor-scroll {  border: 1px solid var(--line);  border-radius: 10px;  overflow-x: auto;  max-width: 100%;}
+.app-root .editor-scroll table {  min-width: 720px;}
+.app-root .editor-scroll table th:first-child,  .app-root .editor-scroll table td:first-child {  position: sticky;  left: 0;  background: var(--card);  z-index: 2;  min-width: 110px;}
+.app-root .editor-scroll table thead th {  position: sticky;  top: 0;  background: var(--tint);  z-index: 5;}
+.app-root .editor-scroll input[type="number"],  .app-root .editor-scroll select {  width: 100%;  min-width: 0;  box-sizing: border-box;}
+/* ===== v0.6R Task D: the working composition donut (labels outside the geometry, the whole circle at every viewport) ===== */
+.app-root .composition-donut {  display: flex;  flex-wrap: wrap;  gap: var(--space-3);  align-items: center;  margin: var(--space-2) 0;}
+.app-root .donut-geometry {  position: relative;  width: 160px;  height: 160px;  flex: 0 0 160px;}
+.app-root .donut-svg {  display: block;  width: 160px;  height: 160px;  max-width: 100%;}
+.app-root .donut-center-total {  position: absolute;  top: 50%;  left: 50%;  transform: translate(-50%, -50%);  font-size: 13px;  font-weight: 700;  font-variant-numeric: tabular-nums;  color: var(--ink);  white-space: nowrap;}
+.app-root .donut-labels {  list-style: none;  margin: 0;  padding: 0;  flex: 1 1 180px;  min-width: 150px;}
+.app-root .donut-label {  display: flex;  align-items: center;  gap: var(--space-1);  margin-bottom: var(--space-1);  font-size: 12px;}
+.app-root .donut-swatch {  width: 10px;  height: 10px;  border-radius: 2px;  flex: 0 0 auto;}
+/* ===== v0.6R Task A2: the Overview metric cards ===== */
+.app-root .metric-cards {  display: flex;  flex-wrap: wrap;  gap: var(--space-2);  margin: var(--space-2) 0;}
+.app-root .metric-card {  flex: 1 1 150px;  min-width: 140px;  background: var(--card);  border: 1px solid var(--line);  border-radius: 10px;  padding: var(--space-2);}
+.app-root .metric-card .metric-label {  display: block;  font-size: 11px;  font-weight: 600;  text-transform: uppercase;  letter-spacing: 0.08em;  color: var(--mut);  margin-bottom: var(--space-1);}
+.app-root .metric-card .metric-value {  display: block;  font-size: 21px;  font-weight: 700;  font-variant-numeric: tabular-nums;  color: var(--ink);}
+.app-root .metric-card.tone-ok .metric-value {  color: var(--ok);}
+.app-root .metric-card.tone-bad .metric-value {  color: var(--bad);}
+/* ===== v0.6R Task A: the signed cashflow chart (one axis, one message) ===== */
+.app-root .signed-cashflow .cashflow-peaks {  display: flex;  justify-content: space-between;  margin-bottom: 2px;}
+.app-root .signed-cashflow .signed-cashflow-frame {  position: relative;}
+.app-root .signed-svg {  display: block;  width: 100%;  height: 180px;}
+.app-root .signed-cashflow .signed-top-value {  position: absolute;  top: 0;  z-index: 2;}
+.app-root .signed-cashflow .line-endpoint.signed-top-value:last-of-type {  right: 0;}
 /* ===== v0.5.7 Task A2/A4: the honest app charts ===== */
 .app-root .paired-columns {
   display: flex;

@@ -16,16 +16,14 @@ describe("Task A2: YEARLY-HONEST", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
-    const columns = document.querySelector('[data-testid="cost-inflow-columns"]') as HTMLElement;
-    const costPeak = Array.from(columns.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
+    const chart = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
+    const costPeak = Array.from(chart.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakCost = Math.max(...result.yearly.map((y) => y.cost));
     expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "SEK", "ones")}`);
-    const inflowPeak = Array.from(columns.querySelectorAll('[data-testid="column-peak-inflow"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
+    const inflowPeak = Array.from(chart.querySelectorAll('[data-testid="column-peak-inflow"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakInflow = Math.max(...result.yearly.map((y) => y.inflow));
     expect(inflowPeak.textContent).toBe(`Inflow peak ${deckMoneyForDisplay(peakInflow, "SEK", "ones")}`);
-    const yearLabels = columns.querySelectorAll('[data-testid="column-year-label"]');
-    expect(yearLabels.length).toBe(result.yearly.length);
-    expect(yearLabels[0].textContent).toBe(yearHeader(1, null));
+    expect(chart.querySelector('[data-testid="column-year-label-first"]')?.textContent).toBe(yearHeader(1, null));
   });
 
   it("the cumulative line carries its endpoints and zero crossing through the formatters, on its own chart", async () => {
@@ -35,7 +33,7 @@ describe("Task A2: YEARLY-HONEST", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
-    const line = document.querySelector('[data-testid="cumulative-line"]') as HTMLElement;
+    const line = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
     expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "SEK", "ones"));
     expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[result.yearly.length - 1].cumulative, "SEK", "ones"));
     expect(line.querySelector('[data-testid="zero-baseline"]')).toBeTruthy();
@@ -47,9 +45,8 @@ describe("Task A2: YEARLY-HONEST", () => {
     } else {
       expect(crossing).toBeNull();
     }
-    const barsChart = document.querySelector('[data-testid="cost-inflow-columns"]') as HTMLElement;
-    expect(barsChart.querySelector('[data-chart-line="cumulative"]')).toBeNull();
-    expect(line.querySelector('[data-chart-bar]')).toBeNull();
+    expect(line.querySelector('[data-chart-line="cumulative"]')).toBeTruthy();
+    expect(line.querySelectorAll('[data-chart-bar]').length).toBe(result.yearly.length * 2);
   });
 });
 
@@ -149,11 +146,11 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
-    const columns = document.querySelector('[data-testid="cost-inflow-columns"]') as HTMLElement;
+    const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
     const costPeak = Array.from(columns.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakCost = Math.max(...result.yearly.map((y) => y.cost));
     expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "SEK", "ones")}`);
-    const line = document.querySelector('[data-testid="cumulative-line"]') as HTMLElement;
+    const line = columns;
     expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "SEK", "ones"));
     expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).not.toMatch(/,\d{2}/);
     fireEvent.click(byNav("detail"));
@@ -180,7 +177,7 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     expect(peak.textContent).toBe(`${deckMoneyForDisplay(inflows[peakIdx], "SEK", "thousands")} in ${yearHeader(peakIdx + 1, null)}`);
     fireEvent.click(byAction("exit-presentation"));
     fireEvent.click(byNav("results"));
-    const columns = document.querySelector('[data-testid="cost-inflow-columns"]') as HTMLElement;
+    const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
     const costPeak = Array.from(columns.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     expect(costPeak.textContent).toMatch(/^Cost peak /);
     const inflowPeak = Array.from(columns.querySelectorAll('[data-testid="column-peak-inflow"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;

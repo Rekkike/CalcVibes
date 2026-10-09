@@ -90,33 +90,62 @@ describe("Task C: STAGE-BG / GLOWS / FADE / DISPLAY-TYPE / CHROME (structural)",
 });
 
 describe("Task D: charts (structural, engine-traceable)", () => {
-  it("CHART-APP (re-anchored per v0.5.7): the paired cost/inflow columns render with HTML year labels and the cumulative line on its own chart", () => {
+  it("CHART-APP (re-anchored per v0.6R): the signed cashflow chart renders costs below the baseline, inflows above, and the cumulative line overlaid on the same axis", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
-    const columns = document.querySelector('[data-testid="cost-inflow-columns"]') as HTMLElement;
-    expect(columns).toBeTruthy();
-    const costBars = columns.querySelectorAll('[data-chart-bar="cost"]');
-    const inflowBars = columns.querySelectorAll('[data-chart-bar="inflow"]');
+    const chart = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
+    expect(chart).toBeTruthy();
+    const costBars = chart.querySelectorAll('[data-chart-bar="cost"]');
+    const inflowBars = chart.querySelectorAll('[data-chart-bar="inflow"]');
     expect(costBars.length).toBe(10);
     expect(inflowBars.length).toBe(10);
-    expect((costBars[0] as SVGRectElement).getAttribute("fill")).toBe("#fb7185");
-    expect(columns.querySelectorAll('[data-testid="column-year-label"]').length).toBe(10);
-    const line = document.querySelector('[data-testid="cumulative-line"]') as HTMLElement;
+    expect((costBars[0] as SVGPolygonElement).getAttribute("fill")).toBe("#fb7185");
+    expect((inflowBars[0] as SVGPolygonElement).getAttribute("fill")).toBe("#34d399");
+    const zeroY = chart.querySelector('[data-testid="zero-baseline"]')?.getAttribute("y1");
+    expect(zeroY).not.toBeNull();
+    const z = Number(zeroY);
+    for (const bar of Array.from(costBars)) {
+      const pts = (bar.getAttribute("points") as string).split(" ").map((xy) => Number(xy.split(",")[1]));
+      expect(Math.min(...pts)).toBeCloseTo(z, 1);
+      expect(Math.max(...pts)).toBeGreaterThan(z - 1);
+      expect(bar.getAttribute("data-signed")).toBe("below");
+    }
+    for (const bar of Array.from(inflowBars)) {
+      const pts = (bar.getAttribute("points") as string).split(" ").map((xy) => Number(xy.split(",")[1]));
+      expect(Math.max(...pts)).toBeCloseTo(z, 1);
+      expect(Math.min(...pts)).toBeLessThan(z + 1);
+      expect(bar.getAttribute("data-signed")).toBe("above");
+    }
+    const line = chart.querySelector('[data-chart-line="cumulative"]');
     expect(line).toBeTruthy();
-    expect(line.querySelector('[data-chart-line="cumulative"]')).toBeTruthy();
-    expect(columns.querySelector("svg text")).toBeNull();
-    expect((inflowBars[0] as SVGRectElement).getAttribute("fill")).toBe("#34d399");
-    expect(line.querySelector('[data-chart-line="cumulative"]')?.getAttribute("stroke")).toBe("#0074ba");
+    expect(line?.getAttribute("stroke")).toBe("#0074ba");
+    expect(chart.querySelector("svg text")).toBeNull();
+    expect(document.querySelector('[data-testid="cost-inflow-columns"]')).toBeNull();
+    expect(document.querySelector('[data-testid="cumulative-line"]')).toBeNull();
   });
 
-  it("APP-ROWS (re-anchored from DONUT-APP per v0.5.7): the Cost section renders the composition rows", () => {
+  it("APP-ROWS and DONUT-WORKING (re-anchored per v0.6R): the Cost section renders the composition rows beside the working donut (labels outside the geometry, the whole circle)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
     const rows = document.querySelector('[data-testid="composition-rows-wrap"] [data-testid="composition-rows"]') as HTMLElement;
     expect(rows.querySelectorAll("[data-composition-row]").length).toBe(3);
-    expect(document.querySelector('[data-testid="composition-donut"]')).toBeNull();
+    const donut = document.querySelector('[data-testid="composition-donut"]') as HTMLElement;
+    expect(donut).toBeTruthy();
+    const segments = donut.querySelectorAll("[data-donut-segment]");
+    expect(segments.length).toBe(3);
+    const colors = new Set(Array.from(segments).map((sg) => (sg as SVGPathElement).getAttribute("stroke")));
+    expect(colors.size).toBe(3);
+    expect(donut.querySelector("svg text")).toBeNull();
+    expect(donut.querySelector('[data-testid="donut-center-total"]')).toBeTruthy();
+    const labels = donut.querySelectorAll('[data-testid="donut-label"]');
+    expect(labels.length).toBe(3);
+    for (const label of Array.from(labels)) {
+      expect(donut.querySelector("svg")?.contains(label)).toBe(false);
+    }
+    const css = fs.readFileSync("src/index.css", "utf8");
+    expect(css).toMatch(/\.app-root \.donut-svg\s*\{[^}]*max-width:\s*100%/);
   });
 
   it("CHART-DECK: the investment donut and recovery bars render on the stage", () => {

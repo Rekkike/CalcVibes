@@ -1,6 +1,6 @@
 import type { CostLine, ModelInputs } from "../../../core/src/types.js";
 import { CURRENCIES, spreadFill } from "../state.js";
-import { CompositionRows } from "../charts.js";
+import { CompositionRows, CompositionDonut } from "../charts.js";
 import { moneyForDisplay } from "../engine.js";
 
 
@@ -24,6 +24,7 @@ export function CostModelSection(props: {
           {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </label>
+      <div className="editor-scroll" data-testid="cost-editor-scroll">
       <table data-testid="cost-lines">
         <thead>
           <tr>
@@ -140,6 +141,7 @@ export function CostModelSection(props: {
           })}
         </tbody>
       </table>
+      </div>
       <div data-testid="depreciation-config">
         <h3>Depreciation (the book view)</h3>
         <p className="muted">Depreciation never touches the cash flows; it owns the yearly book schedule and the split of record (depreciable lines write down, retained lines hold at book).</p>
@@ -164,6 +166,11 @@ export function CostModelSection(props: {
       {result !== null && (
         <div className="scroll" data-testid="composition-rows-wrap">
           <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => moneyForDisplay(t, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK")} />
+        </div>
+      )}
+      {result !== null && (
+        <div data-testid="composition-donut-wrap">
+          <CompositionDonut lineTotals={result.lineTotals} valueFor={(t) => moneyForDisplay(t, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK")} />
         </div>
       )}
     </section>

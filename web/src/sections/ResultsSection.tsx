@@ -1,7 +1,7 @@
 import type { ModelResult } from "../../../core/src/types.js";
 import { percentForDisplay, roundForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CostInflowColumns, CumulativeLine } from "../charts.js";
+import { SignedCashflowChart } from "../charts.js";
 import { deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } from "../engine.js";
 
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null }) {
@@ -51,7 +51,6 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         <p className="caveat">Nominal figures are undiscounted; the cost NPV and achieved IRR are discounted.</p>
       </div>
       <h3>Yearly schedule</h3>
-      <CostInflowColumns yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
       <table data-testid="yearly-table">
         <thead>
           <tr><th>Year</th><th>Cost (nominal)</th><th>Collections (nominal)</th><th>Net (nominal)</th><th>Cumulative net (nominal)</th></tr>
@@ -133,9 +132,9 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
           )}
         </>
       )}
-          <h3>Coverage</h3>
+      <h3>Signed cashflow (costs below the line, collections above it, the cumulative net overlaid)</h3>
       <div data-testid="coverage-chart">
-        <CumulativeLine yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
+        <SignedCashflowChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
       </div>
       {result.termPositions !== undefined && result.termPositions.length > 0 && (
         <>

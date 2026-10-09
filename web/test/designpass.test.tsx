@@ -115,7 +115,7 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     expect(tableIdx).toBeGreaterThan(-1);
     expect(coverageIdx).toBeGreaterThan(tableIdx);
     const coverage = document.querySelector('[data-testid="coverage-chart"]') as HTMLElement;
-    expect(coverage.querySelector('[data-testid="cumulative-line"]')).toBeTruthy();
+    expect(coverage.querySelector('[data-testid="signed-cashflow"]')).toBeTruthy();
   });
 });
 
@@ -143,13 +143,12 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     const { demoProject } = await import("../src/state.js");
     const { computeModel, deckYearsForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
-    const { yearHeader } = await import("../src/state.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
     expect(deck.slides.length).toBe(6);
     expect(deck.slides.map((s) => s.name)).toEqual(["title", "investment", "recovery", "coverage", "returns", "deal"]);
     const coverage = deck.slides[3];
-    expect(coverage.title).toBe(`The outlay is recovered in ${yearHeader(Math.ceil(result.paybackYears as number), null)}`);
+    expect(coverage.title).toBe("The outlay is recovered and the project turns cash-positive");
     expect(coverage.chart?.kind).toBe("coverage");
     expect(coverage.chart?.data.length).toBe(result.yearly.length);
     for (let k = 0; k < (coverage.chart?.data.length ?? 0); k++) {
@@ -159,15 +158,20 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(nominalPayback?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
   });
 
-  it("COVERAGE-SLIDE rendered: the curve mounts with the zero baseline and the crossing label", () => {
+  it("COVERAGE-SLIDE rendered (re-anchored per v0.6R): the signed stage chart mounts with the gold cumulative line, the zero baseline, the break-even label, and the crossing caption", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 3; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
-    const curve = document.querySelector('[data-slide-name="coverage"] [data-testid="coverage-curve"]') as HTMLElement;
-    expect(curve).toBeTruthy();
-    expect(curve.querySelector('[data-testid="coverage-zero-baseline"]')).toBeTruthy();
-    expect(curve.querySelector('[data-testid="coverage-crossing"]')?.textContent).toContain("zero at");
+    const stage = document.querySelector('[data-slide-name="coverage"] [data-testid="stage-returns"]') as HTMLElement;
+    expect(stage).toBeTruthy();
+    expect(stage.querySelector('[data-testid="stage-returns-zero"]')).toBeTruthy();
+    expect(stage.querySelector('[data-testid="stage-gold-line"]')?.getAttribute("stroke")).toBe("#e8b84b");
+    expect(stage.querySelectorAll('[data-stage-bar="cost"]').length).toBeGreaterThan(0);
+    expect(stage.querySelectorAll('[data-stage-bar="inflow"]').length).toBeGreaterThan(0);
+    expect(stage.querySelector('[data-testid="stage-returns-crossing"]')?.textContent).toContain("break-even");
+    const caption = document.querySelector('[data-slide-name="coverage"] [data-testid="crossing-caption"]');
+    expect(caption?.textContent).not.toMatch(/\d/);
   });
 
   it("WATERFALL-BUILD: one segment per cost line; the labels flow through the deck money variant", async () => {

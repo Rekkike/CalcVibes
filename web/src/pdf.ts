@@ -214,7 +214,20 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       const zeroY = y + 30;
       doc.setDrawColor(229, 229, 234);
       doc.line(20, zeroY, 220, zeroY);
-      doc.setDrawColor(0, 116, 186);
+      covData.forEach((d, di) => {
+        const barH = Math.min(22, (Math.abs(d.value) / chartMax) * 22);
+        const x = 20 + (di / Math.max(1, covData.length)) * 200;
+        const barW = 200 / Math.max(1, covData.length) - 1;
+        if (d.value >= 0) {
+          doc.setFillColor(52, 211, 153);
+          doc.rect(x, zeroY - barH, Math.max(0.5, barW), barH, "F");
+        } else {
+          doc.setFillColor(251, 113, 133);
+          doc.rect(x, zeroY, Math.max(0.5, barW), barH, "F");
+        }
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
+      });
+      doc.setDrawColor(232, 184, 75);
       covData.forEach((d, di) => {
         const x = 20 + (di / Math.max(1, covData.length - 1)) * 200;
         const yy = zeroY - (d.value / chartMax) * 22;
@@ -224,7 +237,6 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           const py = zeroY - (prev.value / chartMax) * 22;
           doc.line(px, py, x, yy);
         }
-        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
       });
       doc.setFontSize(6);
       doc.setTextColor(113, 114, 115);
@@ -232,7 +244,10 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         const x = 20 + (di / Math.max(1, covData.length - 1)) * 200;
         doc.text(d.label, x, y + 36, { align: "center", maxWidth: 20 });
       });
-      y += 44;
+      doc.setTextColor(204, 233, 255);
+      doc.text("The cumulative line crosses the axis where the outlay is covered.", 120, y + 42, { align: "center", maxWidth: 180 });
+      doc.setTextColor(0, 0, 0);
+      y += 50;
     } else if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0) {
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
       let rowY = y;

@@ -13,6 +13,60 @@ export const STAGE_CHART_COLORS = {
   zeroLine: "rgba(148,163,184,0.45)",
 };
 
+export const STAGE_GOLD = "#e8b84b";
+
+export function SignedCashflowChart(props: {
+  yearly: YearlyRow[];
+  labelFor: (year: number) => string;
+  valueFor: (v: number) => string;
+}) {
+  const { yearly, labelFor, valueFor } = props;
+  const cum = yearly.map((y) => y.cumulative);
+  const maxAbove = Math.max(...yearly.map((y) => y.inflow), ...cum, 0);
+  const maxBelow = Math.max(...yearly.map((y) => y.cost), ...cum.map((v) => -v), 0);
+  const span = Math.max(1e-12, maxAbove + maxBelow);
+  const yFor = (v: number) => 100 - ((v + maxBelow) / span) * 100;
+  const barW = 100 / Math.max(1, yearly.length * 2);
+  const xFor = (i: number) => (i / Math.max(1, yearly.length)) * 100;
+  const peakCostIdx = yearly.reduce((bi, y, i) => (y.cost > yearly[bi].cost ? i : bi), 0);
+  const peakInflowIdx = yearly.reduce((bi, y, i) => (y.inflow > yearly[bi].inflow ? i : bi), 0);
+  const zeroCrossIdx = cum.findIndex((v, i) => i > 0 && cum[i - 1] < 0 && v >= 0);
+  const linePoints = cum.map((v, i) => `${xFor(i).toFixed(2)},${yFor(v).toFixed(2)}`).join(" ");
+  const points = yearly.map((y, i) => {
+    const base = xFor(i);
+    return { cost: `${base.toFixed(2)},${yFor(0).toFixed(2)} ${base.toFixed(2)},${yFor(-y.cost).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(-y.cost).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(0).toFixed(2)}`, inflow: `${base.toFixed(2)},${yFor(0).toFixed(2)} ${base.toFixed(2)},${yFor(y.inflow).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(y.inflow).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(0).toFixed(2)}` };
+  });
+  return (
+    <div data-testid="signed-cashflow" className="chart-block app-chart signed-cashflow">
+      <div className="cashflow-peaks">
+        <span data-testid="column-peak-cost" className={yearly[peakCostIdx] && yearly[peakCostIdx].cost > 0 ? "column-peak" : "column-peak hidden-peak"}>{yearly[peakCostIdx] && yearly[peakCostIdx].cost > 0 ? `Cost peak ${valueFor(yearly[peakCostIdx].cost)}` : "\u00a0"}</span>
+        <span data-testid="column-peak-inflow" className={yearly[peakInflowIdx] && yearly[peakInflowIdx].inflow > 0 ? "column-peak inflow-peak" : "column-peak inflow-peak hidden-peak"}>{yearly[peakInflowIdx] && yearly[peakInflowIdx].inflow > 0 ? `Inflow peak ${valueFor(yearly[peakInflowIdx].inflow)}` : "\u00a0"}</span>
+      </div>
+      <div className="signed-cashflow-frame">
+        <span data-testid="line-start-value" className="line-endpoint signed-top-value">{valueFor(cum[0] ?? 0)}</span>
+        <span data-testid="line-end-value" className="line-endpoint signed-top-value">{valueFor(cum[cum.length - 1] ?? 0)}</span>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" className="signed-svg">
+          <line data-testid="zero-baseline" x1={0} x2={100} y1={yFor(0).toFixed(2)} y2={yFor(0).toFixed(2)} stroke="var(--line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          {yearly.map((y, i) => (
+            <polygon key={"c" + y.year} data-chart-bar="cost" data-bar-year={y.year} data-signed="below" points={points[i].cost} fill={CHART_COLORS.costBar} />
+          ))}
+          {yearly.map((y, i) => (
+            <polygon key={"i" + y.year} data-chart-bar="inflow" data-bar-year={y.year} data-signed="above" points={points[i].inflow} fill={CHART_COLORS.inflowBar} />
+          ))}
+          <polyline data-chart-line="cumulative" points={linePoints} fill="none" stroke={CHART_COLORS.cumulative} strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+        </svg>
+      </div>
+      <div className="line-years">
+        <span data-testid="column-year-label-first" className="column-year-label">{labelFor(yearly[0]?.year ?? 1)}</span>
+        {zeroCrossIdx > 0 && (
+          <span data-testid="line-zero-crossing" className="column-year-label">zero at {labelFor(yearly[zeroCrossIdx].year)}</span>
+        )}
+        <span data-testid="column-year-label-last" className="column-year-label">{labelFor(yearly[yearly.length - 1]?.year ?? yearly.length)}</span>
+      </div>
+    </div>
+  );
+}
+
 export function CostInflowColumns(props: {
   yearly: YearlyRow[];
   labelFor: (year: number) => string;
@@ -106,6 +160,52 @@ export function CompositionRows(props: {
   );
 }
 
+export const DONUT_COLORS = ["#0074ba", "#059669", "#b45309", "#7c3aed", "#db2777", "#0891b2", "#65a30d", "#c2410c"];
+
+export function CompositionDonut(props: {
+  lineTotals: LineTotal[];
+  valueFor: (total: number) => string;
+}) {
+  const { lineTotals, valueFor } = props;
+  const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
+  const cx = 60, cy = 60, r = 46, ringWidth = 22, rMid = r - ringWidth / 2;
+  let acc = 0;
+  const arcs = lineTotals.map((l, i) => {
+    const frac = l.total / total;
+    const start = (acc / total) * 2 * Math.PI - Math.PI / 2;
+    acc += l.total;
+    const end = (acc / total) * 2 * Math.PI - Math.PI / 2;
+    const large = end - start > Math.PI ? 1 : 0;
+    const x1 = cx + rMid * Math.cos(start), y1 = cy + rMid * Math.sin(start);
+    const x2 = cx + rMid * Math.cos(end), y2 = cy + rMid * Math.sin(end);
+    const d = frac >= 0.9999
+      ? `M ${cx + rMid} ${cy} A ${rMid} ${rMid} 0 1 1 ${cx - rMid - 0.01} ${cy} A ${rMid} ${rMid} 0 1 1 ${cx + rMid} ${cy}`
+      : `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${rMid} ${rMid} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+    return { id: l.id, name: l.name, total: l.total, frac, d, color: DONUT_COLORS[i % DONUT_COLORS.length] };
+  });
+  return (
+    <div data-testid="composition-donut" className="chart-block composition-donut">
+      <div className="donut-geometry">
+        <svg viewBox="0 0 120 120" aria-hidden="true" className="donut-svg">
+          {arcs.map((a) => (
+            <path key={a.id} data-donut-segment={a.id} d={a.d} fill="none" stroke={a.color} strokeWidth={ringWidth} />
+          ))}
+          <circle data-testid="donut-center" cx={cx} cy={cy} r={r - ringWidth - 2} fill="none" stroke="none" />
+        </svg>
+        <span data-testid="donut-center-total" className="donut-center-total">{valueFor(total)}</span>
+      </div>
+      <ul className="donut-labels">
+        {arcs.map((a) => (
+          <li key={a.id} data-testid="donut-label" data-donut-label={a.id} className="donut-label">
+            <span data-testid="donut-swatch" className="donut-swatch" style={{ background: a.color }} />
+            <span className="row-name">{a.name} {valueFor(a.total)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function RecoveryBars(props: {
   collectionsGrid: GridRow[];
   years: number;
@@ -133,6 +233,47 @@ export function RecoveryBars(props: {
             <span data-testid="bar-year-label" className="bar-year-label">{labelFor(k + 1)}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+export function StageReturnsChart(props: {
+  yearly: YearlyRow[];
+  labelFor: (year: number) => string;
+}) {
+  const { yearly, labelFor } = props;
+  const cum = yearly.map((y) => y.cumulative);
+  const maxAbove = Math.max(...yearly.map((y) => y.inflow), ...cum, 0);
+  const maxBelow = Math.max(...yearly.map((y) => y.cost), ...cum.map((v) => -v), 0);
+  const span = Math.max(1e-12, maxAbove + maxBelow);
+  const yFor = (v: number) => 100 - ((v + maxBelow) / span) * 100;
+  const barW = 100 / Math.max(1, yearly.length * 2);
+  const xFor = (i: number) => (i / Math.max(1, yearly.length)) * 100;
+  const zeroCrossIdx = cum.findIndex((v, i) => i > 0 && cum[i - 1] < 0 && v >= 0);
+  const linePoints = cum.map((v, i) => `${xFor(i).toFixed(2)},${yFor(v).toFixed(2)}`).join(" ");
+  const points = yearly.map((y, i) => {
+    const base = xFor(i);
+    return { cost: `${base.toFixed(2)},${yFor(0).toFixed(2)} ${base.toFixed(2)},${yFor(-y.cost).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(-y.cost).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(0).toFixed(2)}`, inflow: `${base.toFixed(2)},${yFor(0).toFixed(2)} ${base.toFixed(2)},${yFor(y.inflow).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(y.inflow).toFixed(2)} ${(base + barW).toFixed(2)},${yFor(0).toFixed(2)}` };
+  });
+  return (
+    <div data-testid="stage-returns" className="chart-block stage-returns">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" className="stage-returns-svg">
+        <line data-testid="stage-returns-zero" x1={0} x2={100} y1={yFor(0).toFixed(2)} y2={yFor(0).toFixed(2)} stroke="rgba(148,163,184,0.45)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        {yearly.map((y, i) => (
+          <polygon key={"c" + y.year} data-stage-bar="cost" data-signed="below" points={points[i].cost} fill="rgba(251,113,133,0.85)" />
+        ))}
+        {yearly.map((y, i) => (
+          <polygon key={"i" + y.year} data-stage-bar="inflow" data-signed="above" points={points[i].inflow} fill="rgba(52,211,153,0.85)" />
+        ))}
+        <polyline data-testid="stage-gold-line" points={linePoints} fill="none" stroke={STAGE_GOLD} strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="line-years">
+        <span data-testid="stage-returns-first" className="column-year-label">{labelFor(yearly[0]?.year ?? 1)}</span>
+        {zeroCrossIdx > 0 && (
+          <span data-testid="stage-returns-crossing" className="column-year-label">break-even {labelFor(yearly[zeroCrossIdx].year)}</span>
+        )}
+        <span data-testid="stage-returns-last" className="column-year-label">{labelFor(yearly[yearly.length - 1]?.year ?? yearly.length)}</span>
       </div>
     </div>
   );

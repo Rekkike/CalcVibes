@@ -141,10 +141,10 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
 
   it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6");
+    expect(VERSION).toBe("v0.6R");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6R");
   });
 });
 
