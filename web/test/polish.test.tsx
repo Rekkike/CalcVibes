@@ -139,11 +139,12 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
     expect(css).toMatch(/\.app-root\[data-theme="dark"\]\s*\{[^}]*--accent:\s*#0074ba|dark[\s\S]*?--mut:\s*#9db4cc/);
   });
 
-  it("VERSION: the rendered string equals the VERSION constant v0.5.5", async () => {
+  it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.5.5");
+    expect(VERSION).toBe("v0.6");
     render(<App />);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.5.5");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6");
   });
 });
 

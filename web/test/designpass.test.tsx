@@ -187,12 +187,15 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i] as HTMLElement;
       const frac = result.lineTotals[i].total / cap;
-      expect(parseFloat(seg.style.width)).toBeCloseTo(frac * 100, 0);
-      expect(parseFloat(seg.style.left)).toBeCloseTo(accShare * 100, 0);
+      expect(parseFloat(seg.style.height)).toBeCloseTo(frac * 100, 0);
+      expect(parseFloat(seg.style.bottom)).toBeCloseTo(accShare * 100, 0);
       accShare += frac;
     }
     const capEl = waterfall.querySelector('[data-testid="waterfall-cap"]') as HTMLElement;
-    expect(parseFloat(capEl.style.width)).toBeCloseTo(100, 0);
+    expect(parseFloat(capEl.style.bottom)).toBeCloseTo(100, 0);
+    for (const seg of Array.from(segments)) {
+      expect((seg as HTMLElement).querySelector('[data-testid="waterfall-label"]')).toBe(null);
+    }
     const labels = waterfall.querySelectorAll('[data-testid="waterfall-label"]');
     expect(labels.length).toBe(result.lineTotals.length);
     for (let i = 0; i < labels.length; i++) {
@@ -220,7 +223,8 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(parseFloat(targetDot.style.left)).toBeCloseTo((target / scale) * 100, 0);
     expect(parseFloat(achievedDot.style.left)).toBeCloseTo((achieved / scale) * 100, 0);
     expect(achievedDot.className).toContain("tone-ok");
-    expect(plot.querySelector('[data-testid="hurdle-margin-label"]')?.textContent).toContain("clears the hurdle");
+    expect(plot.querySelector('[data-testid="hurdle-margin-label"]')?.textContent).toContain("solved to the target");
+    expect(plot.querySelector('[data-testid="hurdle-margin-label"]')?.getAttribute("data-hurdle-mode")).toBe("solved");
   });
 
   it("TONE-SEMANTICS: the met case tones the tiles; the not-met case renders the bad tones", () => {

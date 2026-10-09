@@ -618,44 +618,13 @@
 
 
 
-/* ===== v0.5.8 Task C: the deck charts (waterfall, coverage, hurdle) ===== */
-[data-testid="presentation"] .waterfall-track {
-  position: relative;
-  height: 44px;
-  width: 100%;
-  margin: var(--space-2) 0;
-}
-
-[data-testid="presentation"] .waterfall-segment {
-  position: absolute;
-  top: 10px;
-  height: 24px;
-  background: rgba(0, 116, 186, 0.75);
-  border-right: 2px solid var(--stage, #081c33);
-  border-radius: 4px 0 0 4px;
-}
-
-[data-testid="presentation"] .waterfall-segment:last-of-type {
-  border-radius: 4px;
-}
-
-[data-testid="presentation"] .waterfall-cap {
-  position: absolute;
-  top: 0;
-  height: 4px;
-  background: #e2e8f0;
-  border-radius: 2px;
-}
-
-[data-testid="presentation"] .waterfall-label {
-  position: absolute;
-  top: -16px;
-  left: 0;
-  font-size: 10px;
-  color: #e2e8f0;
-  white-space: nowrap;
-}
-
+/* ===== v0.5.8 Task C: the deck charts (waterfall, coverage, hurdle); the waterfall re-formed to the B4 vertical build-up at v0.6 ===== */
+[data-testid="presentation"] .waterfall-label-list {  list-style: none;  margin: 0 0 var(--space-1);  padding: 0;}
+[data-testid="presentation"] .waterfall-track {  position: relative;  height: 120px;  width: 64px;  margin: var(--space-2) 0;}
+[data-testid="presentation"] .waterfall-segment {  position: absolute;  left: 12px;  width: 40px;  background: rgba(0, 116, 186, 0.75);  border-top: 2px solid var(--stage, #081c33);}
+[data-testid="presentation"] .waterfall-segment:last-of-type {  border-top: none;}
+[data-testid="presentation"] .waterfall-cap {  position: absolute;  background: #e2e8f0;  border-radius: 2px;}
+[data-testid="presentation"] .waterfall-label {  font-size: 10px;  color: #e2e8f0;  white-space: nowrap;}
 [data-testid="presentation"] .hurdle-track {
   position: relative;
   height: 36px;

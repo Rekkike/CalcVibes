@@ -12,8 +12,9 @@ export function CostModelSection(props: {
   removeCost: (id: string) => void;
   updateCost: (id: string, patch: Partial<CostLine>) => void;
   result: import("../../../core/src/types.js").ModelResult | null;
+  setDepreciationDefault: (cfg: import("../../../core/src/types.js").DepreciationConfig | null) => void;
 }) {
-  const { inputs, issueByLine, setCurrency, addCost, removeCost, updateCost, result } = props;
+  const { inputs, issueByLine, setCurrency, addCost, removeCost, updateCost, result, setDepreciationDefault } = props;
   return (
     <section data-testid="costs">
       <h2>Cost model</h2>
@@ -26,7 +27,7 @@ export function CostModelSection(props: {
       <table data-testid="cost-lines">
         <thead>
           <tr>
-            <th>Name</th><th>Category</th><th>Amount / year</th><th>Start year</th><th>Duration (years)</th><th>Escalation %</th><th>Line total</th><th></th>
+            <th>Name</th><th>Category</th><th>Amount / year</th><th>Start year</th><th>Duration (years)</th><th>Escalation %</th><th>Depreciation</th><th>Line total</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -56,6 +57,26 @@ export function CostModelSection(props: {
                 <td>
                   <input data-field="escalation" type="number" value={c.escalation} onChange={(e) => updateCost(c.id, { escalation: parseFloat(e.target.value) || 0 })} />
                 </td>
+                <td>
+                  <select data-field="line-depreciation-mode" value={c.depreciation?.mode ?? ""} onChange={(e) => {
+                    const mode = e.target.value;
+                    if (mode === "") { updateCost(c.id, { depreciation: undefined }); return; }
+                    if (mode === "retained") updateCost(c.id, { depreciation: { mode: "retained" } });
+                    else if (mode === "straight-line") updateCost(c.id, { depreciation: { mode: "straight-line", years: c.depreciation?.years ?? 20 } });
+                    else updateCost(c.id, { depreciation: { mode: "rate", yearlyRatePct: c.depreciation?.yearlyRatePct ?? 5 } });
+                  }}>
+                    <option value="">Project default</option>
+                    <option value="retained">Retained</option>
+                    <option value="straight-line">Straight-line</option>
+                    <option value="rate">Yearly rate</option>
+                  </select>
+                  {c.depreciation?.mode === "straight-line" && (
+                    <input data-field="line-depreciation-years" type="number" value={c.depreciation?.years ?? 20} onChange={(e) => updateCost(c.id, { depreciation: { mode: "straight-line", years: parseFloat(e.target.value) || 0 } })} />
+                  )}
+                  {c.depreciation?.mode === "rate" && (
+                    <input data-field="line-depreciation-rate" type="number" value={c.depreciation?.yearlyRatePct ?? 0} onChange={(e) => updateCost(c.id, { depreciation: { mode: "rate", yearlyRatePct: parseFloat(e.target.value) || 0 } })} />
+                  )}
+                </td>
                 <td data-field="line-total">—</td>
                 <td>
                   <button data-action="remove-cost" onClick={() => removeCost(c.id)}>Remove</button>
@@ -63,11 +84,11 @@ export function CostModelSection(props: {
               </tr>,
               lineIssues.length > 0 && (
                 <tr key={c.id + "-issues"} data-testid="line-issues" data-kind="issues" data-line={c.id}>
-                  <td colSpan={8} className="warning">{lineIssues.join(" ")}</td>
+                  <td colSpan={9} className="warning">{lineIssues.join(" ")}</td>
                 </tr>
               ),
               <tr key={c.id + "-years"} data-kind="year-editor" data-line={c.id}>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <details>
                     <summary data-testid="year-editor-toggle">Per-year amounts</summary>
                     <table data-testid="year-editor">
@@ -119,6 +140,26 @@ export function CostModelSection(props: {
           })}
         </tbody>
       </table>
+      <div data-testid="depreciation-config">
+        <h3>Depreciation (the book view)</h3>
+        <p className="muted">Depreciation never touches the cash flows; it owns the yearly book schedule and the split of record (depreciable lines write down, retained lines hold at book).</p>
+        <label>Project default (applies to unconfigured lines){" "}
+          <select data-field="depreciation-default-mode" value={inputs.depreciationDefault?.mode ?? "retained"} onChange={(e) => {
+            const mode = e.target.value as import("../../../core/src/types.js").DepreciationConfig["mode"];
+            setDepreciationDefault(mode === "retained" ? { mode: "retained" } : mode === "straight-line" ? { mode: "straight-line", years: 20 } : { mode: "rate", yearlyRatePct: 5 });
+          }}>
+            <option value="retained">Retained (never writes down)</option>
+            <option value="straight-line">Straight-line</option>
+            <option value="rate">Yearly rate</option>
+          </select>
+        </label>
+        {inputs.depreciationDefault?.mode === "straight-line" && (
+          <label>Default straight-line years <input data-field="depreciation-default-years" type="number" value={inputs.depreciationDefault?.years ?? 20} onChange={(e) => setDepreciationDefault({ mode: "straight-line", years: parseFloat(e.target.value) || 0 })} /></label>
+        )}
+        {inputs.depreciationDefault?.mode === "rate" && (
+          <label>Default yearly rate % <input data-field="depreciation-default-rate" type="number" value={inputs.depreciationDefault?.yearlyRatePct ?? 0} onChange={(e) => setDepreciationDefault({ mode: "rate", yearlyRatePct: parseFloat(e.target.value) || 0 })} /></label>
+        )}
+      </div>
       <button data-action="add-cost" onClick={addCost}>Add cost line</button>
       {result !== null && (
         <div className="scroll" data-testid="composition-rows-wrap">

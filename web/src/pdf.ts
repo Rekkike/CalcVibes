@@ -130,7 +130,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           doc.setTextColor(50, 50, 50);
           doc.text(`Target ${t.toFixed(2)}%`, 24, y);
           doc.setTextColor(0, 0, 0);
-          doc.text(a >= t ? "clears the hurdle" : "below the hurdle", 120, y);
+          doc.text(sc.solved === true ? "solved to the target" : a >= t ? "clears the hurdle" : "below the hurdle", 120, y);
           doc.text(`Achieved ${a.toFixed(2)}%`, 216, y, { align: "right" });
           doc.setFillColor(0, 116, 186);
           doc.circle(40 + (t / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");

@@ -71,7 +71,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.summaryCharts !== undefined && result !== null && (
               <div data-testid="summary-charts" className="summary-charts">
-                <div data-summary-chart="hurdle"><HurdlePlot target={inputs.targetIrr} achieved={(result.achievedIrr ?? 0) * 100} goalMet={result.goalMet} /></div>
+                <div data-summary-chart="hurdle"><HurdlePlot target={inputs.targetIrr} achieved={(result.achievedIrr ?? 0) * 100} goalMet={result.goalMet} solved={result.paymentAmount !== null} /></div>
                 <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} /></div>
               </div>
             )}

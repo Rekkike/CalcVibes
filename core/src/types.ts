@@ -1,3 +1,9 @@
+export interface DepreciationConfig {
+  mode: "straight-line" | "rate" | "retained";
+  years?: number;
+  yearlyRatePct?: number;
+}
+
 export interface CostLine {
   id: string;
   name: string;
@@ -7,6 +13,7 @@ export interface CostLine {
   durationYears: number;
   escalation: number;
   yearOverrides?: Record<number, number>;
+  depreciation?: DepreciationConfig;
 }
 
 export interface RepaymentParams {
@@ -19,7 +26,28 @@ export interface RepaymentParams {
   collectionsOverrides?: Record<number, number>;
 }
 
+export interface Reinvestment {
+  year: number;
+  amount: number;
+}
+
+export interface ContractParams {
+  id: string;
+  label: string;
+  startYear: number;
+  termYears: number;
+  paymentsPerYear: number;
+  graceYears: number;
+  escalationPerYear: number;
+  balloon: number;
+  mode: "solved" | "evaluated";
+  evaluatedPayment?: number | null;
+  evaluatedProfile?: Record<number, number> | null;
+  reinvestments?: Reinvestment[];
+}
+
 export interface ResidualParams {
+  mode?: "calculated" | "amount";
   amount: number;
   year: number;
 }
@@ -97,6 +125,8 @@ export interface ModelInputs {
   targetIrr: number;
   costs: CostLine[];
   repayment: RepaymentParams;
+  contracts?: ContractParams[];
+  depreciationDefault?: DepreciationConfig | null;
   appraisal?: AppraisalParams;
   operatingLines?: OperatingLine[];
   maintenance?: MaintenanceConfig;
@@ -174,6 +204,62 @@ export interface FinancingResult {
   draws: number[];
 }
 
+export interface HorizonConstituent {
+  label: string;
+  month: number;
+}
+
+export interface HorizonInfo {
+  totalMonths: number;
+  totalYears: number;
+  constituents: HorizonConstituent[];
+}
+
+export interface BookViewRow {
+  year: number;
+  beginning: number;
+  charge: number;
+  ending: number;
+  collections: number;
+  operating: number;
+  bookResult: number;
+}
+
+export interface BookView {
+  lines: { id: string; name: string; isRetained: boolean; years: { year: number; beginning: number; charge: number; ending: number }[] }[];
+  combined: BookViewRow[];
+  totalCharge: number;
+  remainingBookValueAtResidualYear: number;
+  gainOrLossOnSale: number;
+  residualMode: "calculated" | "amount";
+  setAmount: number;
+}
+
+export interface TermPosition {
+  contractId: string;
+  label: string;
+  endMonth: number;
+  truncatedIrr: number | null;
+  truncatedIrrAmbiguous: boolean;
+  cumulativeNet: number;
+  npvAtWacc: number;
+  npvAtTarget: number;
+  paybackSoFar: number | null;
+}
+
+export interface ContractInfo {
+  id: string;
+  label: string;
+  mode: "solved" | "evaluated";
+  startYear: number;
+  termYears: number;
+  paymentsPerYear: number;
+  paymentCount: number;
+  endMonth: number;
+  lastCollectionMonth: number;
+  reinvestments: Reinvestment[];
+}
+
 export interface ModelResult {
   totalCost: number;
   costNpv: number;
@@ -208,6 +294,11 @@ export interface ModelResult {
   leveragedSolve: boolean;
   costGrid: GridRow[];
   collectionsGrid: GridRow[];
+  horizon?: HorizonInfo;
+  bookView?: BookView;
+  termPositions?: TermPosition[];
+  contractsInfo?: ContractInfo[];
+  residualAmountUsed?: number;
 }
 
 export interface GridRow {

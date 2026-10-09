@@ -98,4 +98,4 @@ export function dscrTwoForDisplay(value: number): string {
   return roundForDisplay(value, 2).toFixed(2);
 }
 
-export const VERSION = "v0.5.5";
+export const VERSION = "v0.6";

@@ -1,4 +1,4 @@
-import type { CostLine, MaintenanceConfig, ModelInputs, OperatingLine } from "../../core/src/types.js";
+import type { ContractParams, CostLine, MaintenanceConfig, ModelInputs, OperatingLine } from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
 
 export const CURRENCIES = ["EUR", "USD", "GBP", "SEK", "NOK", "DKK"] as const;
@@ -10,7 +10,7 @@ export function blankProject(): ModelInputs {
     entryUnit: "thousands",
     targetIrr: 12,
     costs: [],
-    repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 4, paymentEscalation: 0, balloon: 0 },
+    repayment: { graceYears: 0, termYears: 7, paymentsPerYear: 1, paymentEscalation: 0, balloon: 0 },
   };
 }
 
@@ -65,8 +65,48 @@ export function demoProject(): ModelInputs {
   };
 }
 
+export function multiLeaseProject(): ModelInputs {
+  return {
+    projectName: "Multi-lease example",
+    currency: "SEK",
+    entryUnit: "ones",
+    targetIrr: 8,
+    costs: [
+      { id: "c1", name: "Depreciable assets", category: "capex", amount: 20000000, startYear: 1, durationYears: 1, escalation: 0, depreciation: { mode: "straight-line", years: 33 } },
+      { id: "c2", name: "Retained assets (land and buildings)", category: "capex", amount: 80000000, startYear: 1, durationYears: 1, escalation: 0, depreciation: { mode: "retained" } },
+      { id: "c3", name: "Build (3-year program)", category: "recurring", amount: 5000000, startYear: 1, durationYears: 3, escalation: 0 },
+    ],
+    repayment: { graceYears: 0, termYears: 15, paymentsPerYear: 1, paymentEscalation: 0, balloon: 0 },
+    contracts: [
+      { id: "k1", label: "Contract one", startYear: 4, termYears: 15, paymentsPerYear: 1, graceYears: 0, escalationPerYear: 0, balloon: 0, mode: "solved", reinvestments: [{ year: 4, amount: 3000000 }] },
+      { id: "k2", label: "Contract two", startYear: 19, termYears: 15, paymentsPerYear: 1, graceYears: 0, escalationPerYear: 0, balloon: 0, mode: "solved" },
+      { id: "k3", label: "Lease three", startYear: 34, termYears: 20, paymentsPerYear: 1, graceYears: 0, escalationPerYear: 0, balloon: 0, mode: "solved" },
+    ],
+    appraisal: { wacc: 6, financeRate: 5, reinvestmentRate: 5, residual: { mode: "calculated", amount: 0, year: 54 } },
+  };
+}
+
 export function nextCostId(costs: CostLine[]): string {
   return "c" + (costs.length + 1);
+}
+
+export function blankContract(id: string, startYear: number): ContractParams {
+  return {
+    id,
+    label: "Contract",
+    startYear,
+    termYears: 15,
+    paymentsPerYear: 1,
+    graceYears: 0,
+    escalationPerYear: 0,
+    balloon: 0,
+    mode: "solved",
+    reinvestments: [],
+  };
+}
+
+export function nextContractId(contracts: ContractParams[]): string {
+  return "k" + (contracts.length + 1);
 }
 
 export function blankCostLine(id: string): CostLine {

@@ -4,7 +4,7 @@ import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
 import { EngineInputError } from "../../core/src/validate.js";
-import { blankCostLine, blankProject, demoProject, nextCostId } from "./state.js";
+import { blankCostLine, blankProject, demoProject, multiLeaseProject, nextCostId } from "./state.js";
 import type { CostLine } from "../../core/src/types.js";
 import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
@@ -86,6 +86,10 @@ export function App() {
   const setProjectLength = (v: number | null) => setInputs((p) => ({ ...p, projectLengthYears: v }));
   const setRepayment = (patch: Partial<ModelInputs["repayment"]>) =>
     setInputs((p) => ({ ...p, repayment: { ...p.repayment, ...patch } }));
+  const setContracts = (contracts: import("../../core/src/types.js").ContractParams[]) =>
+    setInputs((p) => ({ ...p, contracts }));
+  const setDepreciationDefault = (cfg: import("../../core/src/types.js").DepreciationConfig | null) =>
+    setInputs((p) => ({ ...p, depreciationDefault: cfg }));
   const setAppraisal = (patch: Partial<NonNullable<ModelInputs["appraisal"]>>) =>
     setInputs((p) => ({ ...p, appraisal: { ...(p.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } }), ...patch } }));
   const setOperating = (lines: import("../../core/src/types.js").OperatingLine[]) =>
@@ -147,6 +151,7 @@ export function App() {
           <h1>{inputs.projectName || "Untitled project"}</h1>
           <button data-action="new-project" onClick={() => setInputs(blankProject())}>New project</button>
           <button data-action="load-demo" onClick={() => setInputs(demoProject())}>Load demo project (Project Alpha)</button>
+          <button data-action="load-multi-lease-demo" onClick={() => setInputs(multiLeaseProject())}>Load multi-lease demo</button>
         </div>
         <div data-testid="header-controls" className="header-controls">
           <button data-action="present" onClick={() => setPresOpen(true)}>Present results</button>
@@ -228,10 +233,11 @@ export function App() {
             removeCost={removeCost}
             updateCost={updateCost}
             result={result}
+            setDepreciationDefault={setDepreciationDefault}
           />
         )}
         {view === "repayment" && (
-          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} startYear={startYear} />
+          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} setContracts={setContracts} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} startYear={startYear} />
         )}
         {view === "operating" && (
           <OperatingSection inputs={inputs} result={result} setOperating={setOperating} setMaintenance={setMaintenance} />

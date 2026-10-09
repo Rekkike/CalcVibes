@@ -189,6 +189,11 @@ describe("PROJ-LEN battery", () => {
       const c = JSON.parse(JSON.stringify(r)) as Record<string, unknown>;
       delete c.costGrid;
       delete c.collectionsGrid;
+      delete c.horizon;
+      delete c.contractsInfo;
+      delete c.bookView;
+      delete c.termPositions;
+      delete c.residualAmountUsed;
       return JSON.stringify(c);
     };
     expect(strip(len10)).toBe(strip(plain));
@@ -209,10 +214,14 @@ describe("PROJ-LEN battery", () => {
     expect(Math.abs(len12.npvAtWacc - plain.npvAtWacc)).toBeLessThan(1e-12);
   });
 
-  it("PROJ-LEN-EXCEEDED names each offender", () => {
-    expect(() => computeModel({ ...base(), projectLengthYears: 9 })).toThrowError(/the repayment schedule ends at month 120/);
-    expect(() => computeModel({ ...base(), projectLengthYears: 2 })).toThrowError(/the cost program ends at month 36; the repayment schedule ends at month 120/);
-    expect(() => computeModel({ ...base(), projectLengthYears: 5, repayment: { ...base().repayment, collectionsOverrides: profile } })).toThrowError(/the collections profile ends at month 72/);
+  it("PROJ-LEN-DERIVED (re-anchored per v0.6): a short project length extends the horizon, never a veto", () => {
+    const r = computeModel({ ...base(), projectLengthYears: 9 });
+    expect(r.horizon?.totalMonths).toBe(120);
+    const short = computeModel({ ...base(), projectLengthYears: 2 });
+    expect(short.horizon?.totalMonths).toBe(120);
+    expect(short.monthly.length).toBe(120);
+    const prof = computeModel({ ...base(), projectLengthYears: 5, repayment: { ...base().repayment, collectionsOverrides: profile } });
+    expect(prof.horizon?.totalMonths).toBe(72);
   });
 
   it("PROJ-VALID: 0 and 2.5 surface PROJ-LENGTH-INVALID", () => {

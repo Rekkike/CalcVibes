@@ -50,10 +50,7 @@ export function irrAnnual(flows: number[]): number | null {
   return Math.pow(1 + rM, 12) - 1;
 }
 
-interface PaymentSlot {
-  monthIndex: number;
-  escFactor: number;
-}
+export type { PaymentSlot };
 
 export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: number }): import("./types.js").ModelResult {
   const issues = validateInputs(inp);
@@ -96,6 +93,10 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     lastCostYear = Math.max(lastCostYear, end);
   });
   if (lastCostYear === 0) lastCostYear = 1;
+  const explicitContracts = inp.contracts !== undefined && inp.contracts.length > 0;
+  const contracts = normalizeContracts(inp, lastCostYear);
+  const contractsMode = explicitContracts;
+  const reinvestmentsAll = contractsMode ? allReinvestments(contracts) : [];
   const overrideYear = inp.repayment.firstCollectionYear ?? null;
   const repaymentStartYear = overrideYear !== null ? overrideYear : lastCostYear + inp.repayment.graceYears;
   const termMonths = Math.round(Math.max(0, inp.repayment.termYears) * 12);
@@ -113,28 +114,67 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const tariffCollectionMode0 = tariffCfg0.mode === "stable" || tariffCfg0.mode === "manual" || tariffCfg0.mode === "fixed";
   const lastTariffMonth = tariffCfg0.mode !== "off" ? gridYears[gridYears.length - 1] * 12 : -1;
   if (lastTariffMonth > totalMonths) totalMonths = lastTariffMonth;
+  const horizonConstituents: import("./types.js").HorizonConstituent[] = [];
+  horizonConstituents.push({ label: "cost program", month: Math.ceil(lastCostYear * 12) });
+  if (profileMode) {
+    horizonConstituents.push({ label: "collections profile", month: profileEndMonth });
+  } else if (!tariffCollectionMode0) {
+    horizonConstituents.push({ label: "repayment schedule", month: repaymentStartYear * 12 + termMonths });
+  }
+  if (lastTariffMonth > 0) horizonConstituents.push({ label: "tariff grid", month: lastTariffMonth });
+  if (contractsMode) {
+    for (const c of contracts) {
+      horizonConstituents.push({ label: `contract ${c.label} collections`, month: contractLastCollectionMonth(c) });
+      for (const ri of c.reinvestments) horizonConstituents.push({ label: `reinvestment (${c.label})`, month: ri.year * 12 });
+    }
+  }
+  if (residualAmount > 0) horizonConstituents.push({ label: "residual", month: residualYear * 12 });
+  const finCfg0 = inp.financing && inp.financing.enabled ? inp.financing : null;
+  if (finCfg0) {
+    horizonConstituents.push({ label: "financing service", month: (finCfg0.serviceStartYear ?? repaymentStartYear) * 12 + finCfg0.termYears * 12 });
+  }
   if (inp.projectLengthYears !== undefined && inp.projectLengthYears !== null) {
-    const lengthMonths = inp.projectLengthYears * 12;
-    const offenders: string[] = [];
-    const costEnd = lastCostYear * 12;
-    if (costEnd > lengthMonths) offenders.push(`the cost program ends at month ${costEnd}`);
-    if (profileMode) {
-      if (profileEndMonth > lengthMonths) offenders.push(`the collections profile ends at month ${profileEndMonth}`);
+    horizonConstituents.push({ label: "project length", month: inp.projectLengthYears * 12 });
+  }
+  for (const hc of horizonConstituents) {
+    if (hc.month > totalMonths) totalMonths = hc.month;
+  }
+  const residualMode = appraisal.residual.mode === "calculated" ? "calculated" : "amount";
+  const residualSetAmount = appraisal.residual.amount;
+  const horizonYears = Math.ceil(totalMonths / 12);
+  const lineTotalsMap = new Map<string, number>();
+  for (const c of inp.costs) {
+    const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+    let total = 0;
+    if (overrides) {
+      if (c.category === "capex") {
+        for (const amount of Object.values(overrides)) total += amount;
+      } else {
+        const dur = Math.max(1, c.durationYears);
+        for (let j = 0; j < dur; j++) {
+          const y = c.startYear + j;
+          const overridden = Object.prototype.hasOwnProperty.call(overrides, String(y));
+          total += overridden ? (overrides as Record<number, number>)[y] : c.amount * Math.pow(1 + c.escalation / 100, j);
+        }
+      }
+    } else if (c.category === "capex") {
+      total = c.amount;
     } else {
-      const scheduleEnd = repaymentStartYear * 12 + termMonths;
-      if (scheduleEnd > lengthMonths) offenders.push(`the repayment schedule ends at month ${scheduleEnd}`);
+      const dur = Math.max(1, c.durationYears);
+      for (let j = 0; j < dur; j++) total += c.amount * Math.pow(1 + c.escalation / 100, j);
     }
-    if (lastTariffMonth > lengthMonths) offenders.push(`the tariff grid ends at month ${lastTariffMonth}`);
-    if (residualAmount > 0 && residualYear * 12 > lengthMonths) offenders.push(`the residual lands at month ${residualYear * 12}`);
-    const finCfg0 = inp.financing && inp.financing.enabled ? inp.financing : null;
-    if (finCfg0) {
-      const serviceEnd = (finCfg0.serviceStartYear ?? repaymentStartYear) * 12 + finCfg0.termYears * 12;
-      if (serviceEnd > lengthMonths) offenders.push(`the financing service ends at month ${serviceEnd}`);
-    }
-    if (offenders.length > 0) {
-      throw new EngineInputError([`Project length ${inp.projectLengthYears} years is shorter than the modeled schedules (PROJ-LENGTH-EXCEEDED): ${offenders.join("; ")}.`]);
-    }
-    totalMonths = lengthMonths;
+    lineTotalsMap.set(c.id, total);
+  }
+  const bookSchedule = computeBookSchedule(
+    inp.costs,
+    contracts.flatMap((c) => c.reinvestments.map((ri) => ({ contractId: c.id, ri }))),
+    inp.depreciationDefault ?? null,
+    horizonYears,
+    lineTotalsMap,
+  );
+  let residualAmountUsed = residualSetAmount;
+  if (residualMode === "calculated") {
+    residualAmountUsed = bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears));
   }
   const costM = new Array<number>(totalMonths).fill(0);
   costs.forEach((c) => {
@@ -160,6 +200,10 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       }
     }
   });
+  for (const ri of reinvestmentsAll) {
+    const m = Math.min(totalMonths, ri.year * 12);
+    if (m >= 1) costM[m - 1] += ri.amount;
+  }
   let costNpv = 0;
   for (let i = 0; i < totalMonths; i++) costNpv += costM[i] / Math.pow(1 + rM, i + 1);
   const ppy = [1, 2, 4, 12].indexOf(inp.repayment.paymentsPerYear) >= 0 ? inp.repayment.paymentsPerYear : 1;
@@ -180,12 +224,12 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     throw new EngineInputError(["The balloon's discounted value at the target rate reaches the cost NPV; the solved payment would be non-positive."]);
   }
   const residualMonth = residualYear * 12;
-  const residualDf = residualAmount > 0 && residualMonth <= totalMonths ? df(residualMonth) : 0;
+  const residualDf = residualAmountUsed > 0 && residualMonth <= totalMonths ? df(residualMonth) : 0;
   const firstCollectionMonth = repaymentStartYear * 12;
   const lastPaymentMonth = slots.length > 0 ? slots[slots.length - 1].monthIndex : firstCollectionMonth;
   const lastInflowMonth = tariffCollectionMode0
-    ? Math.max(lastTariffMonth, residualAmount > 0 ? residualMonth : 0)
-    : Math.max(lastPaymentMonth, residualAmount > 0 ? residualMonth : 0);
+    ? Math.max(lastTariffMonth, residualAmountUsed > 0 ? residualMonth : 0)
+    : Math.max(lastPaymentMonth, residualAmountUsed > 0 ? residualMonth : 0);
   const finCfg = finCfgIn;
   if (finCfg) {
     const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
@@ -250,6 +294,36 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
 
   let dfSumEsc = 0;
   slots.forEach((s) => { dfSumEsc += s.escFactor * df(s.monthIndex); });
+  let solvedContractsDfSum = dfSumEsc;
+  let evaluatedInflowsPv = 0;
+  let solvedBalloonsPv = inp.repayment.balloon * balloonDf;
+  if (contractsMode) {
+    solvedContractsDfSum = 0;
+    solvedBalloonsPv = 0;
+    evaluatedInflowsPv = 0;
+    for (const c of contracts) {
+      const cDf = (m: number) => (m <= totalMonths ? df(m) : 0);
+      if (c.balloon > 0) solvedBalloonsPv += c.balloon * cDf(c.endMonth);
+      if (c.mode === "solved") {
+        for (const sl of c.slots) {
+          if (sl.monthIndex <= totalMonths) solvedContractsDfSum += sl.escFactor * cDf(sl.monthIndex);
+        }
+      } else {
+        if (c.evaluatedProfile !== null) {
+          for (const [yStr, amt] of Object.entries(c.evaluatedProfile)) {
+            const y = Number(yStr);
+            for (let m = (y - 1) * 12 + 1; m <= y * 12; m++) {
+              evaluatedInflowsPv += ((amt as number) / 12) * cDf(m);
+            }
+          }
+        } else if (c.evaluatedPayment !== null && c.evaluatedPayment > 0) {
+          for (const sl of c.slots) {
+            if (sl.monthIndex <= totalMonths) evaluatedInflowsPv += (c.evaluatedPayment as number) * sl.escFactor * cDf(sl.monthIndex);
+          }
+        }
+      }
+    }
+  }
   const leveraged = finCfg !== null && finCfg.leveragedSolve;
   let leveragedPayment: number | null = null;
   if (leveraged && !tariffCollectionMode) {
@@ -295,13 +369,15 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       pvService += pay / Math.pow(1 + rM, m);
       running -= prin;
     }
-    leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmount * residualDf) / dfSumEsc;
+    leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf) / dfSumEsc;
   }
   const solvedPayment = leveraged && leveragedPayment !== null
     ? leveragedPayment
     : (opts && opts.fixedPayment !== undefined
       ? opts.fixedPayment
-      : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf) / dfSumEsc : 0));
+      : (contractsMode
+        ? (solvedContractsDfSum > 0 ? (costNpvWithOperating - solvedBalloonsPv - residualAmountUsed * residualDf - evaluatedInflowsPv) / solvedContractsDfSum : 0)
+        : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf) / dfSumEsc : 0)));
   const payment = tariffCollectionMode || profileMode ? 0 : solvedPayment;
   const tariffEsc = tariffCfg.escalationPerYear / 100;
   const tariffInfos: import("./types.js").TariffYearInfo[] = [];
@@ -342,7 +418,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         if (volumeNpvWeight <= 0) {
           throw new EngineInputError(["Stable tariff infeasible: all weighted volumes are zero, so no base unit price can recover the cost NPV."]);
         }
-        let netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmount * residualDf;
+        let netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf;
         if (leveraged) {
           let pvDraws = 0;
           const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
@@ -417,6 +493,29 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         inflowByMonth[m] = (inflowByMonth[m] || 0) + monthly;
       }
     }
+  } else if (!tariffCollectionMode && contractsMode) {
+    for (const c of contracts) {
+      if (c.mode === "solved") {
+        for (const sl of c.slots) {
+          if (sl.monthIndex <= totalMonths) inflowByMonth[sl.monthIndex] = (inflowByMonth[sl.monthIndex] || 0) + payment * sl.escFactor;
+        }
+      } else if (c.evaluatedProfile !== null) {
+        for (const [yStr, amt] of Object.entries(c.evaluatedProfile)) {
+          const y = Number(yStr);
+          const monthly = (amt as number) / 12;
+          for (let m = (y - 1) * 12 + 1; m <= y * 12 && m <= totalMonths; m++) {
+            inflowByMonth[m] = (inflowByMonth[m] || 0) + monthly;
+          }
+        }
+      } else if (c.evaluatedPayment !== null) {
+        for (const sl of c.slots) {
+          if (sl.monthIndex <= totalMonths) inflowByMonth[sl.monthIndex] = (inflowByMonth[sl.monthIndex] || 0) + (c.evaluatedPayment as number) * sl.escFactor;
+        }
+      }
+      if (c.balloon > 0 && c.endMonth <= totalMonths) {
+        inflowByMonth[c.endMonth] = (inflowByMonth[c.endMonth] || 0) + c.balloon;
+      }
+    }
   } else if (!tariffCollectionMode) {
     slots.forEach((s) => {
       inflowByMonth[s.monthIndex] = (inflowByMonth[s.monthIndex] || 0) + payment * s.escFactor;
@@ -435,11 +534,11 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     }
   }
   const balloonLandingMonth = profileMode ? profileEndMonth : balloonMonth;
-  if (inp.repayment.balloon > 0 && balloonLandingMonth <= totalMonths) {
+  if (!contractsMode && inp.repayment.balloon > 0 && balloonLandingMonth <= totalMonths) {
     inflowByMonth[balloonLandingMonth] = (inflowByMonth[balloonLandingMonth] || 0) + inp.repayment.balloon;
   }
-  if (residualAmount > 0 && residualMonth <= totalMonths) {
-    inflowByMonth[residualMonth] = (inflowByMonth[residualMonth] || 0) + residualAmount;
+  if (residualAmountUsed > 0 && residualMonth <= totalMonths) {
+    inflowByMonth[residualMonth] = (inflowByMonth[residualMonth] || 0) + residualAmountUsed;
   }
   const monthly: import("./types.js").MonthlyRow[] = [];
   let cumulative = 0;
@@ -490,17 +589,29 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     }
     return { id: c.id, name: c.name, total: total };
   });
-  const totalCost = lineTotals.reduce((a, l) => a + l.total, 0) + operatingTotal;
+  const reinvestmentsTotal = reinvestmentsAll.reduce((a, ri) => a + ri.amount, 0);
+  const totalCost = lineTotals.reduce((a, l) => a + l.total, 0) + operatingTotal + reinvestmentsTotal;
   let totalCollected = 0;
   if (profileMode) {
     for (const y of profileYears) totalCollected += (collectionsProfile as Record<number, number>)[y];
+  } else if (!tariffCollectionMode && contractsMode) {
+    for (const c of contracts) {
+      if (c.mode === "solved") {
+        for (const sl of c.slots) { if (sl.monthIndex <= totalMonths) totalCollected += payment * sl.escFactor; }
+      } else if (c.evaluatedProfile !== null) {
+        for (const amt of Object.values(c.evaluatedProfile)) totalCollected += amt as number;
+      } else if (c.evaluatedPayment !== null) {
+        for (const sl of c.slots) { if (sl.monthIndex <= totalMonths) totalCollected += (c.evaluatedPayment as number) * sl.escFactor; }
+      }
+      if (c.balloon > 0 && c.endMonth <= totalMonths) totalCollected += c.balloon;
+    }
   } else if (!tariffCollectionMode) {
     slots.forEach((s) => { totalCollected += payment * s.escFactor; });
   } else {
     for (const t of tariffInfos) totalCollected += t.revenue;
   }
-  if (inp.repayment.balloon > 0) totalCollected += inp.repayment.balloon;
-  if (residualAmount > 0) totalCollected += residualAmount;
+  if (!contractsMode && inp.repayment.balloon > 0) totalCollected += inp.repayment.balloon;
+  if (residualAmountUsed > 0) totalCollected += residualAmountUsed;
   const signChanges = countSignChanges(monthly.map((mm2) => mm2.net));
   const netFlows = monthly.map((mm2) => mm2.net);
   const npvAtTarget = npvMonthly(rM, netFlows);
@@ -574,6 +685,14 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       costGrid.push({ id: "maintenance", name: "Maintenance (derived)", kind: "maintenance", amounts });
     }
   }
+  for (const c of contracts) {
+    for (const ri of c.reinvestments) {
+      const amounts = zeroRow();
+      const y = ri.year;
+      if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += ri.amount;
+      costGrid.push({ id: `reinv-${c.id}-${ri.year}`, name: `Reinvestment (${c.label})`, kind: "reinvestment", amounts });
+    }
+  }
   const collectionsGrid: import("./types.js").GridRow[] = [];
   if (profileMode) {
     const amounts = zeroRow();
@@ -612,11 +731,57 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += inp.repayment.balloon;
     collectionsGrid.push({ id: "balloon", name: "Balloon", kind: "balloon", amounts });
   }
-  if (residualAmount > 0 && residualMonth <= totalMonths) {
+  if (residualAmountUsed > 0 && residualMonth <= totalMonths) {
     const amounts = zeroRow();
-    if (residualYear >= 1 && residualYear <= totalYearsForGrid) amounts[residualYear - 1] += residualAmount;
+    if (residualYear >= 1 && residualYear <= totalYearsForGrid) amounts[residualYear - 1] += residualAmountUsed;
     collectionsGrid.push({ id: "residual", name: "Residual", kind: "residual", amounts });
   }
+  const bookView: import("./types.js").BookView = {
+    lines: bookSchedule.lines.map((l) => ({ id: l.id, name: l.name, isRetained: l.isRetained, years: l.years })),
+    combined: bookSchedule.combined.map((row, idx) => {
+      const year = row.year;
+      const collections = yearly.find((y) => y.year === year)?.inflow ?? 0;
+      const operating = operatingInfos.reduce((acc, o) => {
+        let sum = 0;
+        for (let m = o.effectiveWindow[0]; m <= o.effectiveWindow[1]; m++) {
+          if (Math.floor((m - 1) / 12) + 1 === year) sum += o.total / Math.max(1, o.effectiveWindow[1] - o.effectiveWindow[0] + 1);
+        }
+        return acc + sum;
+      }, 0);
+      return { year, beginning: row.beginning, charge: row.charge, ending: row.ending, collections, operating, bookResult: collections - operating - row.charge };
+    }),
+    totalCharge: bookSchedule.totalCharge,
+    remainingBookValueAtResidualYear: bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears)),
+    gainOrLossOnSale: residualMode === "amount" ? residualSetAmount - bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears)) : 0,
+    residualMode: residualMode,
+    setAmount: residualSetAmount,
+  };
+  const termPositions: import("./types.js").TermPosition[] = contractsMode
+    ? contracts.map((c) => {
+        const trunc = monthly.slice(0, Math.min(c.endMonth, totalMonths));
+        const flows = trunc.map((row) => row.net);
+        const truncIrr = irrAnnual(flows);
+        const truncSignChanges = countSignChanges(flows);
+        const cumNet = trunc.length > 0 ? trunc[trunc.length - 1].cumulative : 0;
+        const truncNpvWacc = npvMonthly(waccM, flows);
+        const truncNpvTarget = npvMonthly(rM, flows);
+        let pb: number | null = null;
+        for (const row of trunc) {
+          if (row.cumulative >= 0) { pb = row.period / 12; break; }
+        }
+        return {
+          contractId: c.id,
+          label: c.label,
+          endMonth: c.endMonth,
+          truncatedIrr: truncIrr,
+          truncatedIrrAmbiguous: truncSignChanges > 1,
+          cumulativeNet: cumNet,
+          npvAtWacc: truncNpvWacc,
+          npvAtTarget: truncNpvTarget,
+          paybackSoFar: pb,
+        };
+      })
+    : [];
   let financing: import("./types.js").FinancingResult | null = null;
   if (finCfg) {
     const inflowsByMonth = monthly.map((row) => row.inflow);
@@ -647,7 +812,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     npvAtTarget: npvAtTarget, npvAtWacc: npvAtWacc,
     firstPaymentMonth: profileMode ? profileFirstMonth : firstCollectionMonth,
     lastPaymentMonth: profileMode
-      ? Math.max(profileEndMonth, residualAmount > 0 ? residualMonth : 0)
+      ? Math.max(profileEndMonth, residualAmountUsed > 0 ? residualMonth : 0)
       : tariffCollectionMode ? lastTariffMonth : lastPaymentMonth,
     operatingLines: operatingInfos, operatingTotal: operatingTotal,
     tariffYears: tariffInfos, tariffBaseUnitPrice: tariffBaseUnitPrice,
@@ -657,10 +822,29 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     npvCollectionsAtWacc: npvCollectionsAtWacc, npvCostsAtWacc: npvCostsAtWacc,
     profitabilityIndex: profitabilityIndex, discountedPaybackYears: discountedPaybackMonths === null ? null : discountedPaybackMonths / 12,
     mirr: mirr, goalMet: goalMet,
+    horizon: { totalMonths: totalMonths, totalYears: Math.ceil(totalMonths / 12), constituents: horizonConstituents },
+    bookView: bookView,
+    termPositions: termPositions,
+    residualAmountUsed: residualAmountUsed,
+    contractsInfo: contracts.map((c) => ({
+      id: c.id,
+      label: c.label,
+      mode: c.mode,
+      startYear: Math.floor(c.startMonth / 12) + (c.startMonth % 12 === 0 ? 0 : 1),
+      termYears: c.termMonths / 12,
+      paymentsPerYear: c.paymentsPerYear,
+      paymentCount: c.slots.length,
+      endMonth: c.endMonth,
+      lastCollectionMonth: contractLastCollectionMonth(c),
+      reinvestments: c.reinvestments,
+    })),
   };
 }
 
 import { EngineInputError, validateInputs } from "./validate.js";
+import { normalizeContracts, allReinvestments, contractLastCollectionMonth } from "./contracts.js";
+import { computeBookSchedule } from "./depreciation.js";
+import type { PaymentSlot } from "./slots.js";
 import { computeFinancingOverlay, validateFinancing } from "./financing.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;

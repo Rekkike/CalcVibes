@@ -16,6 +16,7 @@ export interface DeckFigure {
 export interface DeckChartSlot {
   kind: "donut" | "bars" | "rows" | "coverage" | "hurdle";
   data: { label: string; value: number }[];
+  solved?: boolean;
 }
 
 export interface DeckTile {
@@ -258,7 +259,7 @@ export function deckSlides(
     }
   }
   const summaryCharts: DeckChartSlot[] = [
-    { kind: "hurdle", data: [
+    { kind: "hurdle", solved: result.paymentAmount !== null, data: [
       { label: "Target", value: inputs.targetIrr },
       { label: "Achieved", value: (result.achievedIrr ?? 0) * 100 },
     ] },

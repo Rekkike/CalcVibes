@@ -45,6 +45,42 @@ export function validateInputs(inp: ModelInputs): string[] {
       issues.push(`Cost line ${c.id} (${c.name}) has a non-finite escalation.`);
     }
   });
+
+  if (inp.contracts !== undefined && inp.contracts.length > 0) {
+    if (inp.tariff !== undefined && inp.tariff.mode !== "off") {
+      issues.push("Tariff collection modes and contracts are mutually exclusive; a project runs one or the other.");
+    }
+    if (inp.repayment.collectionsOverrides && Object.keys(inp.repayment.collectionsOverrides).length > 0) {
+      issues.push("A collections profile and contracts are mutually exclusive; a project runs one or the other.");
+    }
+    const solved = inp.contracts.filter((c) => c.mode === "solved");
+    if (solved.length === 0) {
+      issues.push("At least one contract must be solved; a project cannot run on evaluated contracts alone.");
+    }
+    const solvedSlots = solved.reduce((acc, c) => acc + Math.max(0, Math.round(c.termYears * c.paymentsPerYear)), 0);
+    if (solved.length > 0 && solvedSlots <= 0) {
+      issues.push("The solved contract set has zero payment slots; no payment can be solved.");
+    }
+    for (const c of inp.contracts) {
+      if (!c.label || c.label.trim() === "") issues.push(`Contract ${c.id} has an empty label.`);
+      if (!Number.isInteger(c.startYear) || c.startYear < 1) issues.push(`Contract ${c.id} (${c.label}) has a start year that is not an integer of at least 1.`);
+      if (!(c.termYears > 0)) issues.push(`Contract ${c.id} (${c.label}) has a non-positive term.`);
+      if ([1, 2, 4, 12].indexOf(c.paymentsPerYear) < 0) issues.push(`Contract ${c.id} (${c.label}) has a payments-per-year that is not one of 1, 2, 4, 12.`);
+      if (!(c.graceYears >= 0)) issues.push(`Contract ${c.id} (${c.label}) has a grace period below 0.`);
+      if (!(c.balloon >= 0)) issues.push(`Contract ${c.id} (${c.label}) has a balloon below 0.`);
+      if (!Number.isFinite(c.escalationPerYear)) issues.push(`Contract ${c.id} (${c.label}) has a non-finite escalation.`);
+      const prof = c.evaluatedProfile ?? null;
+      if (c.mode === "evaluated" && c.evaluatedPayment === null && (prof === null || Object.keys(prof).length === 0)) {
+        issues.push(`Evaluated contract ${c.id} (${c.label}) carries neither a payment nor a collections profile.`);
+      }
+      const ris = c.reinvestments ?? [];
+      for (const ri of ris) {
+        if (!(ri.amount > 0)) issues.push(`Reinvestment at year ${ri.year} on contract ${c.id} (${c.label}) has a non-positive amount.`);
+        if (!Number.isInteger(ri.year) || ri.year < 1) issues.push(`Reinvestment on contract ${c.id} (${c.label}) has a year that is not an integer of at least 1.`);
+      }
+    }
+  }
+
   const r = inp.repayment;
   if (!(r.termYears >= 0)) {
     issues.push("Repayment block has a term below 0 years.");

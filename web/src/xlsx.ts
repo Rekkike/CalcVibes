@@ -68,6 +68,23 @@ export async function buildWorkbook(
       ["financing.leveragedSolve", inputs.financing.leveragedSolve],
     );
   }
+  if (inputs.contracts && inputs.contracts.length > 0) {
+    for (const c of inputs.contracts) {
+      flatInputs.push(
+        [`contract ${c.id} label`, c.label],
+        [`contract ${c.id} startYear`, c.startYear],
+        [`contract ${c.id} termYears`, c.termYears],
+        [`contract ${c.id} paymentsPerYear`, c.paymentsPerYear],
+        [`contract ${c.id} graceYears`, c.graceYears],
+        [`contract ${c.id} escalationPerYear`, c.escalationPerYear],
+        [`contract ${c.id} balloon`, c.balloon],
+        [`contract ${c.id} mode`, c.mode],
+      );
+      if (c.mode === "evaluated" && c.evaluatedPayment !== null && c.evaluatedPayment !== undefined) {
+        flatInputs.push([`contract ${c.id} evaluatedPayment`, c.evaluatedPayment]);
+      }
+    }
+  }
   for (const [k, v] of flatInputs) inputsWs.addRow([k, v]);
   width(inputsWs, 30);
 
@@ -124,6 +141,7 @@ export async function buildWorkbook(
     ["lastPaymentMonth", result.lastPaymentMonth, "count"],
     ["operatingTotal", result.operatingTotal, "money"],
     ["tariffBaseUnitPrice", result.tariffBaseUnitPrice, "money"],
+    ["residualAmountUsed", result.residualAmountUsed ?? null, "money"],
   ];
   if (result.financing !== null) {
     const f = result.financing;
@@ -226,6 +244,60 @@ export async function buildWorkbook(
     }
     opWs.getColumn(10).numFmt = "#,##0.00";
     width(opWs, 22);
+  }
+
+  if (inputs.contracts && inputs.contracts.length > 0 && result.contractsInfo !== undefined) {
+    const ctrWs = wb.addWorksheet("Contracts");
+    ctrWs.addRow(["Contract", "Mode", "Start year", "Term (years)", "Payments per year", "Payment count", "End month", "Last collection month", "Reinvestments"]);
+    ctrWs.getRow(1).eachCell(bold);
+    for (const ci of result.contractsInfo) {
+      const c = inputs.contracts?.find((x) => x.id === ci.id);
+      ctrWs.addRow([ci.label, ci.mode, ci.startYear, ci.termYears, ci.paymentsPerYear, ci.paymentCount, ci.endMonth, ci.lastCollectionMonth, (c?.reinvestments ?? []).length]);
+    }
+    for (const c of inputs.contracts) {
+      const ris = c.reinvestments ?? [];
+      if (ris.length > 0) {
+        ctrWs.addRow([]);
+        ctrWs.addRow([`Reinvestments — ${c.label}`, "Year", "Amount"]);
+        for (const ri of ris) {
+          const row = ctrWs.addRow([`Reinvestment (${c.label})`, ri.year, ri.amount]);
+          row.getCell(3).numFmt = "#,##0.00";
+        }
+      }
+    }
+    width(ctrWs, 24);
+  }
+
+  if (result.termPositions !== undefined && result.termPositions.length > 0) {
+    const tpWs = wb.addWorksheet("Term positions");
+    tpWs.addRow(["Position", "End month", "Truncated IRR", "Ambiguous", "Cumulative net", "NPV at WACC", "NPV at target", "Payback so far"]);
+    tpWs.getRow(1).eachCell(bold);
+    for (const tp of result.termPositions) {
+      tpWs.addRow([`Project position at the end of ${tp.label}`, tp.endMonth, tp.truncatedIrr, tp.truncatedIrrAmbiguous ? "true" : "false", tp.cumulativeNet, tp.npvAtWacc, tp.npvAtTarget, tp.paybackSoFar]);
+    }
+    tpWs.getColumn(3).numFmt = "0.00%";
+    for (const c of [5, 6, 7, 8]) tpWs.getColumn(c).numFmt = "#,##0.00";
+    width(tpWs, 30);
+  }
+
+  const depreciationConfigured = inputs.costs.some((c) => c.depreciation !== undefined) || inputs.depreciationDefault !== undefined && inputs.depreciationDefault !== null;
+  if (result.bookView !== undefined && depreciationConfigured) {
+    const bv = result.bookView;
+    const bvWs = wb.addWorksheet("Book view");
+    bvWs.addRow(["Year", "Beginning book value", "Depreciation charge", "Ending book value", "Collections", "Operating", "Book result"]);
+    bvWs.getRow(1).eachCell(bold);
+    for (const row of bv.combined) {
+      bvWs.addRow([row.year, row.beginning, row.charge, row.ending, row.collections, row.operating, row.bookResult]);
+    }
+    for (const c of [2, 3, 4, 5, 6, 7]) bvWs.getColumn(c).numFmt = "#,##0.00";
+    bvWs.addRow([]);
+    bvWs.addRow(["Book view disclosure", "Depreciation is the book view; it never enters the cash flows."]);
+    bvWs.addRow(["Residual mode", bv.residualMode]);
+    bvWs.addRow(["Remaining book value at residual year", bv.remainingBookValueAtResidualYear]);
+    bvWs.addRow(["Set amount", bv.setAmount]);
+    bvWs.addRow(["Gain or loss on sale", bv.gainOrLossOnSale]);
+    for (const r of [bvWs.rowCount - 1, bvWs.rowCount]) bvWs.getRow(r).getCell(2).numFmt = "#,##0.00";
+    width(bvWs, 28);
   }
 
   return wb.xlsx.writeBuffer();

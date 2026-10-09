@@ -137,6 +137,63 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
       <div data-testid="coverage-chart">
         <CumulativeLine yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
       </div>
+      {result.termPositions !== undefined && result.termPositions.length > 0 && (
+        <>
+          <h3>Per-term positions (the whole project at each contract boundary)</h3>
+          <p className="muted">Each row is the whole project's position at the end of the contract: the truncated-flow IRR, the cumulative net, the NPVs, and the payback so far. A lease has no standalone IRR; the outflow belongs to the whole project.</p>
+          <table data-testid="term-positions">
+            <thead>
+              <tr><th>Position</th><th>End month</th><th>Truncated IRR</th><th>Cumulative net</th><th>NPV at WACC</th><th>NPV at target</th><th>Payback so far</th></tr>
+            </thead>
+            <tbody>
+              {result.termPositions.map((tp) => (
+                <tr key={tp.contractId} data-term-contract={tp.contractId}>
+                  <td data-term-label>Project position at the end of {tp.label}</td>
+                  <td>{tp.endMonth}</td>
+                  <td>{tp.truncatedIrr === null ? "\u2014" : roundForDisplay(tp.truncatedIrr * 100, 2) + "%"}{tp.truncatedIrrAmbiguous ? " (ambiguous)" : ""}</td>
+                  <td>{roundForDisplay(tp.cumulativeNet)}</td>
+                  <td>{roundForDisplay(tp.npvAtWacc)}</td>
+                  <td>{roundForDisplay(tp.npvAtTarget)}</td>
+                  <td>{tp.paybackSoFar === null ? "\u2014" : roundForDisplay(tp.paybackSoFar, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {result.bookView !== undefined && (
+        <>
+          <h3>Book view (depreciation; not cash flow)</h3>
+          <p className="muted" data-testid="book-view-disclosure">The book view records the depreciation write-down; it never enters the cash flows (the investment was paid once, in the cost vector). The book result is collections minus operating minus depreciation.</p>
+          <table data-testid="book-schedule">
+            <thead>
+              <tr><th>Year</th><th>Beginning book value</th><th>Depreciation charge</th><th>Ending book value</th><th>Collections</th><th>Operating</th><th>Book result</th></tr>
+            </thead>
+            <tbody>
+              {result.bookView.combined.map((row) => (
+                <tr key={row.year} data-book-year={row.year}>
+                  <td>{yearHeader(row.year, startYear)}</td>
+                  <td>{roundForDisplay(row.beginning)}</td>
+                  <td>{roundForDisplay(row.charge)}</td>
+                  <td>{roundForDisplay(row.ending)}</td>
+                  <td>{roundForDisplay(row.collections)}</td>
+                  <td>{roundForDisplay(row.operating)}</td>
+                  <td>{roundForDisplay(row.bookResult)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <dl data-testid="residual-reconciliation">
+            <dt>Residual mode</dt><dd data-stat="residualMode">{result.bookView.residualMode}</dd>
+            <dt>Remaining book value at the residual year</dt><dd data-stat="remainingBookValue">{roundForDisplay(result.bookView.remainingBookValueAtResidualYear)}</dd>
+            <dt>Residual used (terminal inflow)</dt><dd data-stat="residualUsed">{roundForDisplay(result.residualAmountUsed ?? 0)}</dd>
+            {result.bookView.residualMode === "amount" && (
+              <><dt>Set amount</dt><dd data-stat="residualSetAmount">{roundForDisplay(result.bookView.setAmount)}</dd>
+              <dt>Gain or loss on sale</dt><dd data-stat="gainOrLoss">{roundForDisplay(result.bookView.gainOrLossOnSale)}</dd></>
+            )}
+          </dl>
+        </>
+      )}
     </section>
   );
 }

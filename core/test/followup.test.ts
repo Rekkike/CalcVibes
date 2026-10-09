@@ -93,6 +93,11 @@ describe("Task B: decompose operating window", () => {
       delete c.tariffBaseUnitPrice;
       delete c.costGrid;
       delete c.collectionsGrid;
+      delete c.horizon;
+      delete c.contractsInfo;
+      delete c.bookView;
+      delete c.termPositions;
+      delete c.residualAmountUsed;
       return c;
     };
     expect(JSON.stringify(strip(decM))).toBe(JSON.stringify(strip(offM)));

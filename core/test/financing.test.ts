@@ -16,6 +16,11 @@ const strip = (o: unknown) => {
   const c = JSON.parse(JSON.stringify(o)) as Record<string, unknown>;
   delete c.financing;
   delete c.leveragedSolve;
+  delete c.horizon;
+  delete c.contractsInfo;
+  delete c.bookView;
+  delete c.termPositions;
+  delete c.residualAmountUsed;
   return c;
 };
 

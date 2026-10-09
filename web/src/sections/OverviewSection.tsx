@@ -37,6 +37,16 @@ export function OverviewSection(props: {
       </label>
       {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
       <p data-testid="length-hint" className="note">Derived horizon: {result !== null ? `${result.monthly.length} months (${result.yearly.length} years)` : "not computed"}</p>
+      {result !== null && result.horizon !== undefined && (
+        <div data-testid="horizon-derivation">
+          <p className="note">The horizon derives from the latest of its constituents.</p>
+          <ul>
+            {result.horizon.constituents.map((hc, i) => (
+              <li key={i} data-constituent={hc.label} data-constituent-month={hc.month}>{hc.label}: month {hc.month}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {result !== null ? (
         <dl data-testid="headline-stats">
           <dt>Total cost</dt><dd data-stat="totalCost">{roundForDisplay(result.totalCost)}</dd>

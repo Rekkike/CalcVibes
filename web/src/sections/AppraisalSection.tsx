@@ -17,8 +17,22 @@ export function AppraisalSection(props: {
       <label>Finance rate (%) <input data-field="financeRate" type="number" value={a.financeRate} onChange={num("financeRate")} /></label>
       <label>Reinvestment rate (%) <input data-field="reinvestmentRate" type="number" value={a.reinvestmentRate} onChange={num("reinvestmentRate")} /></label>
       <h3>Residual value (terminal inflow on the collections side)</h3>
-      <label>Residual amount <input data-field="residualAmount" type="number" value={a.residual.amount} onChange={(e) => setAppraisal({ residual: { ...a.residual, amount: parseFloat(e.target.value) || 0 } })} /></label>
+      <label>Residual mode{" "}
+        <select data-field="residualMode" value={a.residual.mode ?? "amount"} onChange={(e) => setAppraisal({ residual: { ...a.residual, mode: e.target.value as "calculated" | "amount" } })}>
+          <option value="calculated">Calculated (the remaining book value at the residual year)</option>
+          <option value="amount">Set amount (a known sale value)</option>
+        </select>
+      </label>
+      {(a.residual.mode ?? "amount") !== "calculated" && (
+        <label>Residual amount <input data-field="residualAmount" type="number" value={a.residual.amount} onChange={(e) => setAppraisal({ residual: { ...a.residual, amount: parseFloat(e.target.value) || 0 } })} /></label>
+      )}
       <label>Residual year <input data-field="residualYear" type="number" value={a.residual.year} onChange={(e) => setAppraisal({ residual: { ...a.residual, year: parseFloat(e.target.value) || 0 } })} /></label>
+      {result !== null && (a.residual.mode ?? "amount") === "calculated" && result.bookView !== undefined && (
+        <p data-testid="residual-derivation" className="muted">The calculated residual is the remaining book value at the residual year: {roundForDisplay(result.bookView.remainingBookValueAtResidualYear)}.</p>
+      )}
+      {result !== null && a.residual.mode === "amount" && result.bookView !== undefined && result.bookView.gainOrLossOnSale !== 0 && (
+        <p data-testid="residual-gain-loss" className="muted">The set amount differs from the remaining book value; the gain or loss on sale is {roundForDisplay(result.bookView.gainOrLossOnSale)}.</p>
+      )}
       {result !== null && (
         <dl data-testid="appraisal-summary">
           <dt>NPV at target IRR (solver identity, discounted)</dt><dd data-stat="npvAtTarget">{roundForDisplay(result.npvAtTarget)}</dd>

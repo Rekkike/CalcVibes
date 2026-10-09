@@ -173,39 +173,39 @@ export function CoverageCurve(props: {
   );
 }
 
-export function CostWaterfall(props: {
-  lineTotals: LineTotal[];
-  total: number;
-  valueFor: (v: number) => string;
-}) {
+export function CostWaterfall(props: { lineTotals: LineTotal[]; total: number; valueFor: (v: number) => string; }) {
   const { lineTotals, total, valueFor } = props;
   const cap = Math.max(1e-12, total);
   let acc = 0;
   return (
     <div data-testid="cost-waterfall" className="chart-block">
+      <ul className="waterfall-label-list">
+        {lineTotals.map((l) => (
+          <li key={l.id} data-testid="waterfall-label" className="waterfall-label">{l.name} {valueFor(l.total)}</li>
+        ))}
+      </ul>
       <div className="waterfall-track">
         {lineTotals.map((l) => {
           const frac = l.total / cap;
           const seg = (
-            <div key={l.id} data-waterfall-segment={l.id} className="waterfall-segment" style={{ left: `${(acc / cap) * 100}%`, width: `${frac * 100}%` }}>
-              <span data-testid="waterfall-label" className="waterfall-label">{l.name} {valueFor(l.total)}</span>
+            <div key={l.id} data-waterfall-segment={l.id} className="waterfall-segment" style={{ bottom: `${(acc / cap) * 100}%`, height: `${frac * 100}%` }}>
             </div>
           );
           acc += l.total;
           return seg;
         })}
-        <div data-testid="waterfall-cap" className="waterfall-cap" style={{ width: "100%" }} />
+        <div data-testid="waterfall-cap" className="waterfall-cap" style={{ bottom: "100%", width: "100%", height: "4px" }} />
       </div>
     </div>
   );
 }
-
 export function HurdlePlot(props: {
   target: number;
   achieved: number;
   goalMet: boolean;
+  solved?: boolean;
 }) {
-  const { target, achieved, goalMet } = props;
+  const { target, achieved, goalMet, solved = false } = props;
   const bound = Math.max(target, achieved) * 1.15;
   const scale = Math.max(1e-12, bound);
   return (
@@ -216,7 +216,7 @@ export function HurdlePlot(props: {
       </div>
       <div className="hurdle-labels">
         <span data-testid="hurdle-target-label" className="column-year-label">Target {target.toFixed(2)}%</span>
-        <span data-testid="hurdle-margin-label" className="column-year-label">{goalMet ? "clears the hurdle" : "below the hurdle"}</span>
+        <span data-testid="hurdle-margin-label" data-hurdle-mode={solved ? "solved" : "evaluated"} className="column-year-label">{solved ? "solved to the target" : goalMet ? "clears the hurdle" : "below the hurdle"}</span>
         <span data-testid="hurdle-achieved-label" className="column-year-label">Achieved {achieved.toFixed(2)}%</span>
       </div>
     </div>
