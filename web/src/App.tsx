@@ -251,14 +251,14 @@ export function App() {
         {view === "appraisal" && (
           <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} />
         )}
-        {view === "results" && result !== null && mode === "A" && <ResultsSection result={result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} />}
+        {view === "results" && result !== null && mode === "A" && <ResultsSection result={result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />}
         {view === "results" && modeResult !== null && mode === "B" && (
           <section data-testid="mode-results">
             <h2>Mode B — solved term</h2>
             {modeResult.kind === "B" && modeResult.paymentCount !== null ? (
               <>
                 <p data-stat="modeBTerm">Solved term: {modeResult.termYears} years ({modeResult.paymentCount} payments; last payment month {modeResult.lastPaymentMonth}).</p>
-                <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} />
+                <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />
               </>
             ) : (
               <p data-stat="modeBInfeasible">Infeasible: the given payment can never reach the cost NPV within the solver bounds; the shortfall is {modeResult.kind === "B" && modeResult.shortfall !== null ? modeResult.shortfall.toFixed(2) : "—"}.</p>
@@ -268,11 +268,11 @@ export function App() {
         {view === "results" && modeResult !== null && mode === "C" && (
           <section data-testid="mode-results">
             <h2>Mode C — evaluation of the given payment</h2>
-            <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} />
+            <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />
           </section>
         )}
         {view === "detail" && result !== null && (
-          <YearlyDetailSection inputs={inputs} result={result} startYear={startYear} />
+          <YearlyDetailSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} />
         )}
         {view === "scenarios" && <ScenariosSection inputs={inputs} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} onScenarioTargetsChange={setScenarioTargets} onScenarioTermsChange={setScenarioTerms} onScenarioBalloonsChange={setScenarioBalloons} />}
         {view === "results" && result === null && <p>Resolve the input issues to see results.</p>}

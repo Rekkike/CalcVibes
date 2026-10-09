@@ -54,9 +54,6 @@ export function validateInputs(inp: ModelInputs): string[] {
       issues.push("A collections profile and contracts are mutually exclusive; a project runs one or the other.");
     }
     const solved = inp.contracts.filter((c) => c.mode === "solved");
-    if (solved.length === 0) {
-      issues.push("At least one contract must be solved; a project cannot run on evaluated contracts alone.");
-    }
     const solvedSlots = solved.reduce((acc, c) => acc + Math.max(0, Math.round(c.termYears * c.paymentsPerYear)), 0);
     if (solved.length > 0 && solvedSlots <= 0) {
       issues.push("The solved contract set has zero payment slots; no payment can be solved.");
@@ -184,8 +181,21 @@ export function validateInputs(inp: ModelInputs): string[] {
     if (!(a.financeRate > -100)) issues.push("Finance rate must be greater than -100.");
     if (!(a.reinvestmentRate > -100)) issues.push("Reinvestment rate must be greater than -100.");
     if (!(a.residual.amount >= 0)) issues.push("Residual amount must be at least 0.");
-    if (a.residual.amount > 0 && (!Number.isInteger(a.residual.year) || a.residual.year < 1)) {
-      issues.push("Residual year must be an integer of at least 1 when the residual amount is positive.");
+    const posture = a.residual.posture
+      ?? ((a.residual.mode ?? "amount") === "amount" && a.residual.amount > 0 ? "set-price"
+        : a.residual.mode === "calculated" ? "book-value"
+        : "none");
+    if (posture === "set-price") {
+      if (!(Number.isFinite(a.residual.amount) && a.residual.amount > 0)) {
+        issues.push("The set-price disposition requires a finite sale amount greater than 0.");
+      }
+      if (!Number.isInteger(a.residual.year) || a.residual.year < 1) {
+        issues.push("The set-price disposition requires a sale year that is an integer of at least 1.");
+      }
+    } else if (posture === "book-value") {
+      if (!Number.isInteger(a.residual.year) || a.residual.year < 1) {
+        issues.push("The book-value disposition requires a sale year that is an integer of at least 1.");
+      }
     }
   }
   return issues;

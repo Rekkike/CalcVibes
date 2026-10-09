@@ -79,7 +79,7 @@ describe("CP-3 stable indexed tariff", () => {
     const expectedRev = [842967.50, 1719653.69, 1754046.76, 1789127.70, 1824910.25, 1861408.46, 1898636.63, 1452457.02];
     for (let i = 0; i < 8; i++) expect(Math.abs(revs[i] - expectedRev[i])).toBeLessThan(0.01);
     expect(Math.abs(r.npvAtTarget)).toBeLessThan(1e-6);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-9);
     expect(r.goalMet).toBe(true);
     expect(r.signChanges).toBe(1);
     expect(Math.abs(r.totalCollected - 13143208.01)).toBeLessThan(0.01);
@@ -100,7 +100,7 @@ describe("CP-3 stable indexed tariff", () => {
     const r = computeModel({ ...base(), appraisal: appraisal(8, 6, 6, 1000000, 10), tariff: tariff("stable") });
     expect(Math.abs((r.tariffBaseUnitPrice as number) - 1145.7806147)).toBeLessThan(1e-4);
     expect(Math.abs(r.npvAtTarget)).toBeLessThan(1e-6);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-9);
     expect(r.goalMet).toBe(true);
     expect(r.signChanges).toBe(1);
   });
@@ -116,12 +116,12 @@ describe("CP-3 stable indexed tariff", () => {
     expect(r.operatingLines[0].effectiveWindow).toEqual([36, 120]);
   });
 
-  it("STABLE-OVR: override composes; ambiguity disclosed", () => {
+  it("STABLE-OVR: override composes; ambiguity disclosed (headline re-anchored per v0.6.1 0.2)", () => {
     const r = computeModel({ ...base(), repayment: { ...base().repayment, firstCollectionYear: 2 }, tariff: tariff("stable") });
     expect(r.tariffYears.map((y) => y.year)).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
     expect(Math.abs((r.tariffBaseUnitPrice as number) - 1075.2136419)).toBeLessThan(1e-4);
     expect(Math.abs(r.npvAtTarget)).toBeLessThan(1e-6);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12054147296513473)).toBeLessThan(1e-9);
     expect(r.goalMet).toBe(true);
     expect(r.signChanges).toBe(3);
     expect(r.irrAmbiguous).toBe(true);

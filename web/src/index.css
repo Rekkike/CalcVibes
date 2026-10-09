@@ -642,6 +642,9 @@
 [data-testid="presentation"] .stage-dots {  display: inline-flex;  gap: 6px;}
 [data-testid="presentation"] .stage-dot {  color: rgba(148,163,184,0.5);  font-size: 18px;  line-height: 1;}
 [data-testid="presentation"] .stage-dot-active {  color: #e8b84b;}
+[data-testid="presentation"] .solver-scenario {  border: 1px dashed #e8b84b;  border-radius: 8px;  padding: var(--space-2) var(--space-3);  margin: var(--space-2) 0;  background: rgba(232, 184, 75, 0.08);}
+[data-testid="presentation"] .solver-scenario-label {  font-size: 12px;  text-transform: uppercase;  letter-spacing: 0.1em;  color: #e8b84b;  margin: 0 0 var(--space-1);}
+[data-testid="presentation"] .solver-scenario-value {  font-size: 15px;  color: #ffffff;  margin: 0;}
 [data-testid="presentation"] .hurdle-track {
   position: relative;
   height: 36px;

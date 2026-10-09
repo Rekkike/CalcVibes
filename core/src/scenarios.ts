@@ -17,10 +17,14 @@ export interface ScenarioShift {
 }
 
 export function applyScenario(inp: ModelInputs, shift: ScenarioShift): ModelInputs {
+  const contractsMode = inp.contracts !== undefined && inp.contracts.length > 0;
   return {
     ...inp,
     targetIrr: inp.targetIrr + shift.targetShift,
-    repayment: { ...inp.repayment, termYears: inp.repayment.termYears + shift.termShift },
+    repayment: contractsMode ? inp.repayment : { ...inp.repayment, termYears: inp.repayment.termYears + shift.termShift },
+    contracts: contractsMode
+      ? inp.contracts?.map((c) => ({ ...c, termYears: c.termYears + shift.termShift }))
+      : inp.contracts,
     costs: inp.costs.map((c) => ({
       ...c,
       amount: c.amount * shift.burnMultiplier,

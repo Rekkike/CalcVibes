@@ -21,7 +21,7 @@ describe("Task A: solveTerm fixed-point window and shortfall semantics", () => {
     expect(Math.abs((b.result.achievedIrr as number) - 0.12272649)).toBeLessThan(1e-6);
   });
 
-  it("A-2 MB-MINT: window [36, 147], both shortfalls on the converged basis", () => {
+  it("A-2 MB-MINT: window [36, 147], both shortfalls on the converged basis (headline re-anchored per v0.6.1 0.2)", () => {
     const b = solveTerm({ ...base(), maintenance: maint }, 400000);
     expect(b.paymentCount).toBe(38);
     expect(b.termYears).toBe(9.5);
@@ -31,12 +31,12 @@ describe("Task A: solveTerm fixed-point window and shortfall semantics", () => {
     expect(b.result.operatingTotal).toBe(21000);
     expect(Math.abs((b.minimalityShortfall as number) - 22467.74)).toBeLessThan(0.01);
     expect(Math.abs((b.shortfall as number) - -77334.25155)).toBeLessThan(0.01);
-    expect(Math.abs((b.result.achievedIrr as number) - 0.12243572)).toBeLessThan(1e-6);
+    expect(Math.abs((b.result.achievedIrr as number) - 0.1240712474763868)).toBeLessThan(1e-9);
     expect(b.result.signChanges).toBe(75);
     expect(b.result.goalMet).toBe(true);
   });
 
-  it("A-3 MB-FLIP: count 39 with maintenance, 38 without, both sides hold", () => {
+  it("A-3 MB-FLIP: count 39 with maintenance, 38 without, both sides hold (headline re-anchored per v0.6.1 0.2)", () => {
     const withM = solveTerm({ ...base(), maintenance: maint }, 394900);
     expect(withM.paymentCount).toBe(39);
     expect(withM.termYears).toBe(9.75);
@@ -46,7 +46,7 @@ describe("Task A: solveTerm fixed-point window and shortfall semantics", () => {
     expect(withM.result.operatingTotal).toBe(21562.50);
     expect(Math.abs((withM.minimalityShortfall as number) - 8473.28)).toBeLessThan(0.01);
     expect(Math.abs((withM.shortfall as number) - -87303.85967)).toBeLessThan(0.01);
-    expect(Math.abs((withM.result.achievedIrr as number) - 0.12270738)).toBeLessThan(1e-6);
+    expect(Math.abs((withM.result.achievedIrr as number) - 0.12427793390192099)).toBeLessThan(1e-9);
     expect(withM.result.signChanges).toBe(77);
     const without = solveTerm(base(), 394900);
     expect(without.paymentCount).toBe(38);

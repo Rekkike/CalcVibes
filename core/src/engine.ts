@@ -50,6 +50,45 @@ export function irrAnnual(flows: number[]): number | null {
   return Math.pow(1 + rM, 12) - 1;
 }
 
+export function npvYearly(rateA: number, flows: number[]): number {
+  let acc = 0;
+  for (let i = 0; i < flows.length; i++) acc += flows[i] / Math.pow(1 + rateA, i + 1);
+  return acc;
+}
+
+export function irrYearly(flows: number[]): number | null {
+  let allZero = true;
+  for (const f of flows) {
+    if (f !== 0) { allZero = false; break; }
+  }
+  if (allZero) return null;
+  const loBound = -0.9, hiBound = 6.0;
+  const steps = 96;
+  const width = (hiBound - loBound) / steps;
+  let fLo = npvYearly(loBound, flows);
+  let bracket: [number, number] | null = null;
+  let prevRate = loBound, prevVal = fLo;
+  for (let i = 1; i <= steps; i++) {
+    const r = loBound + i * width;
+    const v = npvYearly(r, flows);
+    if (prevVal === 0) { bracket = [prevRate, prevRate]; break; }
+    if (prevVal * v < 0) { bracket = [prevRate, r]; break; }
+    prevRate = r; prevVal = v;
+  }
+  if (bracket === null) return null;
+  let lo = bracket[0], hi = bracket[1];
+  fLo = npvYearly(lo, flows);
+  let rA = lo;
+  for (let i = 0; i < 300; i++) {
+    const mid = (lo + hi) / 2;
+    const fMid = npvYearly(mid, flows);
+    rA = mid;
+    if (Math.abs(fMid) < 1e-9) break;
+    if (fLo * fMid < 0) { hi = mid; } else { lo = mid; fLo = fMid; }
+  }
+  return rA;
+}
+
 export type { PaymentSlot };
 
 export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: number }): import("./types.js").ModelResult {
@@ -71,7 +110,11 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   if (issues.length > 0) throw new EngineInputError(issues);
   const appraisal = inp.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } };
-  const residualAmount = appraisal.residual.amount;
+  const residualPosturePre = appraisal.residual.posture
+    ?? ((appraisal.residual.mode ?? "amount") === "amount" && appraisal.residual.amount > 0 ? "set-price"
+      : appraisal.residual.mode === "calculated" ? "book-value"
+      : "none");
+  const residualAmount = residualPosturePre === "none" ? 0 : appraisal.residual.amount;
   const residualYear = appraisal.residual.year;
   const target = inp.targetIrr;
   const rM = Math.pow(1 + target / 100, 1 / 12) - 1;
@@ -139,8 +182,12 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   for (const hc of horizonConstituents) {
     if (hc.month > totalMonths) totalMonths = hc.month;
   }
-  const residualMode = appraisal.residual.mode === "calculated" ? "calculated" : "amount";
-  const residualSetAmount = appraisal.residual.amount;
+  const residualPosture = appraisal.residual.posture
+    ?? ((appraisal.residual.mode ?? "amount") === "amount" && appraisal.residual.amount > 0 ? "set-price"
+      : appraisal.residual.mode === "calculated" ? "book-value"
+      : "none");
+  const residualMode = residualPosture === "book-value" ? "calculated" : "amount";
+  const residualSetAmount = residualPosture === "none" ? 0 : appraisal.residual.amount;
   const horizonYears = Math.ceil(totalMonths / 12);
   const lineTotalsMap = new Map<string, number>();
   for (const c of inp.costs) {
@@ -371,13 +418,15 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     }
     leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf) / dfSumEsc;
   }
-  const solvedPayment = leveraged && leveragedPayment !== null
+  const rawSolvedPayment = leveraged && leveragedPayment !== null
     ? leveragedPayment
     : (opts && opts.fixedPayment !== undefined
       ? opts.fixedPayment
       : (contractsMode
         ? (solvedContractsDfSum > 0 ? (costNpvWithOperating - solvedBalloonsPv - residualAmountUsed * residualDf - evaluatedInflowsPv) / solvedContractsDfSum : 0)
         : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf) / dfSumEsc : 0)));
+  const clampActive = !(tariffCollectionMode || profileMode) && rawSolvedPayment < 0;
+  const solvedPayment = clampActive ? 0 : rawSolvedPayment;
   const payment = tariffCollectionMode || profileMode ? 0 : solvedPayment;
   const tariffEsc = tariffCfg.escalationPerYear / 100;
   const tariffInfos: import("./types.js").TariffYearInfo[] = [];
@@ -554,7 +603,34 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     }
     monthly.push({ period: m2, year: Math.ceil(m2 / 12), cost: cost, inflow: inflow, net: net, cumulative: cumulative });
   }
-  const achieved = irrAnnual(monthly.map((mm2) => mm2.net));
+  const monthlyFlows = monthly.map((mm2) => mm2.net);
+  const monthlySignChanges = countSignChanges(monthlyFlows);
+  const headlineSource: "monthly" | "yearly" | "ambiguous" = monthlySignChanges <= 1
+    ? "monthly"
+    : (() => {
+        const years = Math.ceil(monthly.length / 12);
+        const yearlyFlows: number[] = [];
+        for (let y = 0; y < years; y++) {
+          let sum = 0;
+          for (let mIdx = y * 12; mIdx < Math.min(monthly.length, (y + 1) * 12); mIdx++) sum += monthlyFlows[mIdx];
+          yearlyFlows.push(sum);
+        }
+        return countSignChanges(yearlyFlows) <= 1 ? "yearly" : "ambiguous";
+      })();
+  const achieved = headlineSource === "monthly"
+    ? irrAnnual(monthlyFlows)
+    : headlineSource === "yearly"
+      ? (() => {
+          const years = Math.ceil(monthly.length / 12);
+          const yearlyFlows: number[] = [];
+          for (let y = 0; y < years; y++) {
+            let sum = 0;
+            for (let mIdx = y * 12; mIdx < Math.min(monthly.length, (y + 1) * 12); mIdx++) sum += monthlyFlows[mIdx];
+            yearlyFlows.push(sum);
+          }
+          return irrYearly(yearlyFlows);
+        })()
+      : null;
   const totalYears = Math.ceil(totalMonths / 12);
   const yearly: import("./types.js").YearlyRow[] = [];
   for (let yy = 1; yy <= totalYears; yy++) {
@@ -612,8 +688,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   if (!contractsMode && inp.repayment.balloon > 0) totalCollected += inp.repayment.balloon;
   if (residualAmountUsed > 0) totalCollected += residualAmountUsed;
-  const signChanges = countSignChanges(monthly.map((mm2) => mm2.net));
-  const netFlows = monthly.map((mm2) => mm2.net);
+  const signChanges = monthlySignChanges;
+  const netFlows = monthlyFlows;
   const npvAtTarget = npvMonthly(rM, netFlows);
   const waccM = Math.pow(1 + appraisal.wacc / 100, 1 / 12) - 1;
   const npvCollectionsAtWacc = npvMonthly(waccM, monthly.map((mm2) => mm2.inflow));
@@ -802,8 +878,15 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   return {
     leveragedSolve: leveraged,
-    totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: tariffCollectionMode || profileMode ? null : solvedPayment,
-    paymentCount: tariffCollectionMode || profileMode ? null : slots.length, totalCollected: totalCollected,
+    totalCost: totalCost, costNpv: costNpvWithOperating, paymentAmount: tariffCollectionMode || profileMode ? null : (contractsMode && solvedContractsDfSum <= 0 ? null : solvedPayment),
+    paymentCount: tariffCollectionMode || profileMode ? null : (contractsMode ? contracts.reduce((acc, c) => acc + c.slots.filter((sl) => sl.monthIndex <= totalMonths).length, 0) : slots.length), totalCollected: totalCollected,
+    solvedClamped: clampActive,
+    headlineSource: headlineSource,
+    residualDisclosure: residualPosture === "set-price"
+      ? `Assumes sale at year ${residualYear} for ${residualSetAmount}`
+      : residualPosture === "book-value"
+        ? `Assumes sale at remaining book value at year ${residualYear} for ${bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears))}`
+        : null,
     netGain: totalCollected - totalCost, achievedIrr: achieved,
     paybackYears: paybackMonths === null ? null : paybackMonths / 12,
     lastCostYear: lastCostYear, repaymentStartYear: repaymentStartYear,
@@ -945,7 +1028,11 @@ export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResul
   const issues = validateInputs(inp);
   if (issues.length > 0) throw new EngineInputError(issues);
   const appraisal = inp.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } };
-  const residualAmount = appraisal.residual.amount;
+  const residualPosturePre = appraisal.residual.posture
+    ?? ((appraisal.residual.mode ?? "amount") === "amount" && appraisal.residual.amount > 0 ? "set-price"
+      : appraisal.residual.mode === "calculated" ? "book-value"
+      : "none");
+  const residualAmount = residualPosturePre === "none" ? 0 : appraisal.residual.amount;
   const residualYear = appraisal.residual.year;
   const overrideYear = inp.repayment.firstCollectionYear ?? null;
   const startMonth = overrideYear !== null ? overrideYear * 12 : (lastCostYearOf(inp) + inp.repayment.graceYears) * 12;

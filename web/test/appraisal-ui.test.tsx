@@ -40,7 +40,7 @@ describe("chunk 6: appraisal section, residual, engine goalMet", () => {
     fireEvent.click(byNav("appraisal"));
     fireEvent.change(byField("residualAmount"), { target: { value: "1000000" } });
     fireEvent.change(byField("residualYear"), { target: { value: "1.5" } });
-    expect(screen.getByTestId("issues-summary").textContent).toContain("Residual year must be an integer of at least 1");
+    expect(screen.getByTestId("issues-summary").textContent).toContain("The set-price disposition requires a sale year that is an integer of at least 1.");
   });
 
   it("results section displays the engine goalMet flag", () => {

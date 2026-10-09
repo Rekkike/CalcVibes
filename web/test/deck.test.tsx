@@ -29,8 +29,11 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
     expect(deck.slides[5].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "ones")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "ones")} back`);
   });
 
-  it("slide 0 subtitle", () => {
-    expect(deck.slides[0].body[0].value).toBe("Target 12.00% IRR over a 7-year term");
+  it("slide 0 subtitle chip removed per v0.6.1 2.3; the title carries the project name and the target", () => {
+    expect(deck.slides[0].body).toEqual([]);
+    expect(deck.slides[0].title).toBe(demoProject().projectName);
+    const targetMetric = deck.slides[0].titleMetrics?.find((m) => m.label === "Target IRR");
+    expect(targetMetric?.value).toBe("12.00%");
   });
 
   it("traceability: every money body figure equals its engine field (the anti-hardcode control)", () => {
@@ -134,7 +137,7 @@ describe("EX-1 red proofs (input-level perturbations)", () => {
     const shifted = { ...demoProject(), targetIrr: 13 };
     const r = computeModel(shifted);
     const d = deckSlides(shifted, r);
-    expect(d.slides[0].body[0].value).toBe("Target 13.00% IRR over a 7-year term");
+    expect(d.slides[0].titleMetrics?.find((m) => m.label === "Target IRR")?.value).toBe("13.00%");
     expect(d.slides[4].title).toContain("13.00% target");
   });
 

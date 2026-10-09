@@ -59,7 +59,7 @@ describe("Yearly detail section (Task D web)", () => {
     expect(costGrid.querySelector('[data-grid-totals="true"]')).toBeTruthy();
     expect(colGrid.querySelector('[data-grid-totals="true"]')).toBeTruthy();
     const psRow = colGrid.querySelector('[data-grid-row="payments:payments"]') as HTMLElement;
-    expect(psRow.textContent).toContain("475 309,13");
+    expect(psRow.textContent).toContain("475,31 tkr");
   });
 
   it("profile mode shows the profile row in the collections grid", () => {

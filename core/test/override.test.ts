@@ -6,7 +6,7 @@ import { appraisal, templateLike } from "./_shared.js";
 const base = () => ({ ...templateLike(), appraisal: appraisal() });
 
 describe("CP-2 repayment start override", () => {
-  it("OVR2 (firstCollectionYear 2): full pin set", () => {
+  it("OVR2 (firstCollectionYear 2): full pin set (headline re-anchored per v0.6.1 0.2)", () => {
     const r = computeModel({ ...base(), repayment: { ...base().repayment, firstCollectionYear: 2 } });
     expect(Math.abs((r.paymentAmount as number) - 424383.15542)).toBeLessThan(0.01);
     expect(Math.abs(r.npvAtTarget)).toBeLessThan(1e-6);
@@ -17,7 +17,7 @@ describe("CP-2 repayment start override", () => {
     expect(Math.abs((r.profitabilityIndex as number) - 1.13701)).toBeLessThan(1e-4);
     expect(Math.abs((r.discountedPaybackYears as number) - 7.72609)).toBeLessThan(1e-4);
     expect(Math.abs((r.mirr as number) - 0.08641195)).toBeLessThan(1e-6);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12245908592448196)).toBeLessThan(1e-9);
     expect(r.goalMet).toBe(true);
     expect(r.signChanges).toBe(9);
     expect(r.irrAmbiguous).toBe(true);
@@ -26,7 +26,7 @@ describe("CP-2 repayment start override", () => {
     expect(r.monthly.length).toBe(108);
   });
 
-  it("OVR2+MAINT: full pin set; the maintenance window recomputes to the actual start", () => {
+  it("OVR2+MAINT: full pin set; the maintenance window recomputes to the actual start (headline re-anchored per v0.6.1 0.2)", () => {
     const r = computeModel({ ...base(), repayment: { ...base().repayment, firstCollectionYear: 2 }, maintenance: { mode: "percent", percentPerYear: 0.5 } });
     expect(Math.abs((r.paymentAmount as number) - 424931.60863)).toBeLessThan(0.01);
     expect(r.totalCost).toBe(7865235);
@@ -38,7 +38,7 @@ describe("CP-2 repayment start override", () => {
     expect(Math.abs((r.profitabilityIndex as number) - 1.13681)).toBeLessThan(1e-4);
     expect(Math.abs((r.discountedPaybackYears as number) - 7.72610)).toBeLessThan(1e-4);
     expect(Math.abs((r.mirr as number) - 0.08638338)).toBeLessThan(1e-6);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12246379998352153)).toBeLessThan(1e-9);
     expect(r.signChanges).toBe(55);
     expect(r.firstPaymentMonth).toBe(24);
     expect(r.operatingLines[0].effectiveWindow).toEqual([24, 105]);

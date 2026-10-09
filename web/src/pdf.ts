@@ -99,6 +99,15 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         y += needed;
       }
     }
+    if (slide.solverScenario !== null && slide.solverScenario !== undefined) {
+      doc.setFontSize(9);
+      doc.setTextColor(180, 132, 10);
+      doc.text(slide.solverScenario.label, 24, y);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Required solved rent: ${slide.solverScenario.requiredPayment ?? "not applicable"}`, 24, y + 6);
+      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.solverScenario.label);
+      y += 12;
+    }
     if (slide.verdict !== undefined) {
       const lines = doc.splitTextToSize(`Verdict: ${slide.verdict}`, 220);
       const needed = DISCLOSURE_LINE_HEIGHT * lines.length;

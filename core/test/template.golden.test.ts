@@ -115,7 +115,7 @@ describe("Chunk 0.5: template project golden fixture", () => {
     expect(result.goalMet).toBe(true);
   });
 
-  it("operating variant (schema v3 fields exercised): maintenance percent 0.5 pins the CP-1 MAINT figures", () => {
+  it("operating variant (schema v3 fields exercised): maintenance percent 0.5 pins the CP-1 MAINT figures (headline re-anchored per v0.6.1 0.2 — the monthly flow has 55 sign changes, so the headline is the yearly-aggregated root; the five golden blocks on the template profile are untouched)", () => {
     const operatingVariant = { ...fileInputs, maintenance: { mode: "percent" as const, percentPerYear: 0.5 } };
     const r = computeModel(operatingVariant);
     expect(Math.abs((r.paymentAmount as number) - 475857.58728)).toBeLessThan(0.01);
@@ -123,7 +123,7 @@ describe("Chunk 0.5: template project golden fixture", () => {
     expect(r.irrAmbiguous).toBe(true);
     expect(r.firstPaymentMonth).toBe(36);
     expect(r.operatingTotal).toBe(15375);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12190173489659561)).toBeLessThan(1e-9);
     expect(r.goalMet).toBe(true);
   });
 

@@ -48,6 +48,7 @@ export interface ContractParams {
 
 export interface ResidualParams {
   mode?: "calculated" | "amount";
+  posture?: "none" | "set-price" | "book-value";
   amount: number;
   year: number;
 }
@@ -299,6 +300,9 @@ export interface ModelResult {
   termPositions?: TermPosition[];
   contractsInfo?: ContractInfo[];
   residualAmountUsed?: number;
+  solvedClamped?: boolean;
+  headlineSource?: "monthly" | "yearly" | "ambiguous";
+  residualDisclosure?: string | null;
 }
 
 export interface GridRow {

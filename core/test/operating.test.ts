@@ -17,7 +17,7 @@ describe("CP-0 byte identity", () => {
 });
 
 describe("CP-1 operating lines and maintenance", () => {
-  it("MAINT (percent 0.5 of CAPEX): full pin set", () => {
+  it("MAINT (percent 0.5 of CAPEX): full pin set (headline re-anchored per v0.6.1 0.2: the yearly-aggregated root, the monthly flow non-conventional)", () => {
     const r = computeModel({ ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 } });
     expect(Math.abs((r.paymentAmount as number) - 475857.58728)).toBeLessThan(0.01);
     expect(r.totalCost).toBe(7865235);
@@ -29,7 +29,7 @@ describe("CP-1 operating lines and maintenance", () => {
     expect(Math.abs((r.profitabilityIndex as number) - 1.17888)).toBeLessThan(1e-4);
     expect(Math.abs((r.discountedPaybackYears as number) - 8.47095)).toBeLessThan(1e-4);
     expect(Math.abs((r.mirr as number) - 0.08754387)).toBeLessThan(1e-6);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12190173489659561)).toBeLessThan(1e-9);
     expect(r.goalMet).toBe(true);
     expect(r.signChanges).toBe(55);
     expect(r.irrAmbiguous).toBe(true);
@@ -39,7 +39,7 @@ describe("CP-1 operating lines and maintenance", () => {
     expect(r.operatingLines[0].total).toBe(15375);
   });
 
-  it("MAINT+RENT (rent 120,000/yr years 3-10): full pin set", () => {
+  it("MAINT+RENT (rent 120,000/yr years 3-10): full pin set (headline re-anchored per v0.6.1 0.2)", () => {
     const r = computeModel({ ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 }, operatingLines: [{ id: "o1", label: "Rent", amount: 120000, startYear: 3, yearCount: 8, escalation: 0 }] });
     expect(Math.abs((r.paymentAmount as number) - 505108.42510)).toBeLessThan(0.01);
     expect(r.totalCost).toBe(8685235);
@@ -51,7 +51,7 @@ describe("CP-1 operating lines and maintenance", () => {
     expect(Math.abs((r.profitabilityIndex as number) - 1.16674)).toBeLessThan(1e-4);
     expect(Math.abs((r.discountedPaybackYears as number) - 8.47143)).toBeLessThan(1e-4);
     expect(Math.abs((r.mirr as number) - 0.08628425)).toBeLessThan(1e-6);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12207423730225236)).toBeLessThan(1e-9);
     expect(r.signChanges).toBe(55);
     expect(r.firstPaymentMonth).toBe(36);
     const rent2 = r.operatingLines.find((o) => o.id === "o1");
@@ -62,12 +62,12 @@ describe("CP-1 operating lines and maintenance", () => {
     expect(maint2 && maint2.total).toBe(15375);
   });
 
-  it("MAINT-FIXED (5,000/yr): pins", () => {
+  it("MAINT-FIXED (5,000/yr): pins (headline re-anchored per v0.6.1 0.2)", () => {
     const r = computeModel({ ...base(), maintenance: { mode: "fixed", fixedAnnualAmount: 5000 } });
     expect(Math.abs((r.paymentAmount as number) - 476527.91898)).toBeLessThan(0.01);
     expect(Math.abs(r.totalCost - 7884026.66667)).toBeLessThan(0.01);
     expect(Math.abs(r.operatingTotal - 34166.66667)).toBeLessThan(0.01);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-6);
+    expect(Math.abs((r.achievedIrr as number) - 0.12190568237532207)).toBeLessThan(1e-9);
     expect(r.signChanges).toBe(55);
     expect(r.irrAmbiguous).toBe(true);
   });

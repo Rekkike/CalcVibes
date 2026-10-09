@@ -82,10 +82,16 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 ))}
               </div>
             )}
+            {sl.solverScenario !== null && sl.solverScenario !== undefined && (
+              <div data-testid="solver-scenario" className="solver-scenario">
+                <p className="solver-scenario-label">{sl.solverScenario.label}</p>
+                <p className="solver-scenario-value">Required solved rent: {sl.solverScenario.requiredPayment ?? "not applicable"}</p>
+              </div>
+            )}
             {sl.summaryCharts !== undefined && result !== null && (
               <div data-testid="summary-charts" className="summary-charts">
                 <div data-summary-chart="hurdle"><HurdlePlot target={inputs.targetIrr} achieved={(result.achievedIrr ?? 0) * 100} goalMet={result.goalMet} solved={result.paymentAmount !== null} /></div>
-                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} /></div>
+                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} /></div>
               </div>
             )}
             {sl.body.map((f, j) => (
@@ -125,7 +131,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {i === 2 && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="recovery">
-                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} />
+                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} />
               </div>
             )}
             

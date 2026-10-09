@@ -4,8 +4,9 @@ import { yearHeader } from "../state.js";
 import { SignedCashflowChart } from "../charts.js";
 import { deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } from "../engine.js";
 
-export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null }) {
-  const { result, targetIrr, currency, startYear = null } = props;
+export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null; entryUnit?: import("../engine.js").EntryUnit }) {
+  const { result, targetIrr, currency, startYear = null, entryUnit = "ones" } = props;
+  const money = (v: number) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1], entryUnit);
   return (
     <section data-testid="results">
       <h2>Results</h2>
@@ -59,10 +60,10 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
           {result.yearly.map((y) => (
             <tr key={y.year}>
               <td>{yearHeader(y.year, startYear)}</td>
-              <td>{roundForDisplay(y.cost)}</td>
-              <td>{roundForDisplay(y.inflow)}</td>
-              <td>{roundForDisplay(y.net)}</td>
-              <td>{roundForDisplay(y.cumulative)}</td>
+              <td data-stat="yearly-cost">{money(y.cost)}</td>
+              <td data-stat="yearly-inflow">{money(y.inflow)}</td>
+              <td data-stat="yearly-net">{money(y.net)}</td>
+              <td data-stat="yearly-cumulative">{money(y.cumulative)}</td>
             </tr>
           ))}
         </tbody>
@@ -75,10 +76,10 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
       </ul>
       <h3>Key metrics</h3>
       <dl data-testid="metrics">
-        <dt>Total cost (nominal)</dt><dd data-stat="totalCost">{roundForDisplay(result.totalCost)}</dd>
+        <dt>Total cost (nominal)</dt><dd data-stat="totalCost">{money(result.totalCost)}</dd>
         <dt>Cost NPV at target (discounted)</dt><dd data-stat="costNpv">{roundForDisplay(result.costNpv)}</dd>
-        <dt>Total collected (nominal)</dt><dd data-stat="totalCollected">{roundForDisplay(result.totalCollected)}</dd>
-        <dt>Net gain (nominal)</dt><dd data-stat="netGain">{roundForDisplay(result.netGain)}</dd>
+        <dt>Total collected (nominal)</dt><dd data-stat="totalCollected">{money(result.totalCollected)}</dd>
+        <dt>Net gain (nominal)</dt><dd data-stat="netGain">{money(result.netGain)}</dd>
         <dt>Payback (years, nominal)</dt>
         <dd data-stat="paybackYears">{result.paybackYears === null ? "—" : roundForDisplay(result.paybackYears, 5)}</dd>
         <dt>Achieved IRR</dt>

@@ -26,12 +26,12 @@ describe("Chunk 3: residual value on the collections side", () => {
     expect(JSON.stringify(withZero)).toBe(JSON.stringify(absent));
   });
 
-  it("residual 2,000,000 at year 1: the constructed ambiguity case — payment 347,340.22763, signChanges 3, irrAmbiguous true, achievedIrr 0.12", () => {
+  it("residual 2,000,000 at year 1: the constructed ambiguity case — payment 347,340.22763, signChanges 3, irrAmbiguous true, headline the yearly-aggregated root per v0.6.1 0.2", () => {
     const r = computeModel({ ...templateLike(), appraisal: appraisal(8, 6, 6, 2000000, 1) });
     expect(Math.abs((r.paymentAmount as number) - 347340.22763)).toBeLessThan(0.01);
     expect(r.signChanges).toBe(3);
     expect(r.irrAmbiguous).toBe(true);
-    expect(Math.abs((r.achievedIrr as number) - 0.12)).toBeLessThan(1e-9);
+    expect(Math.abs((r.achievedIrr as number) - 0.12729246446263132)).toBeLessThan(1e-9);
   });
 
   it("directional: a larger residual strictly lowers the solved payment at positive target rates", () => {

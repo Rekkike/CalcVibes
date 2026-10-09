@@ -33,8 +33,15 @@ function ScenarioListEditor(props: { label: string; values: number[] | null; fal
 
 export function ScenariosSection(props: { inputs: ModelInputs; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; onScenarioTargetsChange?: ListSetter; onScenarioTermsChange?: ListSetter; onScenarioBalloonsChange?: ListSetter }) {
   const { inputs, scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null, onScenarioTargetsChange, onScenarioTermsChange, onScenarioBalloonsChange } = props;
-  const sc = scenarioResults(inputs);
-  const t = tornado(inputs);
+  let sc: ReturnType<typeof scenarioResults> | null = null;
+  let t: ReturnType<typeof tornado> | null = null;
+  let refusalMessage: string | null = null;
+  try {
+    sc = scenarioResults(inputs);
+    t = tornado(inputs);
+  } catch (e) {
+    refusalMessage = (e as Error).message;
+  }
   const terms = scenarioTerms ?? [5, 7, 9];
   const targets = scenarioTargets ?? [8, 12, 16];
   const balloons = scenarioBalloons ?? [0, 1000000, 2000000];
@@ -52,6 +59,17 @@ export function ScenariosSection(props: { inputs: ModelInputs; scenarioTargets?:
   } else {
     twoWay = paymentVsTermTargetTable(inputs, terms, targets);
     bt = paymentVsBalloonTermTable(inputs, balloons, terms);
+  }
+  if (refusalMessage !== null || sc === null || t === null) {
+    return (
+      <section data-testid="scenarios">
+        <h2>Scenarios and sensitivity</h2>
+        <div data-testid="scenarios-refusal" className="warning">
+          <p>The engine refused to compute the scenario set for this project.</p>
+          <p>{refusalMessage ?? "The scenario set could not be computed for this project."}</p>
+        </div>
+      </section>
+    );
   }
   return (
     <section data-testid="scenarios">

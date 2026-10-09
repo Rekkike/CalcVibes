@@ -19,7 +19,7 @@ describe("CP-1 Mode B operating basis", () => {
     expect(Math.abs(shortfall - 13199.65)).toBeLessThan(0.01);
   });
 
-  it("MB-MINT: maintenance in the basis", () => {
+  it("MB-MINT: maintenance in the basis (headline re-anchored per v0.6.1 0.2)", () => {
     const b = solveTerm({ ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 } }, 400000);
     expect(b.paymentCount).toBe(38);
     expect(b.termYears).toBe(9.5);
@@ -27,7 +27,7 @@ describe("CP-1 Mode B operating basis", () => {
     expect(Math.abs(b.result.costNpv - 6641866.07220)).toBeLessThan(0.01);
     expect(b.result.operatingTotal).toBe(21000);
     expect(b.result.operatingLines[0].effectiveWindow).toEqual([36, 147]);
-    expect(Math.abs((b.result.achievedIrr as number) - 0.12243572)).toBeLessThan(1e-6);
+    expect(Math.abs((b.result.achievedIrr as number) - 0.1240712474763868)).toBeLessThan(1e-9);
     expect(b.result.goalMet).toBe(true);
     expect(b.result.signChanges).toBe(75);
     expect(b.result.irrAmbiguous).toBe(true);
@@ -38,7 +38,7 @@ describe("CP-1 Mode B operating basis", () => {
     expect(Math.abs(b.result.costNpv - dfSum - 22467.74)).toBeLessThan(0.01);
   });
 
-  it("MB-FLIP: the case that proves the basis matters", () => {
+  it("MB-FLIP: the case that proves the basis matters (headline re-anchored per v0.6.1 0.2)", () => {
     const without = solveTerm(base(), 394900);
     expect(without.paymentCount).toBe(38);
     expect(without.termYears).toBe(9.5);
@@ -53,7 +53,7 @@ describe("CP-1 Mode B operating basis", () => {
     expect(withM.result.operatingLines[0].effectiveWindow).toEqual([36, 150]);
     expect(withM.result.operatingTotal).toBe(21562.50);
     expect(Math.abs(withM.result.costNpv - 6642003.79684)).toBeLessThan(0.01);
-    expect(Math.abs((withM.result.achievedIrr as number) - 0.12270738)).toBeLessThan(1e-6);
+    expect(Math.abs((withM.result.achievedIrr as number) - 0.12427793390192099)).toBeLessThan(1e-9);
     expect(withM.result.goalMet).toBe(true);
     expect(withM.result.signChanges).toBe(77);
     expect(withM.result.irrAmbiguous).toBe(true);

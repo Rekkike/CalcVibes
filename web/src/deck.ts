@@ -38,6 +38,7 @@ export interface DeckSlide {
   summaryCharts?: DeckChartSlot[];
   titleMetrics?: { label: string; value: string }[];
   kickerNumber?: string;
+  solverScenario?: { label: string; requiredPayment: string | null } | null;
 }
 
 export const TERM_GLOSSES: { term: string; gloss: string }[] = [
@@ -73,14 +74,12 @@ export function deckSlides(
   slides.push({
     name: "title",
     title: inputs.projectName || "Untitled project",
-    body: [
-      { label: "Subtitle", value: `Target ${percentTwoForDisplay(inputs.targetIrr / 100)} IRR over a ${inputs.repayment.termYears}-year term`, kind: "text", rawValue: null },
-    ],
+    body: [],
     disclosures: [],
     titleMetrics: [
       { label: "Project cost", value: money(result.totalCost) },
       { label: "Target IRR", value: percentTwoForDisplay(inputs.targetIrr / 100) },
-      { label: "Investment term", value: `${inputs.repayment.termYears} years` },
+      { label: "Investment term", value: `${result.horizon?.totalYears ?? result.yearly.length} years` },
     ],
   });
 
@@ -272,7 +271,14 @@ export function deckSlides(
     ] },
     { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },
   ];
-  slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts });
+  if (result.residualDisclosure !== null && result.residualDisclosure !== undefined) {
+    dealDisclosures.push(result.residualDisclosure);
+  }
+  const solverScenario = result.goalMet ? null : {
+    label: "Scenario: what would we need to reach our target",
+    requiredPayment: result.paymentAmount === null ? null : money(result.paymentAmount),
+  };
+  slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts, solverScenario });
 
   const kickerNumbers = ["01", "02", "03", "04", "05"];
   let kickerIdx = 0;

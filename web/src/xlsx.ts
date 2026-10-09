@@ -142,6 +142,9 @@ export async function buildWorkbook(
     ["operatingTotal", result.operatingTotal, "money"],
     ["tariffBaseUnitPrice", result.tariffBaseUnitPrice, "money"],
     ["residualAmountUsed", result.residualAmountUsed ?? null, "money"],
+    ["solvedClamped", result.solvedClamped === true ? "true" : "false", "flag"],
+    ["headlineSource", result.headlineSource ?? null, "flag"],
+    ["residualDisclosure", result.residualDisclosure ?? null, "flag"],
   ];
   if (result.financing !== null) {
     const f = result.financing;
