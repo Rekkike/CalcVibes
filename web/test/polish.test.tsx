@@ -155,7 +155,8 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
-    const tiles = document.querySelectorAll('[data-testid="summary-tiles"] [data-tile]');
+    const deal = document.querySelector('[data-slide-name="deal"]') as HTMLElement;
+    const tiles = deal.querySelectorAll('[data-testid="summary-tiles"] [data-tile]');
     const labels = Array.from(tiles).map((t) => (t as HTMLElement).getAttribute("data-tile"));
     expect(labels).toEqual([
       "Total cost", "Total collected", "Net gain", "Achieved IRR", "NPV at WACC",
