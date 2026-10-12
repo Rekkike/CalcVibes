@@ -18,35 +18,29 @@ export interface BookSchedule {
 interface BookEntry {
   id: string;
   name: string;
-  amount: number;
+  incurred: Map<number, number>;
   startYear: number;
   config: DepreciationConfig | null;
 }
 
-function resolveCharge(entry: BookEntry, horizonYears: number): { beginning: number; charge: number; ending: number }[] {
-  const cfg = entry.config;
-  const rows: { beginning: number; charge: number; ending: number }[] = [];
-  let book = entry.amount;
-  for (let y = entry.startYear; y <= horizonYears; y++) {
-    const idx = y - entry.startYear;
-    let charge = 0;
-    if (cfg && cfg.mode === "retained") {
-      charge = 0;
-    } else if (cfg && cfg.mode === "straight-line") {
-      const yrs = Math.max(1, cfg.years ?? horizonYears);
-      charge = idx < yrs ? entry.amount / yrs : 0;
-    } else if (cfg && cfg.mode === "rate") {
-      charge = book * ((cfg.yearlyRatePct ?? 0) / 100);
+function lineIncurred(c: CostLine): Map<number, number> {
+  const map = new Map<number, number>();
+  const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+  if (c.category === "capex") {
+    if (overrides) {
+      for (const [yStr, amount] of Object.entries(overrides)) map.set(Number(yStr), amount);
     } else {
-      // The project default when unconfigured: capex held at book (retained) — no silent write-down.
-      charge = 0;
+      map.set(c.startYear, c.amount);
     }
-    if (y < entry.startYear) charge = 0;
-    rows.push({ beginning: book, charge, ending: book - charge });
-    book -= charge;
-    if (book < 0) book = 0;
+  } else {
+    const dur = Math.max(1, c.durationYears);
+    for (let j = 0; j < dur; j++) {
+      const y = c.startYear + j;
+      const overridden = overrides && Object.prototype.hasOwnProperty.call(overrides, String(y));
+      map.set(y, overridden ? (overrides as Record<number, number>)[y] : c.amount * Math.pow(1 + c.escalation / 100, j));
+    }
   }
-  return rows;
+  return map;
 }
 
 export function computeBookSchedule(
@@ -58,20 +52,57 @@ export function computeBookSchedule(
 ): BookSchedule {
   const entries: BookEntry[] = [];
   for (const c of costs) {
-    const total = costLineTotals.get(c.id) ?? c.amount;
-    entries.push({ id: c.id, name: c.name, amount: total, startYear: c.startYear, config: c.depreciation ?? defaultConfig ?? null });
+    entries.push({ id: c.id, name: c.name, incurred: lineIncurred(c), startYear: c.startYear, config: c.depreciation ?? defaultConfig ?? null });
   }
   for (const { contractId, ri } of reinvestments) {
-    entries.push({ id: `reinv-${contractId}-${ri.year}`, name: `Reinvestment (${contractId})`, amount: ri.amount, startYear: ri.year, config: null });
+    const map = new Map<number, number>();
+    map.set(ri.year, ri.amount);
+    entries.push({ id: `reinv-${contractId}-${ri.year}`, name: `Reinvestment (${contractId})`, incurred: map, startYear: ri.year, config: null });
   }
   const lines: BookLineRow[] = entries.map((e) => {
-    const rows = resolveCharge(e, horizonYears);
+    const costYears = [...e.incurred.keys()].sort((a, b) => a - b);
+    const firstYear = costYears.length > 0 ? costYears[0] : e.startYear;
+    const lastCostY = costYears.length > 0 ? costYears[costYears.length - 1] : e.startYear;
+    const cfg = e.config;
+    const commissioning = cfg && cfg.startYear !== undefined && Number.isInteger(cfg.startYear) && (cfg.startYear as number) >= 1
+      ? (cfg.startYear as number)
+      : lastCostY + 1;
+    const straightYears = cfg && cfg.mode === "straight-line" ? Math.max(1, cfg.years ?? horizonYears) : 0;
+    const rows: { year: number; beginning: number; charge: number; ending: number }[] = [];
+    let book = 0;
+    let basis = 0;
+    let charges = 0;
+    let charging = false;
+    for (let y = firstYear; y <= horizonYears; y++) {
+      const incurred = e.incurred.get(y) ?? 0;
+      let charge = 0;
+      if (incurred > 0) {
+        charge = 0;
+      } else if (!charging && y >= commissioning) {
+        charging = true;
+        basis = book;
+      }
+      if (charging && incurred === 0) {
+        if (cfg && cfg.mode === "straight-line") {
+          charge = charges < straightYears ? basis / straightYears : 0;
+        } else if (cfg && cfg.mode === "rate") {
+          charge = book * ((cfg.yearlyRatePct ?? 0) / 100);
+        } else {
+          charge = 0;
+        }
+        charges += charge > 0 ? 1 : 0;
+      }
+      if (book - charge < 0) charge = Math.max(0, book);
+      const ending = book + incurred - charge;
+      rows.push({ year: y, beginning: book, charge: charge, ending: ending });
+      book = ending;
+    }
     return {
       id: e.id,
       name: e.name,
-      years: rows.map((r, i) => ({ year: e.startYear + i, beginning: r.beginning, charge: r.charge, ending: r.ending })),
-      endingBookAtEnd: rows.length > 0 ? rows[rows.length - 1].ending : e.amount,
-      isRetained: !e.config || e.config.mode === "retained",
+      years: rows,
+      endingBookAtEnd: rows.length > 0 ? rows[rows.length - 1].ending : (costLineTotals.get(e.id) ?? 0),
+      isRetained: !cfg || cfg.mode === "retained",
     };
   });
   const combined: { year: number; beginning: number; charge: number; ending: number }[] = [];

@@ -17,7 +17,7 @@ describe("chunk 2: shell, blank start, demo load, validation panel", () => {
     render(<App />);
     expect(screen.getByText("Untitled project")).toBeTruthy();
     expect(screen.queryByText(/Development team/)).toBeNull();
-    expect(byStat("totalCost").textContent).toBe("0");
+    expect(byStat("totalCost").textContent).toBe("0 tkr");
     expect(screen.queryByTestId("issues-summary")).toBeNull();
   });
 
@@ -25,8 +25,8 @@ describe("chunk 2: shell, blank start, demo load, validation panel", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     expect(screen.getByText("Project Alpha")).toBeTruthy();
-    expect(byStat("paymentAmount").textContent).toBe("475309.13");
-    expect(byStat("totalCost").textContent).toBe("7849860");
+    expect(byStat("paymentAmount").textContent).toBe("475 tkr");
+    expect(byStat("totalCost").textContent).toBe("7 850 tkr");
     expect(screen.queryByTestId("issues-summary")).toBeNull();
   });
 

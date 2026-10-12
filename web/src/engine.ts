@@ -24,12 +24,28 @@ export function unitFactor(unit: EntryUnit): number {
   return unit === "thousands" ? 1000 : unit === "millions" ? 1000000 : 1;
 }
 
+function groupIntegerString(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  if (Math.abs(value) < 1e21) return String(Math.round(value));
+  const big = BigInt(Math.trunc(value));
+  return big.toString();
+}
+
+function noSciFormat(value: number, digits: number): string {
+  if (!Number.isFinite(value)) return "—";
+  if (Math.abs(value) >= 1e21) {
+    const grouped = groupIntegerString(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return grouped;
+  }
+  return value.toFixed(digits);
+}
+
 export function moneyForDisplay(value: number, currency: CurrencyCode = "SEK", unit: EntryUnit = "ones"): string {
   const negative = value < 0;
   const factor = unitFactor(unit);
   const scaled = Math.abs(value) / factor;
-  const abs = roundForDisplay(scaled);
-  const [intPart, decPart] = abs.toFixed(2).split(".");
+  const body0 = noSciFormat(scaled, 2);
+  const [intPart, decPart] = body0.includes(".") ? body0.split(".") : [body0, "00"];
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const body = `${grouped},${decPart}`;
   let token = "";
@@ -62,9 +78,7 @@ export function deckMoneyForDisplay(value: number, currency: CurrencyCode = "SEK
   const factor = unitFactor(unit);
   const scaled = Math.abs(value) / factor;
   const negative = value < 0;
-  const rounded = roundForDisplay(scaled, 0);
-  const grouped = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  const body = grouped;
+  const body = noSciFormat(scaled, 0).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   let token = "";
   if (unit === "thousands") token = " k";
   else if (unit === "millions") token = " M";
@@ -98,4 +112,4 @@ export function dscrTwoForDisplay(value: number): string {
   return roundForDisplay(value, 2).toFixed(2);
 }
 
-export const VERSION = "v0.6R";
+export const VERSION = "v0.6.2";

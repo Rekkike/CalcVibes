@@ -167,11 +167,13 @@ describe("v0.6 DEPRECIATION-BOOK-ONLY", () => {
     expect(withDep.profitabilityIndex).toBe(without.profitabilityIndex);
   });
 
-  it("the book schedule equals the configured write-down; retained lines hold at book", () => {
+  it("the book schedule equals the configured write-down; retained lines hold at book (re-anchored to the commissioning convention)", () => {
     const r = computeModel(multiBase());
     const dep = r.bookView!.lines.find((l) => l.id === "c1")!;
-    expect(dep.years[0].charge).toBe(20000000 / 33);
-    expect(dep.years[32].ending).toBeCloseTo(0, 6);
+    expect(dep.years[0].charge).toBe(0);
+    expect(dep.years[0].ending).toBe(20000000);
+    expect(dep.years[1].charge).toBe(20000000 / 33);
+    expect(dep.years[33].ending).toBeCloseTo(0, 6);
     const ret = r.bookView!.lines.find((l) => l.id === "c2")!;
     expect(ret.years[32].ending).toBe(80000000);
   });

@@ -25,7 +25,7 @@ describe("chunk 5: operating, maintenance, override, settings surfaces", () => {
     const info = document.querySelector('[data-testid="operating-info"]');
     expect(info).toBeTruthy();
     expect(info && info.textContent).toContain("effective window 36–117");
-    expect(info && info.textContent).toContain("total 820000");
+    expect(info && info.textContent).toContain("total 820 000,00 tkr");
   });
 
   it("maintenance: percent mode with the rule-of-thumb hint; the derived line renders with its basis", () => {

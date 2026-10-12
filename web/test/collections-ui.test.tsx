@@ -19,7 +19,7 @@ describe("Collections editor (Task B web)", () => {
     const total = editor.querySelector('[data-field="col-spread-total"]') as HTMLInputElement;
     const first = editor.querySelector('[data-field="col-spread-first"]') as HTMLInputElement;
     const count = editor.querySelector('[data-field="col-spread-count"]') as HTMLInputElement;
-    fireEvent.change(total, { target: { value: "10000001" } });
+    fireEvent.change(total, { target: { value: "10000.001" } });
     fireEvent.change(first, { target: { value: "3" } });
     fireEvent.change(count, { target: { value: "3" } });
     fireEvent.click(editor.querySelector('[data-action="col-spread-fill"]') as HTMLElement);
@@ -27,7 +27,7 @@ describe("Collections editor (Task B web)", () => {
     expect(filled.length).toBe(3);
     const amounts = Array.from(document.querySelectorAll('[data-field="col-override-amount"]') as NodeListOf<HTMLInputElement>).map((i) => parseFloat(i.value));
     const sum = amounts.reduce((a, b) => a + b, 0);
-    expect(sum).toBeCloseTo(10000001, 6);
+    expect(sum).toBeCloseTo(10000.001, 6);
   });
 
   it("the SCE-PROFILE note renders in place of the two payment-solve tables when a profile is present", () => {

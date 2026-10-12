@@ -1,6 +1,7 @@
 import type { ModelInputs, ModelResult, TariffRow } from "../../core/src/types.js";
-import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay } from "./engine.js";
+import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
+import { scenarioResults } from "../../core/src/scenarios.js";
 import { yearHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
@@ -55,12 +56,13 @@ export interface DeckModel {
   glosses?: { term: string; gloss: string }[];
   currency?: Parameters<typeof moneyForDisplay>[1];
   unit?: EntryUnit;
+  provenance?: string[];
 }
 
 export function deckSlides(
   inputs: ModelInputs,
   result: ModelResult,
-  opts: { startYear: number | null; entryUnit?: EntryUnit } = { startYear: null },
+  opts: { startYear: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null } = { startYear: null },
 ): DeckModel {
   const currency = (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK";
   const unit = opts.entryUnit ?? "ones";
@@ -280,7 +282,111 @@ export function deckSlides(
   };
   slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts, solverScenario });
 
-  const kickerNumbers = ["01", "02", "03", "04", "05"];
+  // Slide 6 — scenarios summary (v0.6.2 Round 23 supplement ruling; renders only when the user has set at least one axis value)
+  const sceTargets = opts.scenarioTargets ?? [];
+  const sceTerms = opts.scenarioTerms ?? [];
+  const sceBalloonsRaw = opts.scenarioBalloons ?? [];
+  const anyScenarioSet = sceTargets.length > 0 || sceTerms.length > 0 || sceBalloonsRaw.length > 0;
+  if (anyScenarioSet) {
+    const sceBody: DeckFigure[] = [];
+    const sceDisclosures: string[] = ["One source: every figure here is computed exactly as the Scenarios tab computes it."];
+    const profileActive = inputs.repayment.collectionsOverrides !== undefined && Object.keys(inputs.repayment.collectionsOverrides).length > 0;
+    const tryCompute = (patch: Partial<ModelInputs>): ModelResult | null => {
+      try {
+        return computeModel({ ...inputs, ...patch });
+      } catch {
+        return null;
+      }
+    };
+    let sc: ReturnType<typeof scenarioResults> | null = null;
+    try {
+      sc = scenarioResults(inputs);
+    } catch {
+      sc = null;
+    }
+    if (sc !== null && sc.base.paymentAmount !== null) {
+      const basePayment = sc.base.paymentAmount;
+      if (sc.optimistic.paymentAmount !== null) {
+        sceBody.push({ label: "Named-set delta, optimistic vs base", value: money(sc.optimistic.paymentAmount - basePayment), kind: "money", rawValue: sc.optimistic.paymentAmount - basePayment });
+      }
+      if (sc.pessimistic.paymentAmount !== null) {
+        sceBody.push({ label: "Named-set delta, pessimistic vs base", value: money(sc.pessimistic.paymentAmount - basePayment), kind: "money", rawValue: sc.pessimistic.paymentAmount - basePayment });
+      }
+    } else {
+      sceDisclosures.push("The named scenario sets could not be computed for this project; see the Scenarios tab.");
+    }
+    let chartData: { label: string; value: number }[] = [];
+    if (profileActive) {
+      sceDisclosures.push("The payment sensitivity figures do not apply while a collections profile is present (SCE-PROFILE).");
+    } else {
+      if (sceTerms.length > 0) {
+        const termPayments = sceTerms.map((t) => {
+          const r = tryCompute({ repayment: { ...inputs.repayment, termYears: t } });
+          return { label: `${t} years`, payment: r === null ? null : r.paymentAmount };
+        });
+        const okTerms = termPayments.filter((x): x is { label: string; payment: number } => x.payment !== null);
+        if (okTerms.length > 0) {
+          const minP = Math.min(...okTerms.map((x) => x.payment));
+          const maxP = Math.max(...okTerms.map((x) => x.payment));
+          sceBody.push({ label: "Payment range across the set terms", value: `${money(minP)} – ${money(maxP)}`, kind: "money", rawValue: null, disclosure: `${okTerms.length} of ${sceTerms.length} term values computed` });
+          chartData = okTerms.map((x) => ({ label: x.label, value: x.payment }));
+        } else {
+          sceDisclosures.push("The set term values were refused by the engine; see the Scenarios tab.");
+        }
+        if (termPayments.some((x) => x.payment === null)) {
+          sceDisclosures.push("Some term values were refused by the engine; the refused cells render inline on the Scenarios tab.");
+        }
+      }
+      if (sceTargets.length > 0) {
+        for (const g of sceTargets) {
+          const r = tryCompute({ targetIrr: g });
+          if (r === null) {
+            sceDisclosures.push(`The target value ${g} was refused by the engine; see the Scenarios tab.`);
+            continue;
+          }
+          if (r.paymentAmount !== null) {
+            sceBody.push({ label: `Payment at target ${g}%`, value: money(r.paymentAmount), kind: "money", rawValue: r.paymentAmount });
+          } else {
+            sceBody.push({ label: `Verdict at target ${g}%`, value: r.goalMet ? `met — achieved ${percentTwoForDisplay(r.achievedIrr ?? 0)}` : `not met — achieved ${percentTwoForDisplay(r.achievedIrr ?? 0)}`, kind: "percent", rawValue: r.achievedIrr });
+          }
+        }
+      }
+      if (sceBalloonsRaw.length > 0) {
+        const balloonPayments = sceBalloonsRaw.map((b) => {
+          const balloonValue = entryToValue(b, unit);
+          const r = tryCompute({ repayment: { ...inputs.repayment, termYears: inputs.repayment.termYears, balloon: balloonValue } });
+          return { label: `Balloon ${money(balloonValue)}`, payment: r === null ? null : r.paymentAmount };
+        });
+        const okBalloons = balloonPayments.filter((x): x is { label: string; payment: number } => x.payment !== null);
+        if (okBalloons.length > 0) {
+          const minB = Math.min(...okBalloons.map((x) => x.payment));
+          const maxB = Math.max(...okBalloons.map((x) => x.payment));
+          sceBody.push({ label: "Payment range across the set balloons", value: `${money(minB)} – ${money(maxB)}`, kind: "money", rawValue: null, disclosure: `at the ${inputs.repayment.termYears}-year term` });
+          if (chartData.length === 0) {
+            chartData = okBalloons.map((x) => ({ label: x.label, value: x.payment }));
+          }
+        } else {
+          sceDisclosures.push("The set balloon values were refused by the engine; see the Scenarios tab.");
+        }
+      }
+    }
+    if (chartData.length === 0 && sc !== null && sc.base.paymentAmount !== null) {
+      chartData = [
+        { label: "Base", value: sc.base.paymentAmount },
+        ...(sc.optimistic.paymentAmount !== null ? [{ label: "Optimistic", value: sc.optimistic.paymentAmount }] : []),
+        ...(sc.pessimistic.paymentAmount !== null ? [{ label: "Pessimistic", value: sc.pessimistic.paymentAmount }] : []),
+      ];
+    }
+    slides.push({
+      name: "scenarios",
+      title: "How the deal moves as the set scenario values change",
+      body: sceBody,
+      disclosures: sceDisclosures,
+      ...(chartData.length > 0 ? { chart: { kind: "rows", data: chartData } } : {}),
+    });
+  }
+
+  const kickerNumbers = ["01", "02", "03", "04", "05", "06"];
   let kickerIdx = 0;
   for (const sl of slides) {
     if (sl.name !== "title") {
@@ -288,7 +394,10 @@ export function deckSlides(
       kickerIdx++;
     }
   }
-  return { slides, glosses: TERM_GLOSSES, currency, unit };
+  const provenance: string[] = anyScenarioSet
+    ? ["Scenarios summary: present, fed by the user-set Scenarios tab values."]
+    : ["Scenarios summary: no scenarios set."];
+  return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
 }
 
 export type { TariffRow };

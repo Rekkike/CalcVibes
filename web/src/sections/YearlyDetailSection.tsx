@@ -50,6 +50,56 @@ export function YearlyDetailSection(props: { inputs: ModelInputs; result: ModelR
       <h2>Yearly detail</h2>
       <GridTable title="Cost grid" rows={result.costGrid} years={years} startYear={startYear} currency={currency} testId="cost-grid" entryUnit={entryUnit} />
       <GridTable title="Collections grid" rows={result.collectionsGrid} years={years} startYear={startYear} currency={currency} testId="collections-grid" entryUnit={entryUnit} />
+      {result.bookView !== undefined && (
+        <div data-testid="book-grid" className="yearly-grid">
+          <h3>Book and depreciation schedule</h3>
+          <p className="muted" data-testid="book-view-disclosure">The book view records the depreciation write-down; it never enters the cash flows.</p>
+          <div className="grid-scroll">
+            <table data-testid="book-per-line">
+              <thead>
+                <tr>
+                  <th className="grid-name-col sticky-col">Line</th>
+                  <th className="table-value-cell">Year</th>
+                  <th className="table-value-cell">Beginning</th>
+                  <th className="table-value-cell">Charge</th>
+                  <th className="table-value-cell">Ending</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.bookView.lines.map((l) => l.years.map((y) => (
+                  <tr key={`${l.id}-${y.year}`} data-book-line={l.id} data-book-year={y.year}>
+                    <td className="grid-name-col sticky-col">{l.name}</td>
+                    <td className="table-value-cell">{yearHeader(y.year, startYear)}</td>
+                    <td className="table-value-cell">{moneyForDisplay(y.beginning, currency, entryUnit)}</td>
+                    <td className="table-value-cell">{moneyForDisplay(y.charge, currency, entryUnit)}</td>
+                    <td className="table-value-cell">{moneyForDisplay(y.ending, currency, entryUnit)}</td>
+                  </tr>
+                )))}
+              </tbody>
+            </table>
+            <table data-testid="book-combined">
+              <thead>
+                <tr>
+                  <th className="grid-name-col sticky-col">Combined</th>
+                  <th className="table-value-cell">Beginning</th>
+                  <th className="table-value-cell">Charge</th>
+                  <th className="table-value-cell">Ending</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.bookView.combined.map((row) => (
+                  <tr key={row.year} data-book-year={row.year}>
+                    <td className="grid-name-col sticky-col">{yearHeader(row.year, startYear)}</td>
+                    <td className="table-value-cell">{moneyForDisplay(row.beginning, currency, entryUnit)}</td>
+                    <td className="table-value-cell">{moneyForDisplay(row.charge, currency, entryUnit)}</td>
+                    <td className="table-value-cell">{moneyForDisplay(row.ending, currency, entryUnit)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

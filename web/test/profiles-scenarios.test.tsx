@@ -57,70 +57,75 @@ describe("Profile editor (Task B UI)", () => {
 });
 
 describe("SCE battery (Task D)", () => {
-  it("SCE-BYTE: with the three settings absent, the tables render today's values", () => {
+  it("SCE-EMPTY (re-anchored per AXES-1): the axes are empty by default and the tables render the honest empty state", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    const tt = document.querySelector('[data-testid="term-target-table"]') as HTMLElement;
-    expect(tt.textContent).toContain("8%");
-    expect(tt.textContent).toContain("12%");
-    expect(tt.textContent).toContain("16%");
-    expect(tt.textContent).toContain("525633.48");
+    expect(document.querySelectorAll('[data-field="scenario-target"]').length).toBe(0);
+    expect(document.querySelectorAll('[data-field="scenario-term"]').length).toBe(0);
+    expect(document.querySelectorAll('[data-field="scenario-balloon"]').length).toBe(0);
+    expect(document.querySelector('[data-testid="scenarios-empty-state"]')?.textContent).toContain("Enter values to compute the tables.");
+    expect(document.querySelector('[data-testid="term-target-table"]')).toBeNull();
+    expect(document.querySelector('[data-testid="balloon-term-table"]')).toBeNull();
   });
-
-  it("SCE-LIST: scenarioTargets [3, 5, 7] renders the pinned rows", () => {
+  it("SCE-LIST: entering targets [3, 5, 7] and terms [5, 7, 9] renders the pinned rows", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    const targetInputs = document.querySelectorAll('[data-field="scenario-target"]') as NodeListOf<HTMLInputElement>;
-    targetInputs.forEach((input, i) => {
-      fireEvent.change(input, { target: { value: ["3", "5", "7"][i] } });
-    });
+    for (const v of ["3", "5", "7"]) {
+      fireEvent.click(document.querySelector('[data-action="scenario-add-target"]') as HTMLElement);
+      const inputs = document.querySelectorAll('[data-field="scenario-target"]');
+      fireEvent.change(inputs[inputs.length - 1], { target: { value: v } });
+    }
+    for (const v of ["5", "7", "9"]) {
+      fireEvent.click(document.querySelector('[data-action="scenario-add-term"]') as HTMLElement);
+      const inputs = document.querySelectorAll('[data-field="scenario-term"]');
+      fireEvent.change(inputs[inputs.length - 1], { target: { value: v } });
+    }
     const tt = document.querySelector('[data-testid="term-target-table"]') as HTMLElement;
     const rows = Array.from(tt.querySelectorAll("tbody tr"));
     const rowText = (r: HTMLElement) => Array.from(r.querySelectorAll("td")).map((td) => td.textContent).join("|");
     expect(rows.length).toBe(3);
     expect(rowText(rows[0] as HTMLElement)).toContain("3%");
-    expect(rowText(rows[0] as HTMLElement)).toContain("439505.08");
-    expect(rowText(rows[0] as HTMLElement)).toContain("323067.92");
-    expect(rowText(rows[0] as HTMLElement)).toContain("258512.25");
-    expect(rowText(rows[1] as HTMLElement)).toContain("472774.35");
-    expect(rowText(rows[2] as HTMLElement)).toContain("507615.63");
+    expect(rowText(rows[0] as HTMLElement)).toContain("439,51 tkr");
+    expect(rowText(rows[1] as HTMLElement)).toContain("472,77 tkr");
+    expect(rowText(rows[2] as HTMLElement)).toContain("507,62 tkr");
   });
-
   it("SCE-ZERO: the 0 percent row renders the nominal identity", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    const targetInputs = document.querySelectorAll('[data-field="scenario-target"]') as NodeListOf<HTMLInputElement>;
-    fireEvent.change(targetInputs[0], { target: { value: "0" } });
-    fireEvent.change(targetInputs[1], { target: { value: "3" } });
-    fireEvent.change(targetInputs[2], { target: { value: "5" } });
+    for (const v of ["0", "3", "5"]) {
+      fireEvent.click(document.querySelector('[data-action="scenario-add-target"]') as HTMLElement);
+      const inputs = document.querySelectorAll('[data-field="scenario-target"]');
+      fireEvent.change(inputs[inputs.length - 1], { target: { value: v } });
+    }
+    for (const v of ["5", "7", "9"]) {
+      fireEvent.click(document.querySelector('[data-action="scenario-add-term"]') as HTMLElement);
+      const inputs = document.querySelectorAll('[data-field="scenario-term"]');
+      fireEvent.change(inputs[inputs.length - 1], { target: { value: v } });
+    }
     const tt = document.querySelector('[data-testid="term-target-table"]') as HTMLElement;
     const firstRow = tt.querySelector("tbody tr") as HTMLElement;
     expect(firstRow.textContent).toContain("0%");
-    expect(firstRow.textContent).toContain("392493");
-    expect(firstRow.textContent).toContain("280352.14");
-    expect(firstRow.textContent).toContain("218051.67");
+    expect(firstRow.textContent).toContain("392,49 tkr");
   });
-
   it("SCE-VALID: each invalid construct surfaces the named error", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    // negative target
+    fireEvent.click(document.querySelector('[data-action="scenario-add-target"]') as HTMLElement);
     const targetInputs = document.querySelectorAll('[data-field="scenario-target"]') as NodeListOf<HTMLInputElement>;
     fireEvent.change(targetInputs[0], { target: { value: "-5" } });
     let summary = document.querySelector('[data-testid="issues-summary"]');
     expect(summary && summary.textContent).toContain("must not be negative");
     fireEvent.change(targetInputs[0], { target: { value: "8" } });
-    // non-positive term
+    fireEvent.click(document.querySelector('[data-action="scenario-add-term"]') as HTMLElement);
     const termInputs = document.querySelectorAll('[data-field="scenario-term"]') as NodeListOf<HTMLInputElement>;
     fireEvent.change(termInputs[0], { target: { value: "0" } });
     summary = document.querySelector('[data-testid="issues-summary"]');
     expect(summary && summary.textContent).toContain("must be positive");
     fireEvent.change(termInputs[0], { target: { value: "5" } });
-    // empty list
     const termRows = document.querySelectorAll('[data-action="scenario-remove-term"]');
     for (const btn of Array.from(termRows)) fireEvent.click(btn as HTMLElement);
     for (const btn of Array.from(document.querySelectorAll('[data-action="scenario-remove-term"]'))) fireEvent.click(btn as HTMLElement);

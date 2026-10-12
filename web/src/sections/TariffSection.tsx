@@ -1,5 +1,7 @@
 import type { ModelInputs, ModelResult, TariffConfig, TariffRow } from "../../../core/src/types.js";
-import { computeModel, roundForDisplay } from "../engine.js";
+import { computeModel, moneyForDisplay } from "../engine.js";
+import type { CurrencyCode, EntryUnit } from "../engine.js";
+import { MoneyEditor } from "../MoneyEditor.js";
 import { useMemo } from "react";
 import { yearHeader } from "../state.js";
 
@@ -8,8 +10,11 @@ export function TariffSection(props: {
   result: ModelResult | null;
   setTariff: (t: TariffConfig) => void;
   startYear: number | null;
+  entryUnit: EntryUnit;
 }) {
-  const { inputs, result, setTariff, startYear } = props;
+  const { inputs, result, setTariff, startYear, entryUnit } = props;
+  const currency = (inputs.currency as CurrencyCode) ?? "SEK";
+  const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
   const t = inputs.tariff ?? { mode: "off" as const, escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null };
   const spanYears = useMemo(() => {
     if (result) return result.tariffYears.map((y) => y.year);
@@ -45,7 +50,7 @@ export function TariffSection(props: {
       )}
       {t.mode === "fixed" && (
         <label>Fixed annual amount{" "}
-          <input data-field="tariffFixed" type="number" value={t.fixedAnnualAmount ?? 0} onChange={(e) => setTariff({ ...t, fixedAnnualAmount: parseFloat(e.target.value) || 0 })} />
+          <MoneyEditor dataField="tariffFixed" value={t.fixedAnnualAmount ?? 0} entryUnit={entryUnit} onChange={(v) => setTariff({ ...t, fixedAnnualAmount: v })} />
         </label>
       )}
       {t.mode !== "off" && (
@@ -86,13 +91,11 @@ export function TariffSection(props: {
           <h3>Manual prices (one per grid column)</h3>
           {gridYears.map((y, k) => (
             <label key={y}>Price for collection year {y}{" "}
-              <input data-field="manualPrice" data-column={k} type="number"
-                value={t.manualPrices?.[k] ?? 0}
-                onChange={(e) => {
-                  const prices = (t.manualPrices ?? gridYears.map(() => 0)).slice();
-                  prices[k] = parseFloat(e.target.value) || 0;
-                  setTariff({ ...t, manualPrices: prices });
-                }} />
+              <MoneyEditor dataField="manualPrice" dataColumn={k} value={t.manualPrices?.[k] ?? 0} entryUnit={entryUnit} onChange={(v) => {
+                const prices = (t.manualPrices ?? gridYears.map(() => 0)).slice();
+                prices[k] = v;
+                setTariff({ ...t, manualPrices: prices });
+              }} />
             </label>
           ))}
         </>
@@ -108,10 +111,10 @@ export function TariffSection(props: {
               {result.tariffYears.map((y, k) => (
                 <tr key={y.year} data-year={y.year}>
                   <td>{yearHeader(y.year, startYear)}</td>
-                  <td>{y.required === null ? "—" : roundForDisplay(y.required)}</td>
-                  <td>{roundForDisplay(y.weightedVolume)}</td>
-                  <td>{y.unitPrice === null ? "—" : roundForDisplay(y.unitPrice, 4)}</td>
-                  <td>{roundForDisplay(y.revenue)}</td>
+                  <td>{y.required === null ? "—" : money(y.required)}</td>
+                  <td>{money(y.weightedVolume)}</td>
+                  <td>{y.unitPrice === null ? "—" : money(y.unitPrice)}</td>
+                  <td>{money(y.revenue)}</td>
                 </tr>
               ))}
             </tbody>
@@ -121,7 +124,7 @@ export function TariffSection(props: {
               <h4>Per-lift charges (engine-emitted)</h4>
               <ul data-testid="per-lift-charges">
                 {t.rows.map((row) => (
-                  <li key={row.id} data-row-charge={row.id}>{row.label}: {roundForDisplay((result.tariffYears[0].perRowCharges as Record<string, number>)[row.id], 4)}</li>
+                  <li key={row.id} data-row-charge={row.id}>{row.label}: {money((result.tariffYears[0].perRowCharges as Record<string, number>)[row.id])}</li>
                 ))}
               </ul>
             </>

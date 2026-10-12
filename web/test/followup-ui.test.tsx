@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
+import { moneyForDisplay } from "../src/engine.js";
 import { demoProject } from "../src/state.js";
 import { computeModel } from "../src/engine.js";
 import type { TariffRow } from "../../core/src/types.js";
@@ -36,8 +37,8 @@ describe("Task C-3: per-lift charges render engine data verbatim", () => {
     render(<App />);
     loadRows("stable");
     const li = document.querySelector('[data-row-charge="r2"]');
-    expect(li && li.textContent).toContain("2408.4786");
-    expect(li && li.textContent).toContain(String(Math.round(expected * 10000) / 10000));
+    expect(li && li.textContent).toContain("2,41 tkr");
+    expect(li && li.textContent).toContain(moneyForDisplay(expected, "SEK", "thousands"));
   });
 });
 

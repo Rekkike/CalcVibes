@@ -12,7 +12,7 @@ describe("Task R4: VERDICT-NO / TOGGLE-POSITION / NO-DEAD-RULE", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("tariff"));
     fireEvent.change(document.querySelector('[data-field="tariffMode"]') as HTMLElement, { target: { value: "fixed" } });
-    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100000" } });
+    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100" } });
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const verdict = document.querySelector('[data-testid="deck-verdict"]');
@@ -159,7 +159,7 @@ describe("Task R1: TILE-GRID / TONE-RENDER / STAGE-CHART-LEGIBILITY / RESPONSIVE
     fireEvent.click(byAction("exit-presentation"));
     fireEvent.click(byNav("tariff"));
     fireEvent.change(document.querySelector('[data-field="tariffMode"]') as HTMLElement, { target: { value: "fixed" } });
-    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100000" } });
+    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100" } });
     fireEvent.click(byAction("present"));
     const badTile = document.querySelector('[data-tile="Achieved IRR"]') as HTMLElement;
     expect(badTile.className).toContain("tone-bad");

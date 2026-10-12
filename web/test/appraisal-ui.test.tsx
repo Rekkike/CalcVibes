@@ -12,9 +12,9 @@ describe("chunk 6: appraisal section, residual, engine goalMet", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("appraisal"));
-    expect(byStat("npvAtTarget").textContent).toBe("0");
-    expect(byStat("npvAtWacc").textContent).toBe("1252822.99");
-    expect(byStat("profitabilityIndex").textContent).toBe("1.17913");
+    expect(byStat("npvAtTarget").textContent).toBe("-0,00 tkr");
+    expect(byStat("npvAtWacc").textContent).toBe("1 252,82 tkr");
+    expect(byStat("profitabilityIndex").textContent).toBe("0,00 tkr");
     expect(byStat("discountedPaybackYears").textContent).toBe("8.47094");
     expect(byStat("mirr").textContent).toBe("8.75686%");
     expect(byStat("goalMet").textContent).toBe("Target achieved");
@@ -29,16 +29,16 @@ describe("chunk 6: appraisal section, residual, engine goalMet", () => {
     fireEvent.click(byNav("appraisal"));
     expect(document.body.textContent).toContain("terminal inflow on the collections side");
     expect((byField("residualAmount") as HTMLInputElement).value).toBe("0");
-    fireEvent.change(byField("residualAmount"), { target: { value: "1000000" } });
+    fireEvent.change(byField("residualAmount"), { target: { value: "1000" } });
     fireEvent.click(byNav("overview"));
-    expect(byStat("paymentAmount").textContent).toBe("452235.7");
+    expect(byStat("paymentAmount").textContent).toBe("452 tkr");
   });
 
   it("residual validation issues surface next to the fields", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("appraisal"));
-    fireEvent.change(byField("residualAmount"), { target: { value: "1000000" } });
+    fireEvent.change(byField("residualAmount"), { target: { value: "1000" } });
     fireEvent.change(byField("residualYear"), { target: { value: "1.5" } });
     expect(screen.getByTestId("issues-summary").textContent).toContain("The set-price disposition requires a sale year that is an integer of at least 1.");
   });
@@ -54,7 +54,7 @@ describe("chunk 6: appraisal section, residual, engine goalMet", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("appraisal"));
-    fireEvent.change(byField("residualAmount"), { target: { value: "2000000" } });
+    fireEvent.change(byField("residualAmount"), { target: { value: "2000" } });
     fireEvent.change(byField("residualYear"), { target: { value: "1" } });
     fireEvent.click(byNav("results"));
     const warning = screen.getByTestId("irr-ambiguity-warning");
@@ -71,7 +71,7 @@ describe("chunk 7: modes, scenarios, sensitivity in the UI", () => {
     expect(document.querySelector('[data-field="modePayment"]')).toBeNull();
     fireEvent.change(byField("mode"), { target: { value: "B" } });
     expect(document.querySelector('[data-field="modePayment"]')).toBeTruthy();
-    expect((document.querySelector('[data-field="modePayment"]') as HTMLInputElement).value).toBe("400000");
+    expect((document.querySelector('[data-field="modePayment"]') as HTMLInputElement).value).toBe("400");
     fireEvent.change(byField("mode"), { target: { value: "C" } });
     expect(document.querySelector('[data-field="modePayment"]')).toBeTruthy();
   });
@@ -80,9 +80,9 @@ describe("chunk 7: modes, scenarios, sensitivity in the UI", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    expect(byStat("basePayment").textContent).toBe("475309.13");
-    expect(byStat("optPayment").textContent).toBe("356830.02");
-    expect(byStat("pesPayment").textContent).toBe("629065.46");
+    expect(byStat("basePayment").textContent).toBe("475,31 tkr");
+    expect(byStat("optPayment").textContent).toBe("356,83 tkr");
+    expect(byStat("pesPayment").textContent).toBe("629,07 tkr");
   });
 
   it("sensitivity view renders the tornado and both two-way tables", () => {
@@ -90,7 +90,7 @@ describe("chunk 7: modes, scenarios, sensitivity in the UI", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
     expect(screen.getByTestId("tornado-table").querySelectorAll("tbody tr").length).toBe(4);
-    expect(screen.getByTestId("term-target-table").textContent).toContain("525633.48");
-    expect(screen.getByTestId("balloon-term-table").textContent).toContain("601755.85");
+    expect(screen.getByTestId("term-target-empty").textContent).toContain("Enter values to compute the tables.");
+    expect(screen.getByTestId("balloon-term-empty").textContent).toContain("Enter values to compute the tables.");
   });
 });

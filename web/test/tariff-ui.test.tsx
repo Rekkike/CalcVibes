@@ -43,8 +43,8 @@ describe("chunk 6: tariff section and results", () => {
     loadStable();
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
     expect(dec).toBeTruthy();
-    expect(dec && dec.textContent).toContain("842967.5");
-    expect(dec && dec.textContent).toContain("1204.2393");
+    expect(dec && dec.textContent).toContain("842,97 tkr");
+    expect(dec && dec.textContent).toContain("1,20 tkr");
     expect(document.querySelector('[data-testid="payment-na"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="payment-na"]')!.textContent).toContain("not applicable");
   });
@@ -53,8 +53,8 @@ describe("chunk 6: tariff section and results", () => {
     render(<App />);
     loadStable();
     const charges = document.querySelector('[data-testid="per-lift-charges"]');
-    expect(charges && charges.textContent).toContain("Loaded 20-ft: 1204.2393");
-    expect(charges && charges.textContent).toContain("Loaded 40-ft: 2408.4786");
+    expect(charges && charges.textContent).toContain("Loaded 20-ft: 1,20 tkr");
+    expect(charges && charges.textContent).toContain("Loaded 40-ft: 2,41 tkr");
   });
 
   it("decompose mode keeps the solved payment and shows the required per year", () => {
@@ -62,8 +62,8 @@ describe("chunk 6: tariff section and results", () => {
     loadStable();
     fireEvent.change(byField("tariffMode"), { target: { value: "decompose" } });
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
-    expect(dec && dec.textContent).toContain("475309.13");
-    expect(dec && dec.textContent).toContain("679.013");
+    expect(dec && dec.textContent).toContain("475,31 tkr");
+    expect(dec && dec.textContent).toContain("0,68 tkr");
     expect(document.querySelector('[data-testid="payment-na"]')).toBeNull();
   });
 

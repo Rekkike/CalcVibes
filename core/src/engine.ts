@@ -188,7 +188,6 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       : "none");
   const residualMode = residualPosture === "book-value" ? "calculated" : "amount";
   const residualSetAmount = residualPosture === "none" ? 0 : appraisal.residual.amount;
-  const horizonYears = Math.ceil(totalMonths / 12);
   const lineTotalsMap = new Map<string, number>();
   for (const c of inp.costs) {
     const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
@@ -212,6 +211,22 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     }
     lineTotalsMap.set(c.id, total);
   }
+  if (residualMode === "calculated" && residualYear * 12 > totalMonths) {
+    const provisional = computeBookSchedule(
+      inp.costs,
+      contracts.flatMap((c) => c.reinvestments.map((ri) => ({ contractId: c.id, ri }))),
+      inp.depreciationDefault ?? null,
+      residualYear,
+      lineTotalsMap,
+    );
+    if (provisional.remainingBookValueAt(residualYear) > 0) {
+      horizonConstituents.push({ label: "book-value residual horizon extension", month: residualYear * 12 });
+    }
+  }
+  for (const hc of horizonConstituents) {
+    if (hc.month > totalMonths) totalMonths = hc.month;
+  }
+  const horizonYears = Math.ceil(totalMonths / 12);
   const bookSchedule = computeBookSchedule(
     inp.costs,
     contracts.flatMap((c) => c.reinvestments.map((ri) => ({ contractId: c.id, ri }))),
@@ -884,8 +899,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     headlineSource: headlineSource,
     residualDisclosure: residualPosture === "set-price"
       ? `Assumes sale at year ${residualYear} for ${residualSetAmount}`
-      : residualPosture === "book-value"
-        ? `Assumes sale at remaining book value at year ${residualYear} for ${bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears))}`
+      : residualPosture === "book-value" && residualAmountUsed > 0
+        ? `Assumes sale at remaining book value at year ${residualYear} for ${residualAmountUsed}`
         : null,
     netGain: totalCollected - totalCost, achievedIrr: achieved,
     paybackYears: paybackMonths === null ? null : paybackMonths / 12,

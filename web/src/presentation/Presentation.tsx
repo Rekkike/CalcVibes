@@ -6,11 +6,11 @@ import { yearHeader } from "../state.js";
 import { CompositionRows, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
-export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit }) {
-  const { inputs, result, onExit, startYear = null, entryUnit = "ones" } = props;
+export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null }) {
+  const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null } = props;
   const [slide, setSlide] = useState(0);
-  const totalSlides = 6;
-  const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit }) : null;
+  const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons }) : null;
+  const totalSlides = deck?.slides.length ?? 6;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
 
   const dominantLine = result !== null && result.lineTotals.length > 0
@@ -134,7 +134,16 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} />
               </div>
             )}
-            
+            {sl.name === "scenarios" && sl.chart !== undefined && sl.chart.data.length > 0 && (
+              <div data-testid="deck-chart-slot" data-slide-chart="scenarios">
+                <CompositionRows
+                  lineTotals={sl.chart.data.map((d, j) => ({ id: `sce-${j}`, name: d.label, total: d.value }))}
+                  valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
+                  kicker="Payments across the set scenario values"
+                />
+              </div>
+            )}
+
             <footer className="deck-slide-footer">
               <span>slide {i + 1} of {deck.slides.length}</span>
               <span>Generated from the live model — {inputs.projectName || "Untitled project"}</span>
@@ -142,6 +151,13 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
           </section>
         ))}
       </main>
+      {deck?.provenance !== undefined && (
+        <div data-testid="deck-provenance" className="deck-provenance">
+          {deck.provenance.map((p, j) => (
+            <p key={"prov-" + j} className="deck-disclosure">{p}</p>
+          ))}
+        </div>
+      )}
       <footer className="stage-nav">
         <button data-action="prev-slide" className="stage-nav-button" onClick={() => setSlide((s) => Math.max(s - 1, 0))}>← Previous</button>
         <span className="stage-dots">{[...Array(totalSlides)].map((_, i) => <span key={i} data-dot={i} className={i === slide ? "stage-dot stage-dot-active" : "stage-dot"}>·</span>)}</span>

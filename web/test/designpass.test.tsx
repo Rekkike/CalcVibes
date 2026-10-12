@@ -125,7 +125,7 @@ describe("Task B (continued): the not-met answer branch", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("tariff"));
     fireEvent.change(document.querySelector('[data-field="tariffMode"]') as HTMLElement, { target: { value: "fixed" } });
-    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100000" } });
+    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100" } });
     fireEvent.click(byNav("results"));
     const band = document.querySelector('[data-testid="answer-band"]') as HTMLElement;
     expect(band.className).toContain("tone-bad");
@@ -243,7 +243,7 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     fireEvent.click(byAction("exit-presentation"));
     fireEvent.click(byNav("tariff"));
     fireEvent.change(document.querySelector('[data-field="tariffMode"]') as HTMLElement, { target: { value: "fixed" } });
-    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100000" } });
+    fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100" } });
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const npvTileBad = document.querySelector('[data-tile="NPV at WACC"]') as HTMLElement;

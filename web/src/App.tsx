@@ -17,6 +17,7 @@ import { TariffSection } from "./sections/TariffSection.js";
 import { FinancingSection } from "./sections/FinancingSection.js";
 import { YearlyDetailSection } from "./sections/YearlyDetailSection.js";
 import { Presentation } from "./presentation/Presentation.js";
+import { RootErrorBoundary } from "./ErrorBoundary.js";
 
 type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "financing" | "appraisal" | "results" | "scenarios" | "detail";
 
@@ -116,7 +117,7 @@ export function App() {
     if (result === null) return;
     const { buildDeckPdf } = await import("./pdf.js");
     const { deckSlides } = await import("./deck.js");
-    const model = deckSlides(inputs, result, { startYear, entryUnit });
+    const model = deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons });
     const doc = buildDeckPdf(model, inputs.projectName || "project");
     doc.save(`${inputs.projectName || "project"}.pdf`);
   };
@@ -141,7 +142,7 @@ export function App() {
   }, [issues]);
 
   if (presOpen) {
-    return <Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} />;
+    return <RootErrorBoundary><Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} /></RootErrorBoundary>;
   }
 
   return (
@@ -214,8 +215,9 @@ export function App() {
         </section>
       )}
       <main>
+        <RootErrorBoundary>
         {view === "overview" && (
-          <OverviewSection inputs={inputs} result={result} startYear={startYear} setStartYear={(v) => {
+          <OverviewSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setStartYear={(v) => {
             setStartYear(v);
             if (v !== null && (v < 1900 || v > 2200)) {
               setStartYearError("Project start year must be between 1900 and 2200.");
@@ -234,22 +236,24 @@ export function App() {
             updateCost={updateCost}
             result={result}
             setDepreciationDefault={setDepreciationDefault}
+            entryUnit={entryUnit}
+            startYear={startYear}
           />
         )}
         {view === "repayment" && (
-          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} setContracts={setContracts} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} startYear={startYear} />
+          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} setContracts={setContracts} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} startYear={startYear} entryUnit={entryUnit} />
         )}
         {view === "operating" && (
-          <OperatingSection inputs={inputs} result={result} setOperating={setOperating} setMaintenance={setMaintenance} />
+          <OperatingSection inputs={inputs} result={result} setOperating={setOperating} setMaintenance={setMaintenance} entryUnit={entryUnit} />
         )}
         {view === "tariff" && (
-          <TariffSection inputs={inputs} result={result} setTariff={setTariff} startYear={startYear} />
+          <TariffSection inputs={inputs} result={result} setTariff={setTariff} startYear={startYear} entryUnit={entryUnit} />
         )}
         {view === "financing" && (
           <FinancingSection inputs={inputs} setFinancing={setFinancing} />
         )}
         {view === "appraisal" && (
-          <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} />
+          <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} entryUnit={entryUnit} />
         )}
         {view === "results" && result !== null && mode === "A" && <ResultsSection result={result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />}
         {view === "results" && modeResult !== null && mode === "B" && (
@@ -274,8 +278,9 @@ export function App() {
         {view === "detail" && result !== null && (
           <YearlyDetailSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} />
         )}
-        {view === "scenarios" && <ScenariosSection inputs={inputs} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} onScenarioTargetsChange={setScenarioTargets} onScenarioTermsChange={setScenarioTerms} onScenarioBalloonsChange={setScenarioBalloons} />}
+        {view === "scenarios" && <ScenariosSection inputs={inputs} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} onScenarioTargetsChange={setScenarioTargets} onScenarioTermsChange={setScenarioTerms} onScenarioBalloonsChange={setScenarioBalloons} entryUnit={entryUnit} currency={inputs.currency} />}
         {view === "results" && result === null && <p>Resolve the input issues to see results.</p>}
+        </RootErrorBoundary>
       </main>
       <footer>CalcVibes — every figure is computed by the core engine; the UI performs no financial arithmetic.</footer>
     </div>

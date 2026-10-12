@@ -56,8 +56,8 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     fireEvent.click(byNav("overview"));
     const cards = document.querySelector('[data-testid="metric-cards"]') as HTMLElement;
     expect(cards).toBeTruthy();
-    expect(cards.querySelector('[data-metric="totalCost"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.totalCost, "SEK"));
-    expect(cards.querySelector('[data-metric="requiredPayment"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.paymentAmount as number, "SEK"));
+    expect(cards.querySelector('[data-metric="totalCost"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "thousands"));
+    expect(cards.querySelector('[data-metric="requiredPayment"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.paymentAmount as number, "SEK", "thousands"));
     expect(cards.querySelector('[data-metric="achievedIrr"] .metric-value')?.textContent).toBe(percentForDisplay(result.achievedIrr, 2));
     expect(cards.querySelector('[data-metric="payback"] .metric-value')?.textContent).toBe(deckYearsForDisplay(result.paybackYears as number));
     expect(cards.querySelector(".metric-label")?.textContent).toBeTruthy();
@@ -153,10 +153,10 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6R", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6R");
+    expect(VERSION).toBe("v0.6.2");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6R");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.2");
   });
 
   it("CHART-TRACE and ACTION-TITLES stand: the signed chart values equal the engine yearly rows; the deck titles carry no figures on the coverage slide", () => {

@@ -12,8 +12,11 @@ export function OverviewSection(props: {
   setProjectName: (v: string) => void;
   setTargetIrr: (v: string) => void;
   setProjectLength: (v: number | null) => void;
+  entryUnit?: import("../engine.js").EntryUnit;
 }) {
-  const { inputs, result, startYear, setStartYear, startYearError, setProjectName, setTargetIrr, setProjectLength } = props;
+  const { inputs, result, startYear, setStartYear, startYearError, setProjectName, setTargetIrr, setProjectLength, entryUnit = "ones" } = props;
+  const currency = (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK";
+  const money = (v: number) => deckMoneyForDisplay(v, currency, entryUnit);
   return (
     <section data-testid="overview">
       <h2>Overview</h2>
@@ -54,11 +57,11 @@ export function OverviewSection(props: {
           <div data-testid="metric-cards" className="metric-cards">
             <div className="metric-card" data-metric="totalCost">
               <span className="metric-label">Total project cost</span>
-              <span className="metric-value">{deckMoneyForDisplay(result.totalCost, (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK")}</span>
+              <span className="metric-value">{money(result.totalCost)}</span>
             </div>
             <div className="metric-card" data-metric="requiredPayment">
               <span className="metric-label">Required payment</span>
-              <span className="metric-value">{result.paymentAmount === null ? "not applicable (collection mode)" : deckMoneyForDisplay(result.paymentAmount, (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK")}</span>
+              <span className="metric-value">{result.paymentAmount === null ? "not applicable (collection mode)" : money(result.paymentAmount)}</span>
             </div>
             <div className={"metric-card " + (result.goalMet ? "tone-ok" : "tone-bad")} data-metric="achievedIrr">
               <span className="metric-label">Achieved IRR (against the {roundForDisplay(inputs.targetIrr, 2)}% goal)</span>
@@ -70,18 +73,18 @@ export function OverviewSection(props: {
             </div>
           </div>
           <div data-testid="overview-cashflow-chart">
-            <SignedCashflowChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK")} />
+            <SignedCashflowChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => money(v)} />
           </div>
         </div>
       )}
       {result !== null ? (
         <dl data-testid="headline-stats">
-          <dt>Total cost</dt><dd data-stat="totalCost">{roundForDisplay(result.totalCost)}</dd>
-          <dt>Cost NPV at target</dt><dd data-stat="costNpv">{roundForDisplay(result.costNpv)}</dd>
-          <dt>Payment per period</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : roundForDisplay(result.paymentAmount)}</dd>
+          <dt>Total cost</dt><dd data-stat="totalCost">{money(result.totalCost)}</dd>
+          <dt>Cost NPV at target</dt><dd data-stat="costNpv">{money(result.costNpv)}</dd>
+          <dt>Payment per period</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : money(result.paymentAmount)}</dd>
           <dt>Payments</dt><dd data-stat="paymentCount">{result.paymentCount}</dd>
-          <dt>Total collected</dt><dd data-stat="totalCollected">{roundForDisplay(result.totalCollected)}</dd>
-          <dt>Net gain</dt><dd data-stat="netGain">{roundForDisplay(result.netGain)}</dd>
+          <dt>Total collected</dt><dd data-stat="totalCollected">{money(result.totalCollected)}</dd>
+          <dt>Net gain</dt><dd data-stat="netGain">{money(result.netGain)}</dd>
           <dt>Payback (years)</dt>
           <dd data-stat="paybackYears">{result.paybackYears === null ? "—" : roundForDisplay(result.paybackYears, 5)}</dd>
           <dt>Achieved IRR</dt>

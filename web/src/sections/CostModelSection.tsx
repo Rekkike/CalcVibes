@@ -1,7 +1,9 @@
 import type { CostLine, ModelInputs } from "../../../core/src/types.js";
-import { CURRENCIES, spreadFill } from "../state.js";
+import { CURRENCIES, spreadFill, yearHeader } from "../state.js";
 import { CompositionRows, CompositionDonut } from "../charts.js";
-import { moneyForDisplay } from "../engine.js";
+import { moneyForDisplay, entryToValue } from "../engine.js";
+import type { CurrencyCode, EntryUnit } from "../engine.js";
+import { MoneyEditor } from "../MoneyEditor.js";
 
 
 export function CostModelSection(props: {
@@ -13,8 +15,20 @@ export function CostModelSection(props: {
   updateCost: (id: string, patch: Partial<CostLine>) => void;
   result: import("../../../core/src/types.js").ModelResult | null;
   setDepreciationDefault: (cfg: import("../../../core/src/types.js").DepreciationConfig | null) => void;
+  entryUnit: EntryUnit;
+  startYear: number | null;
 }) {
-  const { inputs, issueByLine, setCurrency, addCost, removeCost, updateCost, result, setDepreciationDefault } = props;
+  const { inputs, issueByLine, setCurrency, addCost, removeCost, updateCost, result, setDepreciationDefault, entryUnit, startYear } = props;
+  const currency = (inputs.currency as CurrencyCode) ?? "SEK";
+  const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
+  const lineTotalFor = (c: CostLine): number => result?.lineTotals.find((l) => l.id === c.id)?.total ?? 0;
+  const lastCostYearOf = (c: CostLine): number => {
+    if (c.category === "capex") {
+      const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+      return overrides ? Math.max(...Object.keys(overrides).map(Number)) : c.startYear;
+    }
+    return c.startYear + Math.max(1, c.durationYears) - 1;
+  };
   return (
     <section data-testid="costs">
       <h2>Cost model</h2>
@@ -46,7 +60,7 @@ export function CostModelSection(props: {
                   </select>
                 </td>
                 <td>
-                  <input data-field="amount" type="number" value={c.amount} disabled={c.category === "capex" && c.yearOverrides !== undefined && Object.keys(c.yearOverrides ?? {}).length > 0} onChange={(e) => updateCost(c.id, { amount: parseFloat(e.target.value) || 0 })} title={c.category === "recurring" ? "Annual amount" : "The lump amount"} />
+                  <MoneyEditor dataField="amount" value={c.amount} entryUnit={entryUnit} disabled={c.category === "capex" && c.yearOverrides !== undefined && Object.keys(c.yearOverrides ?? {}).length > 0} onChange={(v) => updateCost(c.id, { amount: v })} title={c.category === "recurring" ? "Annual amount" : "The lump amount"} />
                 </td>
                 <td>
                   <input data-field="startYear" type="number" value={c.startYear} onChange={(e) => updateCost(c.id, { startYear: parseFloat(e.target.value) || 0 })} />
@@ -72,13 +86,25 @@ export function CostModelSection(props: {
                     <option value="rate">Yearly rate</option>
                   </select>
                   {c.depreciation?.mode === "straight-line" && (
-                    <input data-field="line-depreciation-years" type="number" value={c.depreciation?.years ?? 20} onChange={(e) => updateCost(c.id, { depreciation: { mode: "straight-line", years: parseFloat(e.target.value) || 0 } })} />
+                    <input data-field="line-depreciation-years" type="number" value={c.depreciation?.years ?? 20} onChange={(e) => updateCost(c.id, { depreciation: { mode: "straight-line", years: parseFloat(e.target.value) || 0, startYear: c.depreciation?.startYear } })} />
                   )}
                   {c.depreciation?.mode === "rate" && (
-                    <input data-field="line-depreciation-rate" type="number" value={c.depreciation?.yearlyRatePct ?? 0} onChange={(e) => updateCost(c.id, { depreciation: { mode: "rate", yearlyRatePct: parseFloat(e.target.value) || 0 } })} />
+                    <input data-field="line-depreciation-rate" type="number" value={c.depreciation?.yearlyRatePct ?? 0} onChange={(e) => updateCost(c.id, { depreciation: { mode: "rate", yearlyRatePct: parseFloat(e.target.value) || 0, startYear: c.depreciation?.startYear } })} />
                   )}
+                  <label>Commissioning year (empty = {yearHeader(lastCostYearOf(c) + 1, startYear)}, the year after the costs end)
+                    <input data-field="line-depreciation-startYear" type="number" value={c.depreciation?.startYear ?? ""} onChange={(e) => {
+                      const v = e.target.value === "" ? undefined : parseFloat(e.target.value) || 0;
+                      const mode = c.depreciation?.mode ?? (inputs.depreciationDefault?.mode ?? "retained");
+                      const base = mode === "straight-line"
+                        ? { mode: "straight-line" as const, years: c.depreciation?.years ?? 20 }
+                        : mode === "rate"
+                          ? { mode: "rate" as const, yearlyRatePct: c.depreciation?.yearlyRatePct ?? 5 }
+                          : { mode: "retained" as const };
+                      updateCost(c.id, { depreciation: { ...base, startYear: v } });
+                    }} />
+                  </label>
                 </td>
-                <td data-field="line-total">—</td>
+                <td data-field="line-total" data-testid="line-total">{money(lineTotalFor(c))}</td>
                 <td>
                   <button data-action="remove-cost" onClick={() => removeCost(c.id)}>Remove</button>
                 </td>
@@ -103,9 +129,9 @@ export function CostModelSection(props: {
                               next[parseFloat(e.target.value) || 0] = amount;
                               updateCost(c.id, { yearOverrides: next });
                             }} /></td>
-                            <td><input data-field="override-amount" type="number" value={amount} onChange={(e) => {
+                            <td><MoneyEditor dataField="override-amount" value={amount} entryUnit={entryUnit} onChange={(v) => {
                               const next = { ...(c.yearOverrides ?? {}) };
-                              next[Number(y)] = parseFloat(e.target.value) || 0;
+                              next[Number(y)] = v;
                               updateCost(c.id, { yearOverrides: next });
                             }} /></td>
                             <td><button data-action="remove-override" data-year={y} onClick={() => {
@@ -128,10 +154,10 @@ export function CostModelSection(props: {
                       <label>Year count <input data-field="spread-count" type="number" defaultValue={1} /></label>
                       <button data-action="spread-fill" onClick={() => {
                         const root = document.querySelector(`[data-kind="year-editor"][data-line="${c.id}"]`) as HTMLElement;
-                        const total = parseFloat((root.querySelector('[data-field="spread-total"]') as HTMLInputElement).value) || 0;
+                        const totalEntry = parseFloat((root.querySelector('[data-field="spread-total"]') as HTMLInputElement).value) || 0;
                         const firstYear = parseFloat((root.querySelector('[data-field="spread-first"]') as HTMLInputElement).value) || 1;
                         const yearCount = parseFloat((root.querySelector('[data-field="spread-count"]') as HTMLInputElement).value) || 1;
-                        updateCost(c.id, { yearOverrides: spreadFill(total, firstYear, yearCount) });
+                        updateCost(c.id, { yearOverrides: spreadFill(entryToValue(totalEntry, entryUnit), firstYear, yearCount) });
                       }}>Spread</button>
                     </div>
                   </details>
@@ -165,12 +191,12 @@ export function CostModelSection(props: {
       <button data-action="add-cost" onClick={addCost}>Add cost line</button>
       {result !== null && (
         <div className="scroll" data-testid="composition-rows-wrap">
-          <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => moneyForDisplay(t, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK")} />
+          <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => money(t)} />
         </div>
       )}
       {result !== null && (
         <div data-testid="composition-donut-wrap">
-          <CompositionDonut lineTotals={result.lineTotals} valueFor={(t) => moneyForDisplay(t, (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK")} />
+          <CompositionDonut lineTotals={result.lineTotals} valueFor={(t) => money(t)} />
         </div>
       )}
     </section>

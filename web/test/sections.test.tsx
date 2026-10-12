@@ -27,10 +27,10 @@ describe("chunk 7: section parity and presentation", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("475309.13");
+    expect(byStat("paymentAmount").textContent).toBe("475,31 tkr");
     expect(byStat("paymentCount").textContent).toBe("28");
     expect(byStat("repaymentStartYear").textContent).toBe("3");
-    expect(byStat("totalCollected").textContent).toBe("13308655.75");
+    expect(byStat("totalCollected").textContent).toBe("13 308,66 tkr");
   });
 
   it("results section renders the yearly table, composition, metrics, and goal check", () => {
@@ -70,8 +70,8 @@ describe("chunk 7: section parity and presentation", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("475309.13");
+    expect(byStat("paymentAmount").textContent).toBe("475,31 tkr");
     fireEvent.change(byField("termYears"), { target: { value: "3" } });
-    expect(byStat("paymentAmount").textContent).toBe("903142.2");
+    expect(byStat("paymentAmount").textContent).toBe("903,14 tkr");
   });
 });

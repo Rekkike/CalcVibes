@@ -1,5 +1,7 @@
 import type { ContractParams, ModelInputs, ModelResult } from "../../../core/src/types.js";
-import { roundForDisplay } from "../engine.js";
+import { moneyForDisplay, entryToValue } from "../engine.js";
+import type { CurrencyCode, EntryUnit } from "../engine.js";
+import { MoneyEditor } from "../MoneyEditor.js";
 import { blankContract, nextContractId, spreadFill, yearHeader } from "../state.js";
 
 export function RepaymentSection(props: {
@@ -12,8 +14,11 @@ export function RepaymentSection(props: {
   modePayment: number;
   setModePayment: (p: number) => void;
   startYear?: number | null;
+  entryUnit: EntryUnit;
 }) {
-  const { inputs, result, setRepayment, setContracts, mode, setMode, modePayment, setModePayment, startYear = null } = props;
+  const { inputs, result, setRepayment, setContracts, mode, setMode, modePayment, setModePayment, startYear = null, entryUnit } = props;
+  const currency = (inputs.currency as CurrencyCode) ?? "SEK";
+  const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
   const r = inputs.repayment;
   const num = (key: keyof ModelInputs["repayment"]) => (e: { target: { value: string } }) =>
     setRepayment({ [key]: parseFloat(e.target.value) || 0 } as Partial<ModelInputs["repayment"]>);
@@ -36,7 +41,7 @@ export function RepaymentSection(props: {
         </select>
       </label>
       {mode !== "A" && (
-        <label>Payment per period <input data-field="modePayment" type="number" value={modePayment} onChange={(e) => setModePayment(parseFloat(e.target.value) || 0)} /></label>
+        <label>Payment per period <MoneyEditor dataField="modePayment" value={modePayment} entryUnit={entryUnit} onChange={setModePayment} /></label>
       )}
       <div data-testid="contracts-editor">
         <h3>Contracts (deals)</h3>
@@ -65,10 +70,10 @@ export function RepaymentSection(props: {
             </label>
             <label>Grace (years) <input data-field="contract-graceYears" type="number" value={c.graceYears} onChange={(e) => updateContract(c.id, { graceYears: parseFloat(e.target.value) || 0 })} /></label>
             <label>Indexation % per year <input data-field="contract-escalationPerYear" type="number" value={c.escalationPerYear} onChange={(e) => updateContract(c.id, { escalationPerYear: parseFloat(e.target.value) || 0 })} /></label>
-            <label>Balloon <input data-field="contract-balloon" type="number" value={c.balloon} onChange={(e) => updateContract(c.id, { balloon: parseFloat(e.target.value) || 0 })} /></label>
+            <label>Balloon <MoneyEditor dataField="contract-balloon" value={c.balloon} entryUnit={entryUnit} onChange={(v) => updateContract(c.id, { balloon: v })} /></label>
             {c.mode === "evaluated" && (
               <>
-                <label>Payment per period <input data-field="contract-evaluatedPayment" type="number" value={c.evaluatedPayment ?? 0} onChange={(e) => updateContract(c.id, { evaluatedPayment: parseFloat(e.target.value) || 0 })} /></label>
+                <label>Payment per period <MoneyEditor dataField="contract-evaluatedPayment" value={c.evaluatedPayment ?? 0} entryUnit={entryUnit} onChange={(v) => updateContract(c.id, { evaluatedPayment: v })} /></label>
                 <details data-testid="contract-profile-editor">
                   <summary>Per-year collections profile (optional)</summary>
                   <table data-testid="contract-profile-rows">
@@ -82,9 +87,9 @@ export function RepaymentSection(props: {
                             next[parseFloat(e.target.value) || 0] = amount;
                             updateContract(c.id, { evaluatedProfile: next });
                           }} /></td>
-                          <td><input data-field="profile-amount" type="number" value={amount} onChange={(e) => {
+                          <td><MoneyEditor dataField="profile-amount" value={amount} entryUnit={entryUnit} onChange={(v) => {
                             const next = { ...(c.evaluatedProfile ?? {}) };
-                            next[Number(y)] = parseFloat(e.target.value) || 0;
+                            next[Number(y)] = v;
                             updateContract(c.id, { evaluatedProfile: next });
                           }} /></td>
                           <td><button data-action="remove-profile-year" data-year={y} onClick={() => {
@@ -112,7 +117,7 @@ export function RepaymentSection(props: {
                   {(c.reinvestments ?? []).map((ri, idx) => (
                     <tr key={idx} data-reinvestment-year={ri.year}>
                       <td><input data-field="reinvestment-year" type="number" value={ri.year} onChange={(e) => updateReinvestment(c, idx, { year: parseFloat(e.target.value) || 0 })} /></td>
-                      <td><input data-field="reinvestment-amount" type="number" value={ri.amount} onChange={(e) => updateReinvestment(c, idx, { amount: parseFloat(e.target.value) || 0 })} /></td>
+                      <td><MoneyEditor dataField="reinvestment-amount" value={ri.amount} entryUnit={entryUnit} onChange={(v) => updateReinvestment(c, idx, { amount: v })} /></td>
                       <td><button data-action="remove-reinvestment" onClick={() => updateContract(c.id, { reinvestments: (c.reinvestments ?? []).filter((_, j) => j !== idx) })}>Remove</button></td>
                     </tr>
                   ))}
@@ -131,10 +136,27 @@ export function RepaymentSection(props: {
       {!explicit && (
         <>
           <p data-testid="legacy-contract-note" className="muted">This project runs one payment stream (the repayment configuration below maps to one solved contract). Add a contract to model multiple deals.</p>
-          <label>First collection year (override; blank means derived){" "}
-            <input data-field="firstCollectionYear" type="number" value={inputs.repayment.firstCollectionYear ?? ""} onChange={(e) =>
-              setRepayment({ firstCollectionYear: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })} />
+          <label>First collection year (calendar){" "}
+            <input data-field="firstCollectionYear" data-year-semantics="calendar" type="number" value={
+              inputs.repayment.firstCollectionYear === null || inputs.repayment.firstCollectionYear === undefined
+                ? ""
+                : (startYear === null ? inputs.repayment.firstCollectionYear : startYear + (inputs.repayment.firstCollectionYear as number) - 1)
+            } onChange={(e) => {
+              if (e.target.value === "") { setRepayment({ firstCollectionYear: null }); return; }
+              const cal = parseFloat(e.target.value) || 0;
+              const modelYear = startYear === null ? cal : cal - startYear + 1;
+              setRepayment({ firstCollectionYear: modelYear });
+            }} />
           </label>
+          <p data-testid="first-collection-year-conversion" className="muted">
+            {startYear === null
+              ? "No project start year is set; the entry is used as the model year directly."
+              : `Calendar year entry converts to a model year: start year ${startYear} + entry − 1 = model year ${
+                  inputs.repayment.firstCollectionYear === null || inputs.repayment.firstCollectionYear === undefined
+                    ? "(not set)"
+                    : inputs.repayment.firstCollectionYear
+                }.`}
+          </p>
           <details data-testid="collections-editor">
             <summary>Per-year collections profile (optional; overrides the solved stream)</summary>
             <table data-testid="collections-rows">
@@ -148,9 +170,9 @@ export function RepaymentSection(props: {
                       next[parseFloat(e.target.value) || 0] = amount;
                       setRepayment({ collectionsOverrides: next });
                     }} /></td>
-                    <td><input data-field="col-override-amount" type="number" value={amount} onChange={(e) => {
+                    <td><MoneyEditor dataField="col-override-amount" value={amount} entryUnit={entryUnit} onChange={(v) => {
                       const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
-                      next[Number(y)] = parseFloat(e.target.value) || 0;
+                      next[Number(y)] = v;
                       setRepayment({ collectionsOverrides: next });
                     }} /></td>
                     <td><button data-action="remove-col-override" data-year={y} onClick={() => {
@@ -173,10 +195,10 @@ export function RepaymentSection(props: {
               <label>Year count <input data-field="col-spread-count" type="number" defaultValue={1} /></label>
               <button data-action="col-spread-fill" onClick={() => {
                 const root = document.querySelector('[data-testid="collections-editor"]') as HTMLElement;
-                const total = parseFloat((root.querySelector('[data-field="col-spread-total"]') as HTMLInputElement).value) || 0;
+                const totalEntry = parseFloat((root.querySelector('[data-field="col-spread-total"]') as HTMLInputElement).value) || 0;
                 const firstYear = parseFloat((root.querySelector('[data-field="col-spread-first"]') as HTMLInputElement).value) || 1;
                 const yearCount = parseFloat((root.querySelector('[data-field="col-spread-count"]') as HTMLInputElement).value) || 1;
-                setRepayment({ collectionsOverrides: spreadFill(total, firstYear, yearCount) });
+                setRepayment({ collectionsOverrides: spreadFill(entryToValue(totalEntry, entryUnit), firstYear, yearCount) });
               }}>Spread</button>
             </div>
           </details>
@@ -191,15 +213,15 @@ export function RepaymentSection(props: {
           </label>
           <label>Grace (years) <input data-field="graceYears" type="number" value={r.graceYears} disabled={inputs.repayment.firstCollectionYear !== null && inputs.repayment.firstCollectionYear !== undefined} onChange={num("graceYears")} /></label>
           <label>Indexation (CPI) % per year (rule of thumb: 2%) <input data-field="paymentEscalation" type="number" value={r.paymentEscalation} onChange={num("paymentEscalation")} /></label>
-          <label>Balloon <input data-field="balloon" type="number" value={r.balloon} onChange={num("balloon")} /></label>
+          <label>Balloon <MoneyEditor dataField="balloon" value={r.balloon} entryUnit={entryUnit} onChange={(v) => setRepayment({ balloon: v })} /></label>
         </>
       )}
       {result !== null && (
         <dl data-testid="repayment-summary">
-          <dt>Solved payment</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : roundForDisplay(result.paymentAmount)}</dd>
+          <dt>Solved payment</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : money(result.paymentAmount)}</dd>
           <dt>Payment count</dt><dd data-stat="paymentCount">{result.paymentCount}</dd>
           <dt>First payment year</dt><dd data-stat="repaymentStartYear">{result.repaymentStartYear}</dd>
-          <dt>Total collected</dt><dd data-stat="totalCollected">{roundForDisplay(result.totalCollected)}</dd>
+          <dt>Total collected</dt><dd data-stat="totalCollected">{money(result.totalCollected)}</dd>
         </dl>
       )}
     </section>

@@ -104,6 +104,23 @@ export function validateInputs(inp: ModelInputs): string[] {
       issues.push("The first-collection-year override replaces the derived start; grace must be zero when the override is set.");
     }
   }
+  if (inp.repayment.firstCollectionYear !== null && inp.repayment.firstCollectionYear !== undefined && Number.isInteger(inp.repayment.firstCollectionYear)) {
+    let lastCost = 0;
+    inp.costs.forEach((c) => {
+      const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
+      let end: number;
+      if (c.category === "capex") {
+        end = overrides ? Math.max(...Object.keys(overrides).map(Number)) : c.startYear;
+      } else {
+        end = c.startYear + Math.max(1, c.durationYears) - 1;
+      }
+      lastCost = Math.max(lastCost, end);
+    });
+    if (lastCost === 0) lastCost = 1;
+    if ((inp.repayment.firstCollectionYear as number) > lastCost + 100) {
+      issues.push("The first collection year is unreasonably far beyond the cost program; it must be within 100 years of the last cost year. (REP-START-ABSURD)");
+    }
+  }
   if (inp.operatingLines) {
     inp.operatingLines.forEach((o) => {
       if (!o.label || o.label.trim() === "") issues.push(`Operating line ${o.id} has an empty label.`);

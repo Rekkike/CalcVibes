@@ -91,7 +91,7 @@ describe("chunk 5 web task 4: leveraged toggle behavior", () => {
     enableFinancing();
     fireEvent.click(byField("finLeveraged"));
     fireEvent.click(byNav("overview"));
-    expect(byStat("paymentAmount").textContent).toBe("411017.66");
+    expect(byStat("paymentAmount").textContent).toBe("411 tkr");
   });
 
   it("FIN-LEVERAGED-MODE surfaces for fixed tariff mode", () => {

@@ -2,6 +2,7 @@ export interface DepreciationConfig {
   mode: "straight-line" | "rate" | "retained";
   years?: number;
   yearlyRatePct?: number;
+  startYear?: number;
 }
 
 export interface CostLine {
