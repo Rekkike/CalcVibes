@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { deckMoneyForDisplay, percentTwoForDisplay } from "./engine.js";
+import type { CurrencyCode, EntryUnit } from "./engine.js";
 import type { DeckModel, DeckDonut, ScenarioTargetChart } from "./deck.js";
 
 export interface DeckPdfTrace {
@@ -33,7 +34,7 @@ function printColorOf(index: number): string {
 
 // v0.6.5 Task C/W13: the composition donut on the print route — pie-slice polygons through
 // doc.lines, a white center circle, the center total, and direct labels beside the geometry.
-function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, currency: string, unit: string, trace?: DeckPdfTrace): number {
+function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace): number {
   const total = Math.max(1e-12, donut.segments.reduce((a, s) => a + s.value, 0));
   const cx = x + 22;
   const cy = y + 26;
@@ -51,7 +52,6 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
     doc.circle(cx, cy, outerR, "F");
   } else {
     for (let i = 0; i < donut.segments.length; i++) {
-      const frac = donut.segments[i].value / total;
       const a0 = -(acc / total) * 2 * Math.PI - Math.PI / 2;
       acc += donut.segments[i].value;
       const a1 = -(acc / total) * 2 * Math.PI - Math.PI / 2;
@@ -113,7 +113,7 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
 
 // v0.6.5 Task B/W11: the scenarios target chart on the print route — zero-based bars, verdict
 // colors in print ink, the break-even target marked as the crossing with its caption.
-function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number, currency: string, unit: string, trace?: DeckPdfTrace): number {
+function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace): number {
   const n = Math.max(1, tc.points.length);
   const barW = Math.min(20, 200 / n);
   doc.setFontSize(8);
@@ -187,7 +187,6 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
   const total = model.slides.length;
   let footerPage = 0;
-  const slidePageCount: number[] = [];
   model.slides.forEach((slide) => {
     if (trace) trace.drawnFigures.push([]);
     if (footerPage > 0) doc.addPage();
