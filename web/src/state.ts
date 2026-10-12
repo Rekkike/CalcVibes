@@ -86,6 +86,36 @@ export function multiLeaseProject(): ModelInputs {
   };
 }
 
+// v0.6.6 Task A: the third demo of record — a 2 MWp Swedish utility-scale solar park on a twenty-year
+// PPA. Real-world grounding: parks above 500 kW cost roughly 6 000-9 000 kr per kW installed, so the
+// 11.5 MSEK investment sits inside the benchmark band; the financing form of record is the fixed-price
+// power purchase agreement per MWh over 10-20 year tenors, with real Swedish 20-year precedents, here
+// settled monthly from project fulfillment; O&M benchmarks run at roughly $5-8 per kW-DC per year with
+// land lease, insurance, and property costs of similar magnitude, so the two operating lines sum to
+// roughly two percent of CAPEX per year; Swedish tax practice accepts a 20 percent straight-line
+// book-corresponding depreciation basis, charged from commissioning in year 5.
+export function solarParkProject(): ModelInputs {
+  return {
+    projectName: "Solar park example",
+    currency: "SEK",
+    entryUnit: "thousands",
+    targetIrr: 7,
+    costs: [
+      { id: "c1", name: "Development & permitting", category: "recurring", amount: 300000, startYear: 1, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 5 } },
+      { id: "c2", name: "Grid connection", category: "capex", amount: 1600000, startYear: 2, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 5 } },
+      { id: "c3", name: "EPC - modules, inverters & mounting", category: "recurring", amount: 4000000, startYear: 3, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 5 } },
+      { id: "c4", name: "Site works & fencing", category: "capex", amount: 1300000, startYear: 3, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 5 } },
+    ],
+    operatingLines: [
+      { id: "o1", label: "O&M and monitoring", amount: 150000, startYear: 5, yearCount: 20, escalation: 1 },
+      { id: "o2", label: "Land lease and insurance", amount: 180000, startYear: 5, yearCount: 20, escalation: 1 },
+    ],
+    repayment: { graceYears: 0, termYears: 20, paymentsPerYear: 12, paymentEscalation: 0, balloon: 0 },
+    appraisal: { wacc: 5, financeRate: 4, reinvestmentRate: 4, residual: { posture: "none", amount: 0, year: 24 } },
+    maintenance: { mode: "off" },
+  };
+}
+
 export function nextCostId(costs: CostLine[]): string {
   return "c" + (costs.length + 1);
 }

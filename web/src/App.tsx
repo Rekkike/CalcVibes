@@ -4,7 +4,7 @@ import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
 import { EngineInputError } from "../../core/src/validate.js";
-import { blankCostLine, blankProject, demoProject, multiLeaseProject, nextCostId } from "./state.js";
+import { blankCostLine, blankProject, demoProject, multiLeaseProject, nextCostId, solarParkProject } from "./state.js";
 import type { CostLine } from "../../core/src/types.js";
 import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
@@ -202,6 +202,10 @@ export function App() {
           />
           <button data-action="load-demo" onClick={() => setInputs(demoProject())}>Load demo project (Project Alpha)</button>
           <button data-action="load-multi-lease-demo" onClick={() => setInputs(multiLeaseProject())}>Load multi-lease demo</button>
+          {/* v0.6.6 Task B: the third loader presets the scenario axes (the amendment of record: the balloon
+              entries are entry-unit values; at unit thousands, 1000 and 2000 scale to raw balloons of
+              1 000 000 and 2 000 000 at compute). The other two loaders are untouched: additive only. */}
+          <button data-action="load-solar-demo" onClick={() => { setInputs(solarParkProject()); setScenarioTargets([5, 7, 9]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 1000, 2000]); }}>Load solar park demo</button>
         </div>
         <div data-testid="header-controls" className="header-controls">
           <button data-action="present" onClick={() => setPresOpen(true)}>Present results</button>
