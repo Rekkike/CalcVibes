@@ -1,10 +1,89 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
-import { deckMoneyForDisplay } from "../engine.js";
+import type { ScenarioTargetChart } from "../deck.js";
+import { deckMoneyForDisplay, percentTwoForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionRows, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot } from "../charts.js";
+import { CompositionRows, CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
+
+
+// v0.6.5 Task B/W11: the scenarios target infographic — one variable per chart, zero-based, direct
+// HTML labels (no viewbox text), semantic verdict colors, the break-even target marked as the crossing.
+function ScenarioTargetBars(props: { chart: ScenarioTargetChart; currency: CurrencyCode; entryUnit: EntryUnit }) {
+  const { chart, currency, entryUnit } = props;
+  const n = Math.max(1, chart.points.length);
+  const slot = 100 / n;
+  const barW = slot * 0.6;
+  const maxAbs = Math.max(...chart.points.map((p) => Math.abs(p.value)), 1e-12);
+  const targetX = (i: number) => i * slot + slot / 2;
+  const breakX = (() => {
+    const be = chart.breakEvenTarget;
+    if (be === null || chart.points.length === 0) return null;
+    if (be <= chart.points[0].target) return 0;
+    if (be >= chart.points[chart.points.length - 1].target) return 100;
+    for (let i = 0; i < chart.points.length - 1; i++) {
+      const a = chart.points[i].target;
+      const b = chart.points[i + 1].target;
+      if (be >= a && be <= b) {
+        const t = b > a ? (be - a) / (b - a) : 0;
+        return targetX(i) + t * (targetX(i + 1) - targetX(i));
+      }
+    }
+    return null;
+  })();
+  if (chart.mode === "solved") {
+    return (
+      <div data-testid="scenario-target-chart" data-mode="solved" className="chart-block scenario-target-chart">
+        <p data-testid="chart-kicker" className="chart-kicker">{chart.kicker}</p>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" className="scenario-target-svg">
+          {chart.points.map((p, i) => {
+            const h = (Math.max(0, p.value) / maxAbs) * 100;
+            const x = targetX(i) - barW / 2;
+            return <rect key={p.label} data-target-bar={p.label} x={x.toFixed(2)} y={(100 - h).toFixed(2)} width={barW.toFixed(2)} height={h.toFixed(2)} fill="#34d399" />;
+          })}
+        </svg>
+        <ul className="scenario-target-labels">
+          {chart.points.map((p) => (
+            <li key={p.label} data-target-label={p.label} className="scenario-target-label">
+              <span className="row-name">{p.label}</span>
+              <span className="row-value">{deckMoneyForDisplay(p.value, currency, entryUnit)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  const zeroY = 25;
+  return (
+    <div data-testid="scenario-target-chart" data-mode="evaluated" className="chart-block scenario-target-chart">
+      <p data-testid="chart-kicker" className="chart-kicker">{chart.kicker}</p>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" className="scenario-target-svg">
+        <line data-testid="scenario-target-zero" x1={0} x2={100} y1={zeroY} y2={zeroY} stroke="rgba(148,163,184,0.45)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        {chart.points.map((p, i) => {
+          const h = (Math.abs(p.value) / maxAbs) * 70;
+          const x = targetX(i) - barW / 2;
+          return p.value >= 0
+            ? <rect key={p.label} data-target-bar={p.label} data-met={p.met ? "true" : "false"} x={x.toFixed(2)} y={(zeroY - h).toFixed(2)} width={barW.toFixed(2)} height={h.toFixed(2)} fill={p.met ? "#34d399" : "#fb7185"} />
+            : <rect key={p.label} data-target-bar={p.label} data-met={p.met ? "true" : "false"} x={x.toFixed(2)} y={zeroY} width={barW.toFixed(2)} height={h.toFixed(2)} fill={p.met ? "#34d399" : "#fb7185"} />;
+        })}
+        {breakX !== null && <line data-testid="scenario-break-even-marker" x1={breakX.toFixed(2)} x2={breakX.toFixed(2)} y1={0} y2={100} stroke="#e8b84b" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
+      </svg>
+      <ul className="scenario-target-labels">
+        {chart.points.map((p) => (
+          <li key={p.label} data-target-label={p.label} data-met={p.met ? "true" : "false"} className="scenario-target-label">
+            <span className="row-name">{p.label} target</span>
+            <span className="row-value">{p.met ? "met" : "not met"}</span>
+          </li>
+        ))}
+      </ul>
+      {chart.breakEvenTarget !== null && (
+        <p data-testid="scenario-break-even-caption" className="scenario-break-even-caption">break-even at {percentTwoForDisplay(chart.breakEvenTarget)}</p>
+      )}
+    </div>
+  );
+}
 
 export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null }) {
   const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null } = props;
@@ -38,9 +117,39 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onExit]);
+  // v0.6.5 Task F/W14: swipe navigation on touch devices — a horizontal swipe with a threshold
+  // changes slides; the vertical scroll is never hijacked (the dominant-axis test).
+  const stageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (el === null) return;
+    let startX: number | null = null;
+    let startY: number | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (startX === null || startY === null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      startX = null;
+      startY = null;
+      if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      if (dx < 0) setSlide((s) => Math.min(s + 1, totalSlides - 1));
+      else setSlide((s) => Math.max(s - 1, 0));
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [totalSlides]);
+
 
   return (
-    <div data-testid="presentation" data-slide={slide}>
+    <div ref={stageRef} data-testid="presentation" data-slide={slide}>
       <header>
         <span>{inputs.projectName || "Untitled project"}</span>
         <button data-action="exit-presentation" onClick={onExit}>Exit presentation (Esc)</button>
@@ -71,6 +180,9 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 ))}
               </div>
             )}
+            {sl.verdict !== undefined && (
+              <p data-testid="deck-verdict" className="deck-disclosure insight deck-verdict-lead">{sl.verdict}</p>
+            )}
             {sl.tiles !== undefined && (
               <div data-testid="summary-tiles" className="summary-tiles">
                 {sl.tiles.map((t, j) => (
@@ -78,6 +190,17 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                     <span className="stat-label">{t.label}</span>
                     <span className="stat-value">{t.value}</span>
                     {t.disclosure !== undefined && <span className="deck-disclosure">{t.disclosure}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {sl.donuts !== undefined && sl.donuts.length > 0 && (
+              <div data-testid="summary-donuts" className="summary-donuts">
+                {sl.donuts.map((d) => (
+                  <div key={d.id} data-donut={d.id} className="summary-donut">
+                    <p data-testid="chart-kicker" className="chart-kicker">{d.title}</p>
+                    <CompositionDonut lineTotals={d.segments.map((s) => ({ id: s.id, name: s.label, total: s.value }))} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
+                    {d.disclosure !== undefined && <span className="deck-disclosure">{d.disclosure}</span>}
                   </div>
                 ))}
               </div>
@@ -106,7 +229,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
               </div>
             )}
             {sl.name === "coverage" && result !== null && (
-              <div data-testid="deck-chart-slot" data-slide-chart="coverage">
+              <div data-testid="deck-chart-slot" data-slide-chart="coverage" style={sl.chart !== undefined && sl.chart.crossingX != null ? ({ "--deck-crossing-x": `${sl.chart.crossingX}%` } as CSSProperties) : undefined}>
                 <StageReturnsChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} />
                 <p data-testid="crossing-caption" className="stage-crossing-caption">
                   {result.paybackYears === null
@@ -124,6 +247,11 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 />
               </div>
             )}
+            {sl.name === "scenarios" && sl.targetChart !== undefined && (
+              <div data-testid="deck-chart-slot" data-slide-chart="scenarios-target">
+                <ScenarioTargetBars chart={sl.targetChart} currency={currency} entryUnit={entryUnit} />
+              </div>
+            )}
             {sl.body.map((f, j) => (
               <p key={j} className="deck-figure">
                 <span className="deck-figure-label">{f.label}</span>
@@ -134,9 +262,6 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             {sl.insights !== undefined && sl.insights.map((d, j) => (
               <p key={"ins-" + j} data-testid="deck-insight" className="deck-disclosure insight">{d}</p>
             ))}
-            {sl.verdict !== undefined && (
-              <p data-testid="deck-verdict" className="deck-disclosure insight">{sl.verdict}</p>
-            )}
             {sl.disclosures.map((d, j) => (
               <p key={j} className="warning deck-disclosure">{d}</p>
             ))}
@@ -158,10 +283,11 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
           ))}
         </div>
       )}
-      <footer className="stage-nav">
-        <button data-action="prev-slide" className="stage-nav-button" onClick={() => setSlide((s) => Math.max(s - 1, 0))}>← Previous</button>
+      <footer className="stage-nav stage-nav-chrome">
+        <button data-action="prev-slide" className={"stage-nav-button" + (slide === 0 ? " stage-nav-button-disabled" : "")} onClick={() => setSlide((s) => Math.max(s - 1, 0))} aria-disabled={slide === 0 ? "true" : "false"} aria-label="Previous slide">‹</button>
         <span className="stage-dots">{[...Array(totalSlides)].map((_, i) => <span key={i} data-dot={i} className={i === slide ? "stage-dot stage-dot-active" : "stage-dot"}>·</span>)}</span>
-        <button data-action="next-slide" className="stage-nav-button" onClick={() => setSlide((s) => Math.min(s + 1, totalSlides - 1))}>Next →</button>
+        <span className="stage-nav-counter">{slide + 1} / {totalSlides}</span>
+        <button data-action="next-slide" className={"stage-nav-button" + (slide >= totalSlides - 1 ? " stage-nav-button-disabled" : "")} onClick={() => setSlide((s) => Math.min(s + 1, totalSlides - 1))} aria-disabled={slide >= totalSlides - 1 ? "true" : "false"} aria-label="Next slide">›</button>
       </footer>
     </div>
   );

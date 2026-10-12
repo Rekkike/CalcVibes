@@ -28,8 +28,8 @@ describe("Task H3: NO-TAUTOLOGY / PEAK-PDF-FORMAT", () => {
   });
 });
 
-describe("Task H2: DONUT-WHOLE (retired with the donut per v0.5.6; the deck carries no circle chart)", () => {
-  it("the deck scope contains no composition donut element", async () => {
+describe("Task H2: DONUT-WHOLE (re-anchored per v0.6.5 Task C/W13: the paired summary donuts are the deck's circle charts; no other slide carries one)", () => {
+  it("the deck scope carries composition donuts on the summary slide only", async () => {
     const { render: r2 } = await import("@testing-library/react");
     const { App } = await import("../src/App.js");
     const { fireEvent } = await import("@testing-library/react");
@@ -37,7 +37,12 @@ describe("Task H2: DONUT-WHOLE (retired with the donut per v0.5.6; the deck carr
     r2(<App />);
     fireEvent.click(byAction2("load-demo"));
     fireEvent.click(byAction2("present"));
-    expect(document.querySelector('[data-testid="presentation"] [data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
+    const deckDonuts = document.querySelectorAll('[data-testid="presentation"] [data-testid="composition-donut"]');
+    expect(deckDonuts.length).toBe(2);
+    for (const d of Array.from(deckDonuts)) {
+      expect((d.closest("[data-slide-name]") as HTMLElement).getAttribute("data-slide-name")).toBe("summary");
+    }
   });
 });
 

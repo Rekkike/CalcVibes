@@ -6,7 +6,7 @@ import * as fs from "fs";
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 
 describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
-  it("COMPOSITION-ROWS: one labeled row per cost line; the shares sum to 100; no donut in the deck scope", async () => {
+  it("COMPOSITION-ROWS: one labeled row per cost line; the shares sum to 100; the deck's circle charts live on the summary slide only (re-anchored per v0.6.5 Task C/W13)", async () => {
     const { demoProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const demo = demoProject();
@@ -28,8 +28,12 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
       shareSum += Number(shareText.replace("%", ""));
     });
     expect(shareSum).toBe(100);
-    expect(document.querySelector('[data-testid="presentation"] [data-testid="composition-donut"]')).toBeNull();
-    expect(document.querySelector('[data-testid="presentation"] [data-donut-segment]')).toBeNull();
+    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
+    const deckDonuts = document.querySelectorAll('[data-testid="presentation"] [data-testid="composition-donut"]');
+    expect(deckDonuts.length).toBe(2);
+    for (const d of Array.from(deckDonuts)) {
+      expect((d.closest("[data-slide-name]") as HTMLElement).getAttribute("data-slide-name")).toBe("summary");
+    }
   });
 
   it("NO-VIEWBOX-TEXT: no text element inside any chart SVG in the deck scope", () => {

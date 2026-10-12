@@ -21,12 +21,13 @@ describe("Task G: the deck design system (structural pins)", () => {
     expect(css).toMatch(/\.deck-figure-value\s*\{\s*[^}]*text-align:\s*right/);
   });
 
-  it("the labeled composition rows are the investment slide's one composition figure (the donut retired per v0.5.6)", () => {
+  it("the labeled composition rows are the investment slide's one composition figure (re-anchored per v0.6.5 Task C/W13: the donut lives on the summary slide only)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(document.querySelector('[data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
     const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
     expect(rows.querySelectorAll("[data-composition-row]").length).toBe(3);
     expect(rows.querySelectorAll('[data-testid="donut-segment-label"]').length).toBe(0);

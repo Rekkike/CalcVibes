@@ -31,7 +31,16 @@ export function App() {
   const [modePayment, setModePayment] = useState(400000);
   const [startYear, setStartYear] = useState<number | null>(null);
   const [entryUnit, setEntryUnit] = useState<EntryUnit>("thousands");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    // v0.6.5 Task G/W15: the theme follows prefers-color-scheme; with no system preference or no
+    // matchMedia the posture falls back to DARK. The header select remains the manual override.
+    try {
+      if (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+    } catch {
+      // the API is absent or throws: the dark fallback stands
+    }
+    return "dark";
+  });
   const [startYearError, setStartYearError] = useState<string | null>(null);
   const [scenarioTargets, setScenarioTargets] = useState<number[] | null>(null);
   const [scenarioTerms, setScenarioTerms] = useState<number[] | null>(null);

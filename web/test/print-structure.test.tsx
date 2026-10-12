@@ -37,7 +37,8 @@ describe("Task E: composition, one figure (re-anchored to the composition rows p
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(document.querySelector('[data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
     const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
     expect(rows).toBeTruthy();
     expect((rows as HTMLElement).querySelectorAll("[data-composition-row]").length).toBe(3);

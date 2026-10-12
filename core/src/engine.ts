@@ -791,6 +791,37 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += (collectionsProfile as Record<number, number>)[y];
     }
     collectionsGrid.push({ id: "profile", name: "Collections profile", kind: "profile", amounts });
+  } else if (!tariffCollectionMode && contractsMode) {
+    // v0.6.5 Task D (W17): in contracts mode the grid carries one row per contract, built from
+    // that contract's slots with its payment (mirroring the totalCollected construction), so
+    // every deck surface built from the grid reports the true collections. The legacy
+    // dormant-slot row and the residual row are unchanged; the legacy path stays byte-identical.
+    for (const c of contracts) {
+      const amounts = zeroRow();
+      if (c.mode === "solved") {
+        for (const sl of c.slots) {
+          if (sl.monthIndex > totalMonths) continue;
+          const y = Math.floor((sl.monthIndex - 1) / 12) + 1;
+          if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += payment * sl.escFactor;
+        }
+      } else if (c.evaluatedProfile !== null) {
+        for (const [yStr, amt] of Object.entries(c.evaluatedProfile)) {
+          const y = Number(yStr);
+          if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += amt as number;
+        }
+      } else if (c.evaluatedPayment !== null) {
+        for (const sl of c.slots) {
+          if (sl.monthIndex > totalMonths) continue;
+          const y = Math.floor((sl.monthIndex - 1) / 12) + 1;
+          if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += (c.evaluatedPayment as number) * sl.escFactor;
+        }
+      }
+      if (c.balloon > 0 && c.endMonth <= totalMonths) {
+        const y = Math.floor((c.endMonth - 1) / 12) + 1;
+        if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] += c.balloon;
+      }
+      collectionsGrid.push({ id: c.id, name: c.label, kind: "contract", amounts });
+    }
   } else if (tariffCfg0.mode !== "off" && tariffInfos.length > 0) {
     if ((inp.tariff?.rows ?? []).length === 0) {
       const amounts = zeroRow();

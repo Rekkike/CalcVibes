@@ -29,12 +29,13 @@ describe("Task B: CHART-LABEL / ONE-COMPOSITION / PEAK-LABEL", () => {
     expect(rowEls[0].querySelector('[data-row-label="value"]')?.textContent).toContain("5 563");
   });
 
-  it("the deck investment slide carries exactly one composition figure (the donut retired per v0.5.6)", () => {
+  it("the deck investment slide carries exactly one composition figure (re-anchored per v0.6.5 Task C/W13: the donut lives on the summary slide only)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(document.querySelector('[data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
+    expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]')).toBeTruthy();
   });
 
@@ -125,10 +126,12 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
     expect(dangling).toEqual([]);
   });
 
-  it("TOGGLE: the control renders and switches data-theme on the root", () => {
+  it("TOGGLE (re-anchored per v0.6.5 Task G/W15: the theme follows the system with a dark fallback; the select remains the manual override)", () => {
     render(<App />);
     const root = document.querySelector(".app-root") as HTMLElement;
-    expect(root.getAttribute("data-theme")).toBe("light");
+    expect(root.getAttribute("data-theme")).toBe("dark");
+    fireEvent.change(document.querySelector('[data-field="theme"]') as HTMLElement, { target: { value: "light" } });
+    expect(document.querySelector(".app-root")?.getAttribute("data-theme")).toBe("light");
     fireEvent.change(document.querySelector('[data-field="theme"]') as HTMLElement, { target: { value: "dark" } });
     expect(document.querySelector(".app-root")?.getAttribute("data-theme")).toBe("dark");
   });
@@ -142,10 +145,10 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
 
   it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.4");
+    expect(VERSION).toBe("v0.6.5");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.4");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.5");
   });
 });
 

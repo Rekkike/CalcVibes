@@ -18,6 +18,34 @@ export interface DeckChartSlot {
   kind: "donut" | "bars" | "rows" | "coverage" | "hurdle";
   data: { label: string; value: number }[];
   solved?: boolean;
+  crossingX?: number | null;
+}
+
+export interface DeckDonutSegment {
+  id: string;
+  label: string;
+  value: number;
+}
+
+export interface DeckDonut {
+  id: string;
+  title: string;
+  segments: DeckDonutSegment[];
+  disclosure?: string;
+}
+
+export interface ScenarioTargetPoint {
+  target: number;
+  label: string;
+  value: number;
+  met: boolean;
+}
+
+export interface ScenarioTargetChart {
+  mode: "solved" | "evaluated";
+  points: ScenarioTargetPoint[];
+  breakEvenTarget: number | null;
+  kicker: string;
 }
 
 export interface DeckTile {
@@ -38,6 +66,8 @@ export interface DeckSlide {
   verdict?: string;
   tiles?: DeckTile[];
   summaryCharts?: DeckChartSlot[];
+  donuts?: DeckDonut[];
+  targetChart?: ScenarioTargetChart;
   titleMetrics?: { label: string; value: string }[];
   kickerNumber?: string;
   solverScenario?: { label: string; requiredPayment: string | null } | null;
@@ -86,7 +116,25 @@ export function deckSlides(
     ],
   });
 
-  // Slide 1 — executive summary (v0.6.4 Part B: the infographic block row — large figures, no paragraphs)
+  // Slide 1 — executive summary (v0.6.4 Part B: the infographic block row — large figures, no paragraphs;
+  // v0.6.5 Task C/W13: the paired composition donuts beneath the tiles — outflows and inflows)
+  const outflowSegments: DeckDonutSegment[] = result.lineTotals.map((l) => ({ id: l.id, label: l.name, value: l.total }));
+  const reinvestmentsTotal = (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0);
+  if (reinvestmentsTotal > 0) outflowSegments.push({ id: "reinvestments", label: "Reinvestments", value: reinvestmentsTotal });
+  const inflowSegments: DeckDonutSegment[] = [];
+  for (const row of result.collectionsGrid) {
+    const rowTotal = row.amounts.reduce((a, v) => a + v, 0);
+    if (rowTotal > 0) inflowSegments.push({ id: row.id, label: row.name, value: rowTotal });
+  }
+  const summaryDonuts: DeckDonut[] = [
+    {
+      id: "outflows",
+      title: "Outflows — the investment",
+      segments: outflowSegments,
+      ...(result.operatingTotal > 0 ? { disclosure: "Operating lines are a separate consideration, not in the investment total." } : {}),
+    },
+    { id: "inflows", title: "Inflows — the collections", segments: inflowSegments },
+  ];
   slides.push({
     name: "summary",
     title: "Executive summary",
@@ -100,6 +148,7 @@ export function deckSlides(
       { label: "Collected vs cost", value: `${money(result.totalCollected)} vs ${money(result.totalCost)}`, rawValue: result.totalCollected },
       { label: "Verdict", value: result.goalMet ? "Target met" : "Target missed", tone: result.goalMet ? "ok" : "bad" },
     ],
+    donuts: summaryDonuts,
   });
 
   // Slide 2 — investment
@@ -175,12 +224,17 @@ export function deckSlides(
   const coverageTitle = result.paybackYears === null
     ? "Coverage — not within the horizon"
     : "Coverage";
+  const coverageCum = result.yearly.map((y) => y.cumulative);
+  const coverageCrossingIdx = coverageCum.findIndex((v, i) => i > 0 && coverageCum[i - 1] < 0 && v >= 0);
+  const coverageCrossingX = coverageCrossingIdx > 0
+    ? Math.min(85, Math.max(15, Math.round((coverageCrossingIdx / Math.max(1, result.yearly.length - 1)) * 1000) / 10))
+    : null;
   slides.push({
     name: "coverage",
     title: coverageTitle,
     body: coverageBody,
     disclosures: [],
-    chart: { kind: "coverage", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.cumulative })) },
+    chart: { kind: "coverage", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.cumulative })), crossingX: coverageCrossingX },
   });
 
   slides.push({
@@ -243,7 +297,17 @@ export function deckSlides(
     { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },
   ];
   if (result.residualDisclosure !== null && result.residualDisclosure !== undefined) {
-    dealDisclosures.push(result.residualDisclosure);
+    // v0.6.5 Task A (W8): the deck composes its sale disclosure from structured fields through the
+    // deck display formatters; the engine's residualDisclosure strings stay verbatim and immutable
+    // (the XLSX export keeps consuming the raw engine string — the audit route).
+    const res = inputs.appraisal?.residual;
+    const posture = res?.posture ?? ((res?.mode ?? "amount") === "amount" && (res?.amount ?? 0) > 0 ? "set-price" : res?.mode === "calculated" ? "book-value" : "none");
+    const residualYear = res?.year ?? 10;
+    if (posture === "book-value") {
+      dealDisclosures.push(`Assumes sale at remaining book value at year ${residualYear} for ${money(result.residualAmountUsed ?? 0)}`);
+    } else {
+      dealDisclosures.push(`Assumes sale at year ${residualYear} for ${money(res?.amount ?? 0)}`);
+    }
   }
   const solverScenario = result.goalMet ? null : {
     label: "To reach the target",
@@ -346,12 +410,37 @@ export function deckSlides(
         ...(sc.pessimistic.paymentAmount !== null ? [{ label: "Pessimistic", value: sc.pessimistic.paymentAmount }] : []),
       ];
     }
+    let targetChart: ScenarioTargetChart | undefined;
+    if (!profileActive && sceTargets.length >= 2) {
+      if (result.paymentAmount !== null) {
+        const pts: ScenarioTargetPoint[] = [];
+        for (const g of sceTargets) {
+          const r = tryCompute({ targetIrr: g });
+          if (r !== null && r.paymentAmount !== null) pts.push({ target: g, label: `${g}%`, value: r.paymentAmount, met: true });
+        }
+        if (pts.length >= 2) {
+          pts.sort((a, b) => a.target - b.target);
+          targetChart = { mode: "solved", points: pts, breakEvenTarget: null, kicker: "The payment rises as the target rises" };
+        }
+      } else {
+        const pts: ScenarioTargetPoint[] = [];
+        for (const g of sceTargets) {
+          const r = tryCompute({ targetIrr: g });
+          if (r !== null && r.achievedIrr !== null) pts.push({ target: g, label: `${g}%`, value: r.achievedIrr, met: r.goalMet });
+        }
+        if (pts.length >= 2) {
+          pts.sort((a, b) => a.target - b.target);
+          targetChart = { mode: "evaluated", points: pts, breakEvenTarget: result.achievedIrr, kicker: "The collections are fixed; only the verdict moves" };
+        }
+      }
+    }
     slides.push({
       name: "scenarios",
       title: "The scenarios",
       body: sceBody,
       disclosures: sceDisclosures,
       ...(chartData.length > 0 ? { chart: { kind: "rows", data: chartData } } : {}),
+      ...(targetChart !== undefined ? { targetChart } : {}),
     });
   }
 
