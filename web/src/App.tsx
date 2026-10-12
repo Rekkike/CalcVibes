@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { computeModel, solveTerm, CURRENCIES_ENUM, ENTRY_UNITS, VERSION } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
@@ -18,6 +18,8 @@ import { FinancingSection } from "./sections/FinancingSection.js";
 import { YearlyDetailSection } from "./sections/YearlyDetailSection.js";
 import { Presentation } from "./presentation/Presentation.js";
 import { RootErrorBoundary } from "./ErrorBoundary.js";
+import { parseProject, ProjectFileError } from "../../core/src/fileio.js";
+import { downloadProjectFile } from "./projectFile.js";
 
 type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "financing" | "appraisal" | "results" | "scenarios" | "detail";
 
@@ -34,6 +36,8 @@ export function App() {
   const [scenarioTargets, setScenarioTargets] = useState<number[] | null>(null);
   const [scenarioTerms, setScenarioTerms] = useState<number[] | null>(null);
   const [scenarioBalloons, setScenarioBalloons] = useState<number[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
 
   const issues = useMemo(() => {
@@ -101,6 +105,28 @@ export function App() {
     setInputs((p) => ({ ...p, tariff: t }));
   const setFinancing = (fc: import("../../core/src/types.js").FinancingConfig) =>
     setInputs((p) => ({ ...p, financing: fc }));
+  const openProjectFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const loaded = parseProject(String(reader.result));
+        setInputs(loaded.inputs);
+        setStartYear(loaded.settings.startYear);
+        setEntryUnit(loaded.settings.entryUnit);
+        setScenarioTargets(loaded.settings.scenarioTargets);
+        setScenarioTerms(loaded.settings.scenarioTerms);
+        setScenarioBalloons(loaded.settings.scenarioBalloons);
+        setMode("A");
+        setLoadError(null);
+      } catch (e) {
+        setLoadError(e instanceof ProjectFileError ? e.message : "FILE-MALFORMED: the file is not valid JSON and cannot be opened.");
+      }
+    };
+    reader.readAsText(file);
+  };
+  const saveProjectFile = () => {
+    downloadProjectFile(inputs, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons });
+  };
   const exportXlsx = async () => {
     if (result === null) return;
     const { buildWorkbook } = await import("./xlsx.js");
@@ -151,6 +177,20 @@ export function App() {
         <div className="toolbar-left">
           <h1>{inputs.projectName || "Untitled project"}</h1>
           <button data-action="new-project" onClick={() => setInputs(blankProject())}>New project</button>
+          <button data-testid="save-project" onClick={saveProjectFile}>Save project</button>
+          <button data-testid="open-project" onClick={() => fileInputRef.current?.click()}>Open project</button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".calcvibes.json,.json"
+            data-testid="open-project-input"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files && e.target.files[0];
+              if (file) openProjectFile(file);
+              e.target.value = "";
+            }}
+          />
           <button data-action="load-demo" onClick={() => setInputs(demoProject())}>Load demo project (Project Alpha)</button>
           <button data-action="load-multi-lease-demo" onClick={() => setInputs(multiLeaseProject())}>Load multi-lease demo</button>
         </div>
@@ -206,6 +246,9 @@ export function App() {
           </div>
         </nav>
       </header>
+      {loadError !== null && (
+        <div data-testid="load-error" className="warning">{loadError}</div>
+      )}
       {(issues.length > 0 || engineIssues.length > 0) && (
         <section data-testid="issues-summary" className="issues">
           <h2>Input issues ({issues.length + engineIssues.length})</h2>
