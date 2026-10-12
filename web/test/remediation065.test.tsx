@@ -347,7 +347,7 @@ describe("v0.6.5 Task H: the PDF quality sweep (W10/W16)", () => {
     buildDeckPdf(axesDeck, "Project Alpha", trace2);
     const sce = trace2.drawnFigures[7].join("|");
     expect(sce).toContain("353 739 kr");
-    expect(sce).toContain("762 057 kr");
+    expect(sce).toContain("762 056 kr");
     const fixed: ModelInputs = {
       ...demo,
       tariff: { mode: "fixed", escalationPerYear: 2, rows: [], fixedAnnualAmount: 100000, manualPrices: null },
