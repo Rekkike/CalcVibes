@@ -38,12 +38,12 @@ describe("Task A: application-wide design system (structural pins)", () => {
     expect(css).toMatch(/@media \(max-width:\s*480px\)[\s\S]*?flex-direction:\s*column/);
   });
 
-  it("deck content lock: the deck's six slides and the design conventions are untouched", () => {
+  it("deck content lock: the deck's seven slides and the design conventions are untouched", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slides = document.querySelectorAll('[data-testid="presentation"] .deck-slide');
-    expect(slides.length).toBe(6);
+    expect(slides.length).toBe(7);
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\[data-testid="presentation"\] \.deck-figure-value\s*\{\s*[^}]*text-align:\s*right/);
   });
@@ -100,8 +100,8 @@ describe("Task C: carried observations", () => {
     const finModel = deckSlides(finInputs, finResult);
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(finModel, finInputs.projectName, trace);
-    const tracedDeal = trace.drawnFigures[5].join("|");
-    for (const d of finModel.slides[4].disclosures) {
+    const tracedDeal = trace.drawnFigures[6].join("|");
+    for (const d of finModel.slides[5].disclosures) {
       expect(tracedDeal).toContain(d);
     }
   });

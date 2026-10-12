@@ -89,13 +89,13 @@ describe("Task F1/F2: DECK-MONEY-CLASS / DECK-YEARS-CLASS", () => {
     const result = computeModel(demo);
     const unit = "thousands";
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: unit as never });
-    const moneyTiles = deck.slides[5].tiles ?? [];
+    const moneyTiles = deck.slides[6].tiles ?? [];
     for (const t of moneyTiles) {
       if (t.label.includes("IRR") || t.label.includes("MIRR") || t.label.includes("index") || t.label.includes("Break-even")) continue;
       expect(t.value).not.toMatch(/,\d/);
     }
     expect(moneyTiles.find((t) => t.label === "Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", unit as never));
-    expect(deck.slides[1].title).toContain(deckMoneyForDisplay(result.totalCost, "SEK", unit as never));
+    expect(deck.slides[1].tiles?.find((t) => t.label === "Cost NPV")?.value).toBe(deckMoneyForDisplay(result.costNpv, "SEK", unit as never));
   });
 
   it("DECK-YEARS-CLASS: every deck year-count string equals the deck years formatter output (one decimal)", async () => {
@@ -105,9 +105,9 @@ describe("Task F1/F2: DECK-MONEY-CLASS / DECK-YEARS-CLASS", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null });
-    const tiles = deck.slides[5].tiles ?? [];
+    const tiles = deck.slides[6].tiles ?? [];
     expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
-    expect(tiles.find((t) => t.label === "Payback (discounted)")?.value).toBe(result.discountedPaybackYears === null ? "—" : deckYearsForDisplay(result.discountedPaybackYears));
+    expect(deck.slides[4].body.find((f) => f.label === "Discounted payback (at WACC)")?.value).toBe(result.discountedPaybackYears === null ? undefined : deckYearsForDisplay(result.discountedPaybackYears));
     expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toMatch(/\.1 years$|\.0 years$|\.\d years$/);
     expect(result.paybackYears as number).not.toBe(Math.round(result.paybackYears as number));
   });

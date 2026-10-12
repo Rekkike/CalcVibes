@@ -46,17 +46,21 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
   const result = computeModel(demoProject());
   const deck = deckSlides(demoProject(), result, { startYear: null, entryUnit: "thousands" });
 
-  it("the deck titles re-anchor at the template's thousands default through the deck display class", () => {
-    expect(deck.slides[1].title).toBe(`We invest ${deckMoneyForDisplay(result.totalCost, "SEK", "thousands")} nominal across 3 cost lines`);
-    expect(deck.slides[2].title).toBe(`${result.paymentCount} payments of ${deckMoneyForDisplay(result.paymentAmount as number, "SEK", "thousands")} recover the full requirement`);
-    expect(deck.slides[5].title).toBe(`The deal in one view — ${deckMoneyForDisplay(result.totalCost, "SEK", "thousands")} in, ${deckMoneyForDisplay(result.totalCollected, "SEK", "thousands")} back`);
+  it("the deck figures re-anchor at the template's thousands default through the deck display class", () => {
+    expect(deck.slides[1].title).toBe("Executive summary");
+    expect(deck.slides[2].title).toBe("The investment");
+    expect(deck.slides[3].title).toBe("The recovery — solved payments");
+    expect(deck.slides[2].body.find((f) => f.label === "Total cost (nominal)")!.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "thousands"));
+    expect(deck.slides[3].body.find((f) => f.label === "Payment per period")!.value).toBe(deckMoneyForDisplay(result.paymentAmount as number, "SEK", "thousands"));
+    expect(deck.slides[6].tiles?.find((t) => t.label === "Total collected")?.value).toBe(deckMoneyForDisplay(result.totalCollected, "SEK", "thousands"));
   });
 
   it("the financing variant at thousands", () => {
     const finInputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const finResult = computeModel(finInputs);
     const finDeck = deckSlides(finInputs, finResult, { startYear: null, entryUnit: "thousands" });
-    expect(finDeck.slides[5].title).toBe(`Equity earns 20.01% on ${deckMoneyForDisplay(finResult.financing!.equity.outlay, "SEK", "thousands")} outlaid`);
+    expect(finDeck.slides[6].title).toBe("The deal — equity view");
+    expect(finDeck.slides[6].verdict).toContain(deckMoneyForDisplay(finResult.financing!.equity.outlay, "SEK", "thousands"));
   });
 
   it("the stable variant at thousands", () => {
@@ -67,14 +71,15 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
     const stInputs = { ...demoProject(), tariff: { mode: "stable" as const, escalationPerYear: 2, rows, fixedAnnualAmount: null, manualPrices: null } };
     const stResult = computeModel(stInputs);
     const stDeck = deckSlides(stInputs, stResult, { startYear: null, entryUnit: "thousands" });
-    expect(stDeck.slides[2].title).toBe(`A stable tariff of ${deckMoneyForDisplay(stResult.tariffBaseUnitPrice as number, "SEK", "thousands")} per weighted lift recovers the full requirement`);
+    expect(stDeck.slides[3].title).toBe("The recovery — a stable tariff");
+    expect(stDeck.slides[3].body.find((f) => f.label === "Base price (first grid year terms)")!.value).toBe(deckMoneyForDisplay(stResult.tariffBaseUnitPrice as number, "SEK", "thousands"));
   });
 
   it("the profile branch title", () => {
     const pInputs = { ...demoProject(), repayment: { ...demoProject().repayment, collectionsOverrides: { 3: 1000000, 4: 2000000 } } };
     const pResult = computeModel(pInputs);
     const pDeck = deckSlides(pInputs, pResult, { startYear: null, entryUnit: "thousands" });
-    expect(pDeck.slides[2].title).toBe("A per-year collections profile — evaluated, not solved");
+    expect(pDeck.slides[3].title).toBe("The recovery — evaluated, not solved");
   });
 });
 

@@ -9,9 +9,9 @@ const model = deckSlides(demoProject(), result);
 
 describe("EX-4 route B: jsPDF deck builder", () => {
 
-  it("consumes the deckSlides model (the seam) and produces exactly six pages", () => {
+  it("consumes the deckSlides model (the seam) and produces exactly seven pages", () => {
     const doc = buildDeckPdf(model, demoProject().projectName);
-    expect(doc.getNumberOfPages()).toBe(6);
+    expect(doc.getNumberOfPages()).toBe(7);
   });
 
   it("the output buffer is non-empty (byte length > 1,000)", () => {
@@ -32,35 +32,35 @@ describe("v0.5.1 Task A/C: PDF action, pagination, trace", () => {
   it("every body figure and every deal tile appears in the trace (base demo); page count pinned", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, demoProject().projectName, trace);
-    expect(doc.getNumberOfPages()).toBe(6);
-    expect(trace.drawnFigures.length).toBe(6);
-    for (let i = 0; i < 6; i++) {
+    expect(doc.getNumberOfPages()).toBe(7);
+    expect(trace.drawnFigures.length).toBe(7);
+    for (let i = 0; i < 7; i++) {
       for (const fig of model.slides[i].body) {
         expect(trace.drawnFigures[i]).toContain(fig.value);
       }
     }
-    const tiles = model.slides[5].tiles ?? [];
-    expect(tiles.length).toBe(10);
-    const tracedDeal = trace.drawnFigures[5].join("|");
+    const tiles = model.slides[6].tiles ?? [];
+    expect(tiles.length).toBe(6);
+    const tracedDeal = trace.drawnFigures[6].join("|");
     for (const t of tiles) {
       expect(tracedDeal).toContain(t.value);
       expect(tracedDeal).toContain(t.label.toUpperCase());
     }
   });
 
-  it("the financing-on variant: the deal slide carries all fifteen tiles plus the disclosure; page count pinned", () => {
+  it("the financing-on variant: the deal slide carries all nine tiles plus the disclosure; page count pinned", () => {
     const finInputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const finResult = computeModel(finInputs);
     const finModel = deckSlides(finInputs, finResult);
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(finModel, finInputs.projectName, trace);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(5);
-    const tiles = finModel.slides[5].tiles ?? [];
-    expect(tiles.length).toBe(15);
-    const traced = trace.drawnFigures[5].join("|");
+    const tiles = finModel.slides[6].tiles ?? [];
+    expect(tiles.length).toBe(9);
+    const traced = trace.drawnFigures[6].join("|");
     for (const t of tiles) {
       expect(traced).toContain(t.value);
     }
-    expect(finModel.slides[5].disclosures.length).toBeGreaterThan(0);
+    expect(finModel.slides[6].disclosures.length).toBeGreaterThan(0);
   });
 });

@@ -10,7 +10,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
   const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null } = props;
   const [slide, setSlide] = useState(0);
   const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons }) : null;
-  const totalSlides = deck?.slides.length ?? 6;
+  const totalSlides = deck?.slides.length ?? 7;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
 
   const dominantLine = result !== null && result.lineTotals.length > 0
@@ -94,6 +94,36 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} /></div>
               </div>
             )}
+            {sl.name === "investment" && result !== null && (
+              <div data-testid="deck-chart-slot" data-slide-chart="investment">
+                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker={investmentKicker} />
+                <CostWaterfall lineTotals={result.lineTotals} total={result.totalCost} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
+              </div>
+            )}
+            {sl.name === "recovery" && result !== null && (
+              <div data-testid="deck-chart-slot" data-slide-chart="recovery">
+                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} />
+              </div>
+            )}
+            {sl.name === "coverage" && result !== null && (
+              <div data-testid="deck-chart-slot" data-slide-chart="coverage">
+                <StageReturnsChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} />
+                <p data-testid="crossing-caption" className="stage-crossing-caption">
+                  {result.paybackYears === null
+                    ? "The cumulative line never crosses zero."
+                    : "The gold line crosses zero where the outlay is covered."}
+                </p>
+              </div>
+            )}
+            {sl.name === "scenarios" && sl.chart !== undefined && sl.chart.data.length > 0 && (
+              <div data-testid="deck-chart-slot" data-slide-chart="scenarios">
+                <CompositionRows
+                  lineTotals={sl.chart.data.map((d, j) => ({ id: `sce-${j}`, name: d.label, total: d.value }))}
+                  valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
+                  kicker="Payments across the set scenario values"
+                />
+              </div>
+            )}
             {sl.body.map((f, j) => (
               <p key={j} className="deck-figure">
                 <span className="deck-figure-label">{f.label}</span>
@@ -110,39 +140,9 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             {sl.disclosures.map((d, j) => (
               <p key={j} className="warning deck-disclosure">{d}</p>
             ))}
-            {i === 5 && deck?.glosses !== undefined && deck.glosses.map((g, j) => (
+            {sl.name === "deal" && deck?.glosses !== undefined && deck.glosses.map((g, j) => (
               <p key={"gl-" + j} data-testid="term-gloss" className="deck-disclosure"><strong>{g.term}</strong>: {g.gloss}</p>
             ))}
-            {i === 1 && result !== null && (
-              <div data-testid="deck-chart-slot" data-slide-chart="investment">
-                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker={investmentKicker} />
-                <CostWaterfall lineTotals={result.lineTotals} total={result.totalCost} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
-              </div>
-            )}
-            {i === 3 && result !== null && (
-              <div data-testid="deck-chart-slot" data-slide-chart="coverage">
-                <StageReturnsChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} />
-                <p data-testid="crossing-caption" className="stage-crossing-caption">
-                  {result.paybackYears === null
-                    ? "The cumulative line stays below the axis: the collections never cover the outlay within the horizon."
-                    : "The gold line is the cumulative net: it dips while the project pays for itself and crosses the axis where the outlay is covered."}
-                </p>
-              </div>
-            )}
-            {i === 2 && result !== null && (
-              <div data-testid="deck-chart-slot" data-slide-chart="recovery">
-                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} />
-              </div>
-            )}
-            {sl.name === "scenarios" && sl.chart !== undefined && sl.chart.data.length > 0 && (
-              <div data-testid="deck-chart-slot" data-slide-chart="scenarios">
-                <CompositionRows
-                  lineTotals={sl.chart.data.map((d, j) => ({ id: `sce-${j}`, name: d.label, total: d.value }))}
-                  valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
-                  kicker="Payments across the set scenario values"
-                />
-              </div>
-            )}
 
             <footer className="deck-slide-footer">
               <span>slide {i + 1} of {deck.slides.length}</span>

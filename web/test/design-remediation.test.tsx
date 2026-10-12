@@ -108,7 +108,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const kickers = document.querySelectorAll('[data-testid="slide-kicker"]');
-    expect(kickers.length).toBe(5);
+    expect(kickers.length).toBe(6);
     expect(kickers[0].textContent).toMatch(/^01 — /);
     const titleMetrics = document.querySelector('[data-testid="title-metrics"]') as HTMLElement;
     expect(titleMetrics).toBeTruthy();
@@ -173,6 +173,6 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
       expect(row).toBeTruthy();
     }
     const deck = deckSlides(demoProject(), result, { startYear: null, entryUnit: "ones" });
-    expect(deck.slides[3].title).not.toMatch(/\d/);
+    expect(deck.slides[4].title).not.toMatch(/\d/);
   });
 });

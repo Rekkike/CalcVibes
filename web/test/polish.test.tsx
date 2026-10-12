@@ -64,26 +64,27 @@ describe("Task C: PRINT-DESIGN / PDF-DESIGN", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
-    expect(doc.getNumberOfPages()).toBe(6);
-    expect(model.slides[1].chart?.data.length).toBe(3);
-    expect(model.slides[2].chart?.data.length).toBe(10);
+    expect(doc.getNumberOfPages()).toBe(7);
+    expect(model.slides[2].chart?.data.length).toBe(3);
+    expect(model.slides[3].chart?.data.length).toBe(10);
   });
 });
 
 describe("Task D: INSIGHT-BREAKEVEN / INSIGHT-NULL / VERDICT / GLOSSES", () => {
-  it("the recovery slide states the break-even composed from the engine payback", async () => {
+  it("the coverage slide states the break-even composed from the engine payback", async () => {
     const { demoProject } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
     const { deckYearsForDisplay } = await import("../src/engine.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
-    const insights = deck.slides[2].insights ?? [];
-    expect(insights.length).toBeGreaterThan(0);
-    expect(insights[0]).toContain("You start turning a profit in");
-    expect(insights[0]).toContain(deckYearsForDisplay(result.paybackYears as number));
+    expect(deck.slides[4].title).toBe("Coverage");
+    const coverage = deck.slides[4].body;
+    const breakEven = coverage.find((f) => f.label === "Break-even year")!;
     const { yearHeader } = await import("../src/state.js");
-    expect(insights[0]).toContain(`in ${yearHeader(Math.ceil(result.paybackYears as number), null)}`);
+    expect(breakEven.value).toBe(yearHeader(Math.ceil(result.paybackYears as number), null));
+    const nominal = coverage.find((f) => f.label === "Nominal payback")!;
+    expect(nominal.value).toBe(deckYearsForDisplay(result.paybackYears as number));
   });
 
   it("INSIGHT-NULL: a null payback renders the honest no-profit line", async () => {
@@ -94,17 +95,17 @@ describe("Task D: INSIGHT-BREAKEVEN / INSIGHT-NULL / VERDICT / GLOSSES", () => {
     const fixedResult = computeModel(fixedInputs);
     expect(fixedResult.paybackYears).toBeNull();
     const deck = deckSlides(fixedInputs, fixedResult, { startYear: null });
-    const insights = deck.slides[2].insights ?? [];
-    expect(insights.join(" ")).toContain("does not turn a profit within the modeled horizon");
+    expect(deck.slides[4].title).toBe("Coverage — not within the horizon");
+    expect(deck.slides[4].body.find((f) => f.label === "Break-even year")?.value).toBe("not within the horizon");
   });
 
   it("VERDICT-YES on the goal-met case; the glosses render on the deck", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const verdict = document.querySelector('[data-testid="deck-verdict"]');
-    expect(verdict && verdict.textContent).toContain("This is a good deal");
+    expect(verdict && verdict.textContent).toContain("Target met");
     const glosses = document.querySelectorAll('[data-testid="term-gloss"]');
     expect(glosses.length).toBe(6);
   });
@@ -153,12 +154,12 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const tiles = document.querySelectorAll('[data-testid="summary-tiles"] [data-tile]');
     const labels = Array.from(tiles).map((t) => (t as HTMLElement).getAttribute("data-tile"));
     expect(labels).toEqual([
       "Total cost", "Total collected", "Net gain", "Achieved IRR", "NPV at WACC",
-      "Payback (nominal)", "Payback (discounted)", "Break-even year", "MIRR", "Profitability index",
+      "Payback (nominal)",
     ]);
   });
 
@@ -166,7 +167,7 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const summary = document.querySelector('[data-testid="summary-charts"]') as HTMLElement;
     expect(summary.querySelector('[data-summary-chart="hurdle"] [data-testid="hurdle-plot"]')).toBeTruthy();
     expect(summary.querySelector('[data-summary-chart="bars"] [data-testid="recovery-bars"]')).toBeTruthy();
@@ -179,8 +180,8 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(blankProject());
     const deck = deckSlides(blankProject(), result, { startYear: null });
-    const tiles = deck.slides[5].tiles ?? [];
+    const tiles = deck.slides[6].tiles ?? [];
     expect(tiles.find((t) => t.label === "Total cost")?.value).toBe("0 kr");
-    expect(tiles.find((t) => t.label === "Break-even year")?.value).toBe("not within the horizon");
+    expect(deck.slides[4].body.find((f) => f.label === "Break-even year")?.value).toBe("not within the horizon");
   });
 });

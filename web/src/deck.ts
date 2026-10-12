@@ -25,6 +25,7 @@ export interface DeckTile {
   value: string;
   tone?: "ok" | "bad";
   disclosure?: string;
+  rawValue?: number | null;
 }
 
 export interface DeckSlide {
@@ -85,78 +86,64 @@ export function deckSlides(
     ],
   });
 
-  // Slide 1 — investment
-  const lineCount = inputs.costs.length;
+  // Slide 1 — executive summary (v0.6.4 Part B: the infographic block row — large figures, no paragraphs)
+  slides.push({
+    name: "summary",
+    title: "Executive summary",
+    body: [],
+    disclosures: [],
+    tiles: [
+      { label: "Cost NPV", value: money(result.costNpv), rawValue: result.costNpv, disclosure: "at the target rate" },
+      { label: "Achieved IRR", value: percentTwoForDisplay(result.achievedIrr ?? 0), rawValue: result.achievedIrr, tone: result.goalMet ? "ok" : "bad" },
+      { label: "Payback", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), rawValue: result.paybackYears },
+      { label: "Solved payment", value: result.paymentAmount === null ? "—" : money(result.paymentAmount), rawValue: result.paymentAmount },
+      { label: "Collected vs cost", value: `${money(result.totalCollected)} vs ${money(result.totalCost)}`, rawValue: result.totalCollected },
+      { label: "Verdict", value: result.goalMet ? "Target met" : "Target missed", tone: result.goalMet ? "ok" : "bad" },
+    ],
+  });
+
+  // Slide 2 — investment
   const investmentBody: DeckFigure[] = [
     { label: "Total cost (nominal)", value: money(result.totalCost), kind: "money", rawValue: result.totalCost },
     { label: "Cost NPV at target (discounted)", value: money(result.costNpv), kind: "money", rawValue: result.costNpv, disclosure: "discounted at the target rate" },
   ];
-  for (const lt of result.lineTotals) {
-    investmentBody.push({ label: lt.name, value: money(lt.total), kind: "money", rawValue: lt.total });
-  }
   if (result.operatingTotal > 0) {
     investmentBody.push({ label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "a separate consideration, not in the investment total" });
   }
   slides.push({
     name: "investment",
-    title: `We invest ${money(result.totalCost)} nominal across ${lineCount} cost lines`,
+    title: "The investment",
     body: investmentBody,
     disclosures: [],
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
   });
 
-  // Slide 2 — recovery
+  // Slide 3 — recovery
   let recoveryTitle: string;
   const recoveryBody: DeckFigure[] = [];
   if (!tariffCollectionMode && result.paymentAmount !== null) {
-    recoveryTitle = `${result.paymentCount} payments of ${money(result.paymentAmount)} recover the full requirement`;
+    recoveryTitle = "The recovery — solved payments";
     recoveryBody.push({ label: "Payments", value: String(result.paymentCount), kind: "count", rawValue: result.paymentCount });
     recoveryBody.push({ label: "Payment per period", value: money(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
-    recoveryBody.push({ label: "First collection", value: yearHeader(result.repaymentStartYear, startYear), kind: "text", rawValue: null });
-    recoveryBody.push({ label: "Last collection", value: yearHeader(Math.ceil(result.lastPaymentMonth / 12), startYear), kind: "text", rawValue: null });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
     if (inputs.tariff?.mode === "decompose") {
-      recoveryTitle = "Per-lift prices recover the requirement year by year";
-      for (const ty of result.tariffYears) {
-        recoveryBody.push({ label: `Unit price ${yearHeader(ty.year, startYear)}`, value: ty.unitPrice === null ? "not applicable" : money(ty.unitPrice), kind: "money", rawValue: ty.unitPrice });
-      }
-      const firstYearCharges = result.tariffYears[0]?.perRowCharges;
-      if (firstYearCharges) {
-        for (const row of inputs.tariff?.rows ?? []) {
-          recoveryBody.push({ label: `Per-lift charge, ${row.label}`, value: money(firstYearCharges[row.id]), kind: "money", rawValue: firstYearCharges[row.id] });
-        }
-      }
+      recoveryTitle = "The recovery — per-lift prices";
+      const firstPrice = result.tariffYears[0]?.unitPrice;
+      recoveryBody.push({ label: `Unit price ${yearHeader(result.tariffYears[0]?.year ?? 1, startYear)}`, value: firstPrice === null || firstPrice === undefined ? "not applicable" : money(firstPrice), kind: "money", rawValue: firstPrice ?? null });
     }
   } else if (inputs.tariff?.mode === "stable") {
     const base = result.tariffBaseUnitPrice as number;
-    const unitPrices = result.tariffYears.map((y) => y.unitPrice as number);
-    const minPrice = Math.min(...unitPrices);
-    const maxPrice = Math.max(...unitPrices);
-    recoveryTitle = `A stable tariff of ${money(base)} per weighted lift recovers the full requirement`;
+    recoveryTitle = "The recovery — a stable tariff";
     recoveryBody.push({ label: "Base price (first grid year terms)", value: money(base), kind: "money", rawValue: base });
-    recoveryBody.push({ label: "Tariff escalation per year", value: percentTwoForDisplay(inputs.tariff.escalationPerYear / 100), kind: "percent", rawValue: inputs.tariff.escalationPerYear / 100 });
-    recoveryBody.push({ label: "Unit-price range", value: `${money(minPrice)} – ${money(maxPrice)}`, kind: "money", rawValue: null });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   } else if (inputs.tariff?.mode === "manual") {
-    recoveryTitle = "Manual per-year prices — evaluated, not solved";
-    recoveryBody.push({ label: "Mode", value: "evaluated, not solved", kind: "text", rawValue: null });
+    recoveryTitle = "The recovery — evaluated, not solved";
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   } else if (inputs.repayment.collectionsOverrides && Object.keys(inputs.repayment.collectionsOverrides).length > 0) {
-    recoveryTitle = "A per-year collections profile — evaluated, not solved";
-    recoveryBody.push({ label: "Mode", value: "evaluated, not solved", kind: "text", rawValue: null });
-    for (const gr of result.collectionsGrid) {
-      if (gr.id === "profile") {
-        for (let k = 0; k < gr.amounts.length; k++) {
-          if (gr.amounts[k] > 0) {
-            recoveryBody.push({ label: `Collections ${yearHeader(k + 1, startYear)}`, value: money(gr.amounts[k]), kind: "money", rawValue: gr.amounts[k] });
-          }
-        }
-      }
-    }
+    recoveryTitle = "The recovery — evaluated, not solved";
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   } else {
-    recoveryTitle = "A fixed amount per year — evaluated, not solved";
-    recoveryBody.push({ label: "Mode", value: "evaluated, not solved", kind: "text", rawValue: null });
+    recoveryTitle = "The recovery — evaluated, not solved";
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   }
   const yearsCount = result.yearly.length;
@@ -164,22 +151,12 @@ export function deckSlides(
   for (const row of result.collectionsGrid) {
     for (let k = 0; k < Math.min(yearsCount, row.amounts.length); k++) inflowByYear[k] += row.amounts[k];
   }
-  const insights: string[] = [];
-  if (result.paybackYears !== null) {
-    insights.push(`You start turning a profit in ${yearHeader(Math.ceil(result.paybackYears), startYear)} (nominal payback ${deckYearsForDisplay(result.paybackYears)}).`);
-  } else {
-    insights.push("The project does not turn a profit within the modeled horizon.");
-  }
-  if (result.discountedPaybackYears !== null) {
-    insights.push(`On a discounted basis, break-even arrives in ${yearHeader(Math.ceil(result.discountedPaybackYears), startYear)} (${deckYearsForDisplay(result.discountedPaybackYears)}).`);
-  }
   slides.push({
     name: "recovery",
     title: recoveryTitle,
     body: recoveryBody,
     disclosures: leveraged ? ["Collections solved so the equity earns the target (leveraged solve)"] : [],
     chart: { kind: "bars", data: inflowByYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })) },
-    insights,
   });
 
   // Slide 3 — returns
@@ -196,8 +173,8 @@ export function deckSlides(
     coverageBody.push({ label: "Discounted payback (at WACC)", value: deckYearsForDisplay(result.discountedPaybackYears), kind: "years", rawValue: result.discountedPaybackYears });
   }
   const coverageTitle = result.paybackYears === null
-    ? "The requirement is not covered within the horizon"
-    : "The outlay is recovered and the project turns cash-positive";
+    ? "Coverage — not within the horizon"
+    : "Coverage";
   slides.push({
     name: "coverage",
     title: coverageTitle,
@@ -208,14 +185,12 @@ export function deckSlides(
 
   slides.push({
     name: "returns",
-    title: `The project earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the ${percentTwoForDisplay(inputs.targetIrr / 100)} target`,
+    title: "The returns",
     body: [
       { label: "Achieved IRR", value: percentTwoForDisplay(result.achievedIrr ?? 0), kind: "percent", rawValue: result.achievedIrr },
       { label: "Goal check", value: result.goalMet ? "target achieved" : "target not achieved", kind: "text", rawValue: null },
       { label: "NPV at WACC (discounted)", value: money(result.npvAtWacc), kind: "money", rawValue: result.npvAtWacc, disclosure: "discounted at the WACC" },
       { label: "Profitability index", value: result.profitabilityIndex === null ? "—" : dscrTwoForDisplay(result.profitabilityIndex), kind: "dscr", rawValue: result.profitabilityIndex },
-      { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), kind: "years", rawValue: result.paybackYears },
-      { label: "Payback (discounted at WACC)", value: result.discountedPaybackYears === null ? "—" : deckYearsForDisplay(result.discountedPaybackYears), kind: "years", rawValue: result.discountedPaybackYears },
       { label: "MIRR", value: result.mirr === null ? "—" : percentTwoForDisplay(result.mirr), kind: "percent", rawValue: result.mirr, disclosure: "finance and reinvestment rates as configured" },
     ],
     disclosures: returnsDisclosures,
@@ -225,45 +200,39 @@ export function deckSlides(
   let dealTitle: string;
   const dealDisclosures: string[] = [];
   if (result.financing === null) {
-    dealTitle = `The deal in one view — ${money(result.totalCost)} in, ${money(result.totalCollected)} back`;
+    dealTitle = "The deal";
   } else {
     const eq = result.financing.equity;
     if (eq.irrAmbiguous) {
       dealDisclosures.push(`The equity net flow has ${eq.signChanges} sign changes; the equity IRR may not be unique.`);
     }
-    dealTitle = `Equity earns ${eq.zeroOutlay ? "nothing" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid`;
+    dealTitle = "The deal — equity view";
   }
   let verdict: string | undefined;
   if (result.financing === null) {
     verdict = result.goalMet
-      ? `This is a good deal: it earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the target, and the net gain is ${money(result.netGain)}.`
-      : `This deal falls short: it earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the target, and the net gain is ${money(result.netGain)}.`;
+      ? `Target met — net gain ${money(result.netGain)}.`
+      : `Target missed — net gain ${money(result.netGain)}.`;
   } else {
     const eq = result.financing.equity;
     verdict = result.goalMet
-      ? `This is a good deal: the equity earns ${eq.zeroOutlay ? "nothing" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid, and the project meets its target.`
-      : `This deal falls short: the project earns ${percentTwoForDisplay(result.achievedIrr ?? 0)} against the target, and the equity does not recover its outlay.`;
+      ? `Target met — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid.`
+      : `Target missed — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid.`;
   }
   const tiles: DeckTile[] = [
-    { label: "Total cost", value: money(result.totalCost) },
-    { label: "Total collected", value: money(result.totalCollected) },
-    { label: "Net gain", value: money(result.netGain), tone: result.netGain >= 0 ? "ok" : "bad" },
-    { label: "Achieved IRR", value: `${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad" },
-    { label: "NPV at WACC", value: money(result.npvAtWacc), tone: result.npvAtWacc >= 0 ? "ok" : "bad" },
-    { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears) },
-    { label: "Payback (discounted)", value: result.discountedPaybackYears === null ? "—" : deckYearsForDisplay(result.discountedPaybackYears) },
-    { label: "Break-even year", value: result.paybackYears === null ? "not within the horizon" : yearHeader(Math.ceil(result.paybackYears), startYear) },
-    { label: "MIRR", value: percentTwoForDisplay(result.mirr ?? 0) },
-    { label: "Profitability index", value: dscrTwoForDisplay(result.profitabilityIndex ?? 0) },
+    { label: "Total cost", value: money(result.totalCost), rawValue: result.totalCost },
+    { label: "Total collected", value: money(result.totalCollected), rawValue: result.totalCollected },
+    { label: "Net gain", value: money(result.netGain), tone: result.netGain >= 0 ? "ok" : "bad", rawValue: result.netGain },
+    { label: "Achieved IRR", value: `${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad", rawValue: result.achievedIrr },
+    { label: "NPV at WACC", value: money(result.npvAtWacc), tone: result.npvAtWacc >= 0 ? "ok" : "bad", rawValue: result.npvAtWacc },
+    { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), rawValue: result.paybackYears },
   ];
   if (result.financing !== null) {
     const eq = result.financing.equity;
-    tiles.push({ label: "Equity outlay", value: money(eq.outlay) });
-    tiles.push({ label: "Equity IRR", value: eq.zeroOutlay ? "not applicable (zero equity outlay)" : (eq.irr === null ? "—" : percentTwoForDisplay(eq.irr)) });
-    tiles.push({ label: "Equity NPV at WACC (discounted)", value: money(eq.npvAtWacc) });
-    tiles.push({ label: "Drawn (nominal)", value: money(result.financing.drawnTotal) });
+    tiles.push({ label: "Equity outlay", value: money(eq.outlay), rawValue: eq.outlay });
+    tiles.push({ label: "Equity IRR", value: eq.zeroOutlay ? "not applicable (zero equity outlay)" : (eq.irr === null ? "—" : percentTwoForDisplay(eq.irr)), rawValue: eq.irr });
     if (result.financing.minDscr !== null) {
-      tiles.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), tone: result.financing.minDscr.value >= 1.0 ? "ok" : "bad", disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}` });
+      tiles.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), tone: result.financing.minDscr.value >= 1.0 ? "ok" : "bad", disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}`, rawValue: result.financing.minDscr.value });
     }
   }
   const summaryCharts: DeckChartSlot[] = [
@@ -277,7 +246,7 @@ export function deckSlides(
     dealDisclosures.push(result.residualDisclosure);
   }
   const solverScenario = result.goalMet ? null : {
-    label: "Scenario: what would we need to reach our target",
+    label: "To reach the target",
     requiredPayment: result.paymentAmount === null ? null : money(result.paymentAmount),
   };
   slides.push({ name: "deal", title: dealTitle, body: [], disclosures: dealDisclosures, verdict, tiles, summaryCharts, solverScenario });
@@ -379,14 +348,14 @@ export function deckSlides(
     }
     slides.push({
       name: "scenarios",
-      title: "How the deal moves as the set scenario values change",
+      title: "The scenarios",
       body: sceBody,
       disclosures: sceDisclosures,
       ...(chartData.length > 0 ? { chart: { kind: "rows", data: chartData } } : {}),
     });
   }
 
-  const kickerNumbers = ["01", "02", "03", "04", "05", "06"];
+  const kickerNumbers = ["01", "02", "03", "04", "05", "06", "07"];
   let kickerIdx = 0;
   for (const sl of slides) {
     if (sl.name !== "title") {

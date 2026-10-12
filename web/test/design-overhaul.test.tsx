@@ -166,12 +166,12 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
-    const donutData = deck.slides[1].chart?.data;
+    const donutData = deck.slides[2].chart?.data;
     expect(donutData?.length).toBe(result.lineTotals.length);
     for (let i = 0; i < (donutData?.length ?? 0); i++) {
       expect(donutData?.[i].value).toBe(result.lineTotals[i].total);
     }
-    const barsData = deck.slides[2].chart?.data;
+    const barsData = deck.slides[3].chart?.data;
     expect(barsData?.length).toBe(result.yearly.length);
     for (let k = 0; k < (barsData?.length ?? 0); k++) {
       expect(barsData?.[k].value).toBe(result.yearly[k].inflow);
@@ -185,10 +185,10 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     const { buildDeckPdf } = await import("../src/pdf.js");
     const result = computeModel(demoProject());
     const model = deckSlides(demoProject(), result, { startYear: null });
-    expect(model.slides[1].chart?.kind).toBe("rows");
-    expect(model.slides[2].chart?.kind).toBe("bars");
+    expect(model.slides[2].chart?.kind).toBe("rows");
+    expect(model.slides[3].chart?.kind).toBe("bars");
     const doc = buildDeckPdf(model, "Project Alpha");
-    expect(doc.getNumberOfPages()).toBe(6);
+    expect(doc.getNumberOfPages()).toBe(7);
     const bytes = doc.output("arraybuffer");
     expect(bytes.byteLength).toBeGreaterThan(1000);
   });

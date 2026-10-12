@@ -139,16 +139,16 @@ describe("Task B (continued): the not-met answer branch", () => {
 });
 
 describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTICS / TAKEAWAY-KICKERS", () => {
-  it("COVERAGE-SLIDE: the deck counts six slides; the coverage slide sits between recovery and returns with the engine cumulative curve", async () => {
+  it("COVERAGE-SLIDE: the deck counts seven slides; the coverage slide sits between recovery and returns with the engine cumulative curve", async () => {
     const { demoProject } = await import("../src/state.js");
     const { computeModel, deckYearsForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
-    expect(deck.slides.length).toBe(6);
-    expect(deck.slides.map((s) => s.name)).toEqual(["title", "investment", "recovery", "coverage", "returns", "deal"]);
-    const coverage = deck.slides[3];
-    expect(coverage.title).toBe("The outlay is recovered and the project turns cash-positive");
+    expect(deck.slides.length).toBe(7);
+    expect(deck.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "recovery", "coverage", "returns", "deal"]);
+    const coverage = deck.slides[4];
+    expect(coverage.title).toBe("Coverage");
     expect(coverage.chart?.kind).toBe("coverage");
     expect(coverage.chart?.data.length).toBe(result.yearly.length);
     for (let k = 0; k < (coverage.chart?.data.length ?? 0); k++) {
@@ -235,7 +235,7 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const npvTile = document.querySelector('[data-tile="NPV at WACC"]') as HTMLElement;
     expect(npvTile.className).toContain("tone-ok");
     const netGainTile = document.querySelector('[data-tile="Net gain"]') as HTMLElement;
@@ -245,7 +245,7 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     fireEvent.change(document.querySelector('[data-field="tariffMode"]') as HTMLElement, { target: { value: "fixed" } });
     fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100" } });
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const npvTileBad = document.querySelector('[data-tile="NPV at WACC"]') as HTMLElement;
     expect(npvTileBad.className).toContain("tone-bad");
     const irrTileBad = document.querySelector('[data-tile="Achieved IRR"]') as HTMLElement;

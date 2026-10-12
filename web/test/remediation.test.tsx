@@ -14,9 +14,9 @@ describe("Task R4: VERDICT-NO / TOGGLE-POSITION / NO-DEAD-RULE", () => {
     fireEvent.change(document.querySelector('[data-field="tariffMode"]') as HTMLElement, { target: { value: "fixed" } });
     fireEvent.change(document.querySelector('[data-field="tariffFixed"]') as HTMLElement, { target: { value: "100" } });
     fireEvent.click(byAction("present"));
-    for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const verdict = document.querySelector('[data-testid="deck-verdict"]');
-    expect(verdict && verdict.textContent).toContain("This deal falls short");
+    expect(verdict && verdict.textContent).toContain("Target missed");
   });
 
   it("TOGGLE-POSITION: the theme toggle and the version render at the top right of the header", () => {
@@ -42,7 +42,7 @@ describe("Task R4: VERDICT-NO / TOGGLE-POSITION / NO-DEAD-RULE", () => {
 });
 
 describe("Task R3: FIN-TILES / NO-DEAD-BODY", () => {
-  it("FIN-TILES: the financing variant renders exactly fifteen tiles, enumerated, the DSCR tile carrying the calendar-labeled year", async () => {
+  it("FIN-TILES: the financing variant renders exactly nine tiles, enumerated, the DSCR tile carrying the calendar-labeled year", async () => {
     const { demoProject } = await import("../src/state.js");
     const { computeModel, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
@@ -50,21 +50,18 @@ describe("Task R3: FIN-TILES / NO-DEAD-BODY", () => {
     const inputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const result = computeModel(inputs);
     const deck = deckSlides(inputs, result, { startYear: null });
-    const tiles = deck.slides[5].tiles ?? [];
-    expect(tiles.length).toBe(15);
+    const tiles = deck.slides[6].tiles ?? [];
+    expect(tiles.length).toBe(9);
     const labels = tiles.map((t) => t.label);
     expect(labels).toEqual([
       "Total cost", "Total collected", "Net gain", "Achieved IRR", "NPV at WACC",
-      "Payback (nominal)", "Payback (discounted)", "Break-even year", "MIRR", "Profitability index",
-      "Equity outlay", "Equity IRR", "Equity NPV at WACC (discounted)", "Drawn (nominal)", "Minimum DSCR",
+      "Payback (nominal)", "Equity outlay", "Equity IRR", "Minimum DSCR",
     ]);
     const fin = result.financing;
     expect(fin).not.toBeNull();
     const byLabel = (l: string) => tiles.find((t) => t.label === l);
     expect(byLabel("Equity outlay")?.value).toBe(deckMoneyForDisplay(fin!.equity.outlay, "SEK", "ones"));
     expect(byLabel("Equity IRR")?.value).toBe(percentTwoForDisplay(fin!.equity.irr as number));
-    expect(byLabel("Equity NPV at WACC (discounted)")?.value).toBe(deckMoneyForDisplay(fin!.equity.npvAtWacc, "SEK", "ones"));
-    expect(byLabel("Drawn (nominal)")?.value).toBe(deckMoneyForDisplay(fin!.drawnTotal, "SEK", "ones"));
     expect(byLabel("Minimum DSCR")?.value).toBe(dscrTwoForDisplay(fin!.minDscr!.value));
     expect(byLabel("Minimum DSCR")?.disclosure).toBe(`in ${yearHeader(fin!.minDscr!.year, null)}`);
   });
@@ -85,13 +82,13 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
-    const tracedDeal = trace.drawnFigures[5].join("|");
-    const tiles = model.slides[5].tiles ?? [];
-    expect(tiles.length).toBe(10);
+    const tracedDeal = trace.drawnFigures[6].join("|");
+    const tiles = model.slides[6].tiles ?? [];
+    expect(tiles.length).toBe(6);
     for (const t of tiles) {
       expect(tracedDeal).toContain(t.value);
     }
-    expect(doc.getNumberOfPages()).toBe(6);
+    expect(doc.getNumberOfPages()).toBe(7);
   });
 
   it("PDF-SUMMARY-CHARTS: both mini charts are drawn with their labels and the peak", async () => {
@@ -103,9 +100,9 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(model, "Project Alpha", trace);
-    const tracedDeal = trace.drawnFigures[5].join("|");
-    const hurdle = model.slides[5].summaryCharts?.[0];
-    const bars = model.slides[5].summaryCharts?.[1];
+    const tracedDeal = trace.drawnFigures[6].join("|");
+    const hurdle = model.slides[6].summaryCharts?.[0];
+    const bars = model.slides[6].summaryCharts?.[1];
     expect(hurdle?.kind).toBe("hurdle");
     expect(bars?.kind).toBe("bars");
     expect(bars?.data.length).toBe(result.yearly.length);
@@ -118,13 +115,12 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
 
   it("TILE-TRACE (the EX-1 repair): every base-demo deal tile value equals its engine field through the display formatters", async () => {
     const { demoProject } = await import("../src/state.js");
-    const { computeModel, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay } = await import("../src/engine.js");
+    const { computeModel, percentTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
-    const { yearHeader } = await import("../src/state.js");
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null });
-    const tiles = deck.slides[5].tiles ?? [];
+    const tiles = deck.slides[6].tiles ?? [];
     const byLabel = (l: string) => tiles.find((t) => t.label === l);
     const unit = "ones";
     expect(byLabel("Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", unit));
@@ -133,10 +129,6 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     expect(byLabel("Achieved IRR")?.value).toBe(`${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(demo.targetIrr / 100)} target`);
     expect(byLabel("NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", unit));
     expect(byLabel("Payback (nominal)")?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
-    expect(byLabel("Payback (discounted)")?.value).toBe(deckYearsForDisplay(result.discountedPaybackYears as number));
-    expect(byLabel("Break-even year")?.value).toBe(yearHeader(Math.ceil(result.paybackYears as number), null));
-    expect(byLabel("MIRR")?.value).toBe(percentTwoForDisplay(result.mirr ?? 0));
-    expect(byLabel("Profitability index")?.value).toBe(dscrTwoForDisplay(result.profitabilityIndex ?? 0));
   });
 });
 
