@@ -32,6 +32,22 @@ describe("Task G: the deck design system (structural pins)", () => {
     expect(css).toMatch(/--deck-content-width:\s*56rem/);
   });
 
+  it("the deck carries its width breakpoints — the phone-deck block and the two-column wide-workspace rules (v0.6.9 Tasks B/C)", () => {
+    const css = fs.readFileSync("src/index.css", "utf8");
+    // The phone-deck block (the red proof: the deck carried only print media queries).
+    expect(css).toMatch(/@media \(max-width: 480px\) \{\s*\[data-testid="presentation"\] \.deck-slide \{\s*padding: var\(--space-3\) var\(--space-2\);\s*min-height: auto;\s*\}/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.chart-kicker \{\s*font-size: 0\.85rem;\s*\}/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.donut-geometry \{\s*width: 132px;\s*height: 132px;/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.waterfall-track \{\s*height: 180px;\s*\}/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.stage-returns-svg \{\s*min-height: 120px;\s*\}/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.summary-tiles \{\s*grid-template-columns: repeat\(auto-fit, minmax\(120px, 1fr\)\);\s*\}/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.bar-year-label,\s*\[data-testid="presentation"\] \.peak-label \{\s*font-size: 10px;\s*\}/);
+    // The two-column sections at the wide workspace breakpoint — the two source-verified shapes.
+    expect(css).toMatch(/@media \(min-width: 80rem\) \{\s*\.app-root \[data-testid="overview-summary"\] \{\s*display: grid;\s*grid-template-columns: minmax\(28rem, 2fr\) minmax\(0, 3fr\);/);
+    expect(css).toMatch(/\.app-root section\[data-testid="repayment"\] \{\s*display: grid;\s*grid-template-columns: minmax\(0, 3fr\) minmax\(22rem, 1fr\);/);
+    expect(css).toMatch(/\.app-root section\[data-testid="repayment"\] > \[data-testid="repayment-summary"\] \{\s*grid-column: 2;\s*grid-row: 1;\s*\}/);
+  });
+
   it("figure values are right-aligned via the alignment class", () => {
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\.deck-figure-value\s*\{\s*[^}]*text-align:\s*right/);
