@@ -94,6 +94,34 @@ export function CompositionRows(props: {
   );
 }
 
+// v0.6.8 Task G (finding W23): the scenarios comparison chart — zero-based comparison bars with
+// direct labels (the parameter label and the payment value), no composition-share column. It
+// reuses the established chart vocabulary (the scenario target bars class); no chart library.
+export function ScenarioComparisonBars(props: {
+  data: { label: string; value: number }[];
+  valueFor: (v: number) => string;
+  kicker?: string;
+}) {
+  const { data, valueFor, kicker } = props;
+  const max = Math.max(1e-12, ...data.map((d) => Math.abs(d.value)));
+  return (
+    <div data-testid="scenario-comparison-chart" className="chart-block scenario-comparison-chart">
+      {kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{kicker}</p>}
+      {data.map((d) => (
+        <div key={d.label} data-scenario-comparison-row={d.label} className="scenario-comparison-row">
+          <span data-scenario-label={d.label} className="row-name">{d.label}</span>
+          <div className="row-bar-track">
+            <svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" className="row-bar-svg">
+              <rect x={0} y={0} width={100 * (Math.abs(d.value) / max)} height={8} fill={CHART_COLORS.accentBar} rx={2} />
+            </svg>
+          </div>
+          <span data-scenario-value={d.label} className="row-value">{valueFor(d.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function bucketWidthFor(yearCount: number, cap: number): number {
   for (const w of [1, 2, 5, 10]) {
     if (Math.ceil(yearCount / w) <= cap) return w;
@@ -174,17 +202,21 @@ export function RecoveryBars(props: {
   const { buckets: inflows, width } = bucketSeries(rawInflows, cap);
   const max = Math.max(1, ...inflows);
   const peakIdx = inflows.indexOf(Math.max(...inflows));
+  // v0.6.8 Task C (finding W22): when the bucket width is greater than 1, the range label renders
+  // only on every ceil(bucketCount / 8)th column; the thinned columns render an empty label with
+  // data-thinned="true". At width 1 the yearly label set is the designed shape and is unchanged.
+  const thinStep = width > 1 ? Math.ceil(inflows.length / 8) : 1;
   return (
     <div data-testid="recovery-bars" className="chart-block">
       {kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{kicker}</p>}
       <div className="recovery-grid">
         {inflows.map((v, k) => (
           <div key={k} data-recovery-column={k} data-bucket-width={width} className="recovery-column">
-            <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? `${peakFor(v)} in ${labelFor(k * width + 1)}` : "\u00a0"}</span>
+            <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? (width === 1 ? `${peakFor(v)} in ${labelFor(k * width + 1)}` : `${peakFor(v)} in ${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}`) : "\u00a0"}</span>
             <svg viewBox={`0 0 10 ${Math.max(1, Math.round((v / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
               <rect x={0} y={0} width={10} height={Math.max(1, Math.round((v / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
             </svg>
-            <span data-testid="bar-year-label" className="bar-year-label">{width === 1 ? labelFor(k + 1) : `${labelFor(k * width + 1)}–${labelFor(Math.min(years, (k + 1) * width))}`}</span>
+            <span data-testid="bar-year-label" {...(width > 1 && k % thinStep !== 0 ? { "data-thinned": "true" } : {})} className="bar-year-label">{width === 1 ? labelFor(k + 1) : (k % thinStep === 0 ? `${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}` : "\u00a0")}</span>
           </div>
         ))}
       </div>
@@ -233,25 +265,36 @@ export function StageReturnsChart(props: {
   );
 }
 
-export function CostWaterfall(props: { lineTotals: LineTotal[]; total: number; valueFor: (v: number) => string; }) {
-  const { lineTotals, total, valueFor } = props;
+export interface WaterfallSegment {
+  id: string;
+  name: string;
+  total: number;
+  kind: "capital" | "operating" | "reinvestments";
+}
+
+// v0.6.8 Task A (finding W18): the honest cost waterfall. The props are a general segment list —
+// the capital lines, then the operating segment, then the reinvestments segment when present — and
+// the build closes exactly at the cap (totalCost). The operating and reinvestments segments carry a
+// visually distinct class so the investment basis and the operating basis are never conflated.
+export function CostWaterfall(props: { segments: WaterfallSegment[]; total: number; valueFor: (v: number) => string; }) {
+  const { segments, total, valueFor } = props;
   const cap = Math.max(1e-12, total);
   let acc = 0;
   return (
     <div data-testid="cost-waterfall" className="chart-block">
       <ul className="waterfall-label-list">
-        {lineTotals.map((l) => (
-          <li key={l.id} data-testid="waterfall-label" className="waterfall-label">{l.name} {valueFor(l.total)}</li>
+        {segments.map((s) => (
+          <li key={s.id} data-testid="waterfall-label" data-waterfall-kind={s.kind} className="waterfall-label">{s.name} {valueFor(s.total)}</li>
         ))}
       </ul>
       <div className="waterfall-track">
-        {lineTotals.map((l) => {
-          const frac = l.total / cap;
+        {segments.map((s) => {
+          const frac = s.total / cap;
           const seg = (
-            <div key={l.id} data-waterfall-segment={l.id} className="waterfall-segment" style={{ bottom: `${(acc / cap) * 100}%`, height: `${frac * 100}%` }}>
+            <div key={s.id} data-waterfall-segment={s.id} data-waterfall-kind={s.kind} className={"waterfall-segment" + (s.kind === "capital" ? "" : " waterfall-segment-" + s.kind)} style={{ bottom: `${(acc / cap) * 100}%`, height: `${frac * 100}%` }}>
             </div>
           );
-          acc += l.total;
+          acc += s.total;
           return seg;
         })}
         <div data-testid="waterfall-cap" className="waterfall-cap" style={{ bottom: "100%", width: "100%", height: "4px" }} />

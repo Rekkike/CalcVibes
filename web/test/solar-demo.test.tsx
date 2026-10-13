@@ -96,12 +96,14 @@ describe("v0.6.6: the solar park demo", () => {
     expect(sce?.targetChart).toBeDefined();
     expect(sce?.targetChart?.mode).toBe("solved");
     expect(sce?.targetChart?.points.map((p) => p.value)).toEqual([109095.45410129367, 124150.30495915706, 140617.60988926986]);
-    expect(sce?.targetChart?.kicker).toBe("The payment rises as the target rises");
+    // v0.6.8 Task G: the solved-mode target kicker names the target IRR.
+    expect(sce?.targetChart?.kicker).toBe("The payment rises as the target IRR rises");
     const summary = deck.slides.find((s) => s.name === "summary");
     const outflows = summary?.donuts?.find((d) => d.id === "outflows");
     expect(outflows?.segments).toHaveLength(4);
     expect(outflows?.segments.reduce((a, s) => a + s.value, 0)).toBe(11500000);
-    expect(outflows?.disclosure).toBe("Operating lines are a separate consideration, not in the investment total.");
+    // v0.6.8 Task A: the donut disclosure states the capital-program scope honestly.
+    expect(outflows?.disclosure).toBe("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
     const inflows = summary?.donuts?.find((d) => d.id === "inflows");
     expect(inflows?.segments).toHaveLength(1);
     expect(inflows?.segments[0].value).toBeCloseTo(29796073.19, 2);

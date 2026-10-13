@@ -127,6 +127,12 @@ export function solarParkProject(): ModelInputs {
 // models ONE terminal's share of the program and charges the full modeled cost base to the
 // solved per-lift fee (the one-terminal full-recovery-fee assumption of record; the real program
 // recovers across several terminals with public co-funding the app cannot model — finding F4).
+// v0.6.8 Task D (finding W19): the yearly lift volumes are rescaled by 1,000 to yearly vessel
+// moves at a terminal of this class — hundreds of thousands of container moves per year is the
+// sourced order of magnitude (a deep-sea berth alone handles on the order of half a million to
+// a million moves per year; the feeder share is comparable at smaller vessels). The per-call-sized
+// 1,330/760 numbers were the composition-time miss of record; the rescale is harness-verified
+// to leave every solved figure byte-identical, dividing only the unit price (€5.81 per lift).
 export function shorePowerProject(): ModelInputs {
   return {
     projectName: "Shore power example (Rotterdam)",
@@ -144,12 +150,12 @@ export function shorePowerProject(): ModelInputs {
       { id: "o1", label: "Operations & maintenance", amount: 3600000, startYear: 4, yearCount: 20, escalation: 1 },
       { id: "o2", label: "Insurance, grid fees & platform", amount: 1400000, startYear: 4, yearCount: 20, escalation: 1 },
     ],
-    repayment: { graceYears: 0, termYears: 20, paymentsPerYear: 12, paymentEscalation: 0, balloon: 0 },
+    repayment: { graceYears: 0, termYears: 20, paymentsPerYear: 12, paymentEscalation: 0, balloon: 0, basisNote: "Monthly payments solved so the project earns the 6 percent target over 20 years; volumes are yearly vessel calls times lifts." },
     appraisal: { wacc: 4, financeRate: 3.5, reinvestmentRate: 3.5, residual: { posture: "none", amount: 0, year: 24 } },
     maintenance: { mode: "off" },
-    tariff: { mode: "decompose", escalationPerYear: 0, rows: [
-      { id: "r1", label: "Deep-sea container vessel (8-24k TEU)", weight: 2, lifts: [110, 840, 1050, 1190, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330, 1330] },
-      { id: "r2", label: "Feeder & medium vessel (3-8k TEU)", weight: 1, lifts: [60, 480, 600, 680, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760, 760] },
+    tariff: { mode: "decompose", escalationPerYear: 0, basisNote: "Per-lift infrastructure surcharge recovering the full modeled program cost, including 20 years of operations and maintenance.", rows: [
+      { id: "r1", label: "Deep-sea container vessel (8-24k TEU)", weight: 2, lifts: [110000, 840000, 1050000, 1190000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000, 1330000] },
+      { id: "r2", label: "Feeder & medium vessel (3-8k TEU)", weight: 1, lifts: [60000, 480000, 600000, 680000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000, 760000] },
     ], fixedAnnualAmount: null, manualPrices: null },
   };
 }

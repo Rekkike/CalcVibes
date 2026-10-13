@@ -207,7 +207,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     }
   });
 
-  it("CHART-WHOLE: the recovery bars carry complete year labels equal to the year headers (v0.6.7 re-anchor: the port recovery buckets at width 2)", async () => {
+  it("CHART-WHOLE: the recovery bars label the visible buckets and thin the rest (v0.6.8 re-anchor: the port recovery buckets at width 2 thin to six visible labels)", async () => {
     const { shorePowerProject } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
@@ -222,10 +222,22 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     const yearLabels = bars.querySelectorAll('[data-testid="bar-year-label"]');
     const { width } = bucketSeries(new Array<number>(result.yearly.length).fill(0), 15);
     expect(yearLabels.length).toBe(Math.ceil(result.yearly.length / width));
+    // v0.6.8 Task C: labels thin to every ceil(bucketCount/8)th column at width > 1;
+    // thinned columns carry a non-breaking space and data-thinned="true". Port at
+    // cap 15: 12 buckets, thinStep 2, six visible labels and six thinned.
+    const thinStep = width > 1 ? Math.ceil(yearLabels.length / 8) : 1;
+    expect(Array.from(yearLabels).filter((l) => (l as SVGTextElement).getAttribute("data-thinned") !== "true").length).toBe(6);
     for (let k = 0; k < yearLabels.length; k++) {
-      expect((yearLabels[k] as SVGTextElement).textContent).toBe(width === 1
+      const labelEl = yearLabels[k] as SVGTextElement;
+      const expected = width === 1
         ? yearHeader(k + 1, null)
-        : `${yearHeader(k * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (k + 1) * width), null)}`);
+        : `${yearHeader(k * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (k + 1) * width), null)}`;
+      if (width > 1 && k % thinStep !== 0) {
+        expect(labelEl.textContent).toBe("\u00a0");
+        expect(labelEl.getAttribute("data-thinned")).toBe("true");
+      } else {
+        expect(labelEl.textContent).toBe(expected);
+      }
     }
   });
 
@@ -262,7 +274,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Per-lift prices set the yearly recovery");
   });
 
-  it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force (v0.6.7 re-anchor: the port peak is a recovery bucket sum at width 2)", async () => {
+  it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force (v0.6.8 re-anchor: the port peak is a recovery bucket sum at width 2 and names its range)", async () => {
     const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
@@ -280,7 +292,8 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     }, new Array<number>(result.yearly.length).fill(0));
     const { buckets, width } = bucketSeries(rawInflows, 15);
     const peakIdx = buckets.indexOf(Math.max(...buckets));
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", unit)} in ${yearHeader(peakIdx * width + 1, null)}`);
+    // v0.6.8 Task C: the peak label names the bucket range, not just its first year.
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", unit)} in ${yearHeader(peakIdx * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), null)}`);
   });
 
   it("PEAK-PRINT: the print stylesheet carries the peak-label ink variant", () => {

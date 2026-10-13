@@ -75,10 +75,20 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     const width = 2;
     const years = result.yearly.length;
     expect(years).toBe(23);
+    // v0.6.8 Task C: at width > 1 the label set thins to every ceil(bucketCount/8)th column;
+    // thinned columns carry a non-breaking space and data-thinned="true". Port at cap 15:
+    // 12 buckets, thinStep 2, six visible labels and six thinned.
+    const thinStep = width > 1 ? Math.ceil(cols.length / 8) : 1;
+    expect(Array.from(cols).filter((c) => (c.querySelector('[data-testid="bar-year-label"]') as HTMLElement)?.getAttribute("data-thinned") !== "true").length).toBe(6);
     for (let k = 0; k < cols.length; k++) {
-      const label = cols[k].querySelector('[data-testid="bar-year-label"]')?.textContent;
+      const labelEl = cols[k].querySelector('[data-testid="bar-year-label"]') as HTMLElement;
       const expected = `${yearHeader(k * width + 1, null)}–${yearHeader(Math.min(years, (k + 1) * width), null)}`;
-      expect(label).toBe(expected);
+      if (k % thinStep === 0) {
+        expect(labelEl.textContent).toBe(expected);
+      } else {
+        expect(labelEl.textContent).toBe("\u00a0");
+        expect(labelEl.getAttribute("data-thinned")).toBe("true");
+      }
     }
   });
 });

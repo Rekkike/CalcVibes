@@ -19,6 +19,9 @@ export interface DeckChartSlot {
   data: { label: string; value: number }[];
   solved?: boolean;
   crossingX?: number | null;
+  // v0.6.8 Task G: the deck model emits the chart's kicker (an action title naming the varied
+  // parameter); the hard-coded Presentation line is gone.
+  kicker?: string;
 }
 
 export interface DeckDonutSegment {
@@ -98,6 +101,11 @@ export function deckSlides(
   const currency = (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK";
   const unit = opts.entryUnit ?? "ones";
   const money = (v: number) => deckMoneyForDisplay(v, currency, unit);
+  // v0.6.8 Task B (finding W22): the fee closure — fee-class figures render at the ones unit
+  // (two decimals, grouped, no unit token) instead of collapsing under the coarse global entry
+  // unit (the witnessed "€0 M" unit price and "€2 M" payment). Program-scale figures keep the
+  // entry unit; their semantics are unchanged.
+  const fee = (v: number) => moneyForDisplay(v, currency, "ones");
   const startYear = opts.startYear;
   const leveraged = result.leveragedSolve;
   const tariffCollectionMode = inputs.tariff !== undefined && inputs.tariff.mode !== "off" && inputs.tariff.mode !== "decompose";
@@ -131,7 +139,9 @@ export function deckSlides(
       id: "outflows",
       title: "Outflows — the investment",
       segments: outflowSegments,
-      ...(result.operatingTotal > 0 ? { disclosure: "Operating lines are a separate consideration, not in the investment total." } : {}),
+      // v0.6.8 Task A.4: the donut shows the capital program; the wording no longer contradicts
+      // the waterfall arithmetic (operating lines and reinvestments are part of the total cost).
+      ...(result.operatingTotal > 0 ? { disclosure: "The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately." } : {}),
     },
     { id: "inflows", title: "Inflows — the collections", segments: inflowSegments },
   ];
@@ -144,7 +154,7 @@ export function deckSlides(
       { label: "Cost NPV", value: money(result.costNpv), rawValue: result.costNpv, disclosure: "at the target rate" },
       { label: "Achieved IRR", value: percentTwoForDisplay(result.achievedIrr ?? 0), rawValue: result.achievedIrr, tone: result.goalMet ? "ok" : "bad" },
       { label: "Payback", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), rawValue: result.paybackYears },
-      { label: "Solved payment", value: result.paymentAmount === null ? "—" : money(result.paymentAmount), rawValue: result.paymentAmount },
+      { label: "Solved payment", value: result.paymentAmount === null ? "—" : fee(result.paymentAmount), rawValue: result.paymentAmount },
       { label: "Collected vs cost", value: `${money(result.totalCollected)} vs ${money(result.totalCost)}`, rawValue: result.totalCollected },
       { label: "Verdict", value: result.goalMet ? "Target met" : "Target missed", tone: result.goalMet ? "ok" : "bad" },
     ],
@@ -157,13 +167,15 @@ export function deckSlides(
     { label: "Cost NPV at target (discounted)", value: money(result.costNpv), kind: "money", rawValue: result.costNpv, disclosure: "discounted at the target rate" },
   ];
   if (result.operatingTotal > 0) {
-    investmentBody.push({ label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "a separate consideration, not in the investment total" });
+    investmentBody.push({ label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "expensed as incurred; part of the total cost, not depreciated" });
   }
   slides.push({
     name: "investment",
     title: "The investment",
     body: investmentBody,
-    disclosures: [],
+    // v0.6.8 Task A.4: the composition shares on this slide are of the capital program; the
+    // disclosed 101 percent artifact (the port's five shares read 8/30/30/23/10) is named.
+    disclosures: ["Composition shares are of the capital program; integer rounding can differ from 100 percent."],
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
   });
 
@@ -173,17 +185,17 @@ export function deckSlides(
   if (!tariffCollectionMode && result.paymentAmount !== null) {
     recoveryTitle = "The recovery — solved payments";
     recoveryBody.push({ label: "Payments", value: String(result.paymentCount), kind: "count", rawValue: result.paymentCount });
-    recoveryBody.push({ label: "Payment per period", value: money(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
+    recoveryBody.push({ label: "Payment per period", value: fee(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
     if (inputs.tariff?.mode === "decompose") {
       recoveryTitle = "The recovery — per-lift prices";
       const firstPrice = result.tariffYears[0]?.unitPrice;
-      recoveryBody.push({ label: `Unit price ${yearHeader(result.tariffYears[0]?.year ?? 1, startYear)}`, value: firstPrice === null || firstPrice === undefined ? "not applicable" : money(firstPrice), kind: "money", rawValue: firstPrice ?? null });
+      recoveryBody.push({ label: `Unit price ${yearHeader(result.tariffYears[0]?.year ?? 1, startYear)}`, value: firstPrice === null || firstPrice === undefined ? "not applicable" : fee(firstPrice), kind: "money", rawValue: firstPrice ?? null });
     }
   } else if (inputs.tariff?.mode === "stable") {
     const base = result.tariffBaseUnitPrice as number;
     recoveryTitle = "The recovery — a stable tariff";
-    recoveryBody.push({ label: "Base price (first grid year terms)", value: money(base), kind: "money", rawValue: base });
+    recoveryBody.push({ label: "Base price (first grid year terms)", value: fee(base), kind: "money", rawValue: base });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   } else if (inputs.tariff?.mode === "manual") {
     recoveryTitle = "The recovery — evaluated, not solved";
@@ -200,11 +212,20 @@ export function deckSlides(
   for (const row of result.collectionsGrid) {
     for (let k = 0; k < Math.min(yearsCount, row.amounts.length); k++) inflowByYear[k] += row.amounts[k];
   }
+  // v0.6.8 Task E.4 (finding W21): the user basis notes surface here — disclosed verbatim when
+  // non-empty, absent when empty (the land fixture is the null-tolerance demo and gains none).
+  const recoveryDisclosures: string[] = leveraged ? ["Collections solved so the equity earns the target (leveraged solve)"] : [];
+  if (typeof inputs.tariff?.basisNote === "string" && inputs.tariff.basisNote.trim() !== "") {
+    recoveryDisclosures.push(`Tariff basis: ${inputs.tariff.basisNote}`);
+  }
+  if (typeof inputs.repayment?.basisNote === "string" && inputs.repayment.basisNote.trim() !== "") {
+    recoveryDisclosures.push(`Repayment basis: ${inputs.repayment.basisNote}`);
+  }
   slides.push({
     name: "recovery",
     title: recoveryTitle,
     body: recoveryBody,
-    disclosures: leveraged ? ["Collections solved so the equity earns the target (leveraged solve)"] : [],
+    disclosures: recoveryDisclosures,
     chart: { kind: "bars", data: inflowByYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })) },
   });
 
@@ -349,6 +370,7 @@ export function deckSlides(
       sceDisclosures.push("The named scenario sets could not be computed for this project; see the Scenarios tab.");
     }
     let chartData: { label: string; value: number }[] = [];
+    let chartKicker: string | undefined;
     if (profileActive) {
       sceDisclosures.push("The payment sensitivity figures do not apply while a collections profile is present (SCE-PROFILE).");
     } else {
@@ -363,6 +385,8 @@ export function deckSlides(
           const maxP = Math.max(...okTerms.map((x) => x.payment));
           sceBody.push({ label: "Payment range across the set terms", value: `${money(minP)} – ${money(maxP)}`, kind: "money", rawValue: null, disclosure: `${okTerms.length} of ${sceTerms.length} term values computed` });
           chartData = okTerms.map((x) => ({ label: x.label, value: x.payment }));
+          // v0.6.8 Task G: the kicker is emitted by the deck model and names the varied parameter.
+          chartKicker = "Longer terms lower the payment";
         } else {
           sceDisclosures.push("The set term values were refused by the engine; see the Scenarios tab.");
         }
@@ -397,6 +421,7 @@ export function deckSlides(
           sceBody.push({ label: "Payment range across the set balloons", value: `${money(minB)} – ${money(maxB)}`, kind: "money", rawValue: null, disclosure: `at the ${inputs.repayment.termYears}-year term` });
           if (chartData.length === 0) {
             chartData = okBalloons.map((x) => ({ label: x.label, value: x.payment }));
+            chartKicker = "Larger balloons lower the payment";
           }
         } else {
           sceDisclosures.push("The set balloon values were refused by the engine; see the Scenarios tab.");
@@ -409,6 +434,7 @@ export function deckSlides(
         ...(sc.optimistic.paymentAmount !== null ? [{ label: "Optimistic", value: sc.optimistic.paymentAmount }] : []),
         ...(sc.pessimistic.paymentAmount !== null ? [{ label: "Pessimistic", value: sc.pessimistic.paymentAmount }] : []),
       ];
+      chartKicker = "The named scenarios set the payment range";
     }
     let targetChart: ScenarioTargetChart | undefined;
     if (!profileActive && sceTargets.length >= 2) {
@@ -420,7 +446,7 @@ export function deckSlides(
         }
         if (pts.length >= 2) {
           pts.sort((a, b) => a.target - b.target);
-          targetChart = { mode: "solved", points: pts, breakEvenTarget: null, kicker: "The payment rises as the target rises" };
+          targetChart = { mode: "solved", points: pts, breakEvenTarget: null, kicker: "The payment rises as the target IRR rises" };
         }
       } else {
         const pts: ScenarioTargetPoint[] = [];
@@ -439,7 +465,7 @@ export function deckSlides(
       title: "The scenarios",
       body: sceBody,
       disclosures: sceDisclosures,
-      ...(chartData.length > 0 ? { chart: { kind: "rows", data: chartData } } : {}),
+      ...(chartData.length > 0 ? { chart: { kind: "rows", data: chartData, ...(chartKicker !== undefined ? { kicker: chartKicker } : {}) } } : {}),
       ...(targetChart !== undefined ? { targetChart } : {}),
     });
   }

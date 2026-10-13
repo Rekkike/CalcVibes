@@ -629,6 +629,10 @@
 [data-testid="presentation"] .waterfall-track {  position: relative;  height: 120px;  width: 64px;  margin: var(--space-2) 0;}
 [data-testid="presentation"] .waterfall-segment {  position: absolute;  left: 12px;  width: 40px;  background: rgba(0, 116, 186, 0.75);  border-top: 2px solid var(--stage, #081c33);}
 [data-testid="presentation"] .waterfall-segment:last-of-type {  border-top: none;}
+/* v0.6.8 Task A (finding W18): the operating and reinvestments segments carry visually distinct
+   fills (hatched / lighter) so the investment basis and the operating basis are never conflated. */
+[data-testid="presentation"] .waterfall-segment-operating {  background: repeating-linear-gradient(45deg, rgba(52, 211, 153, 0.35), rgba(52, 211, 153, 0.35) 4px, rgba(0, 116, 186, 0.28) 4px, rgba(0, 116, 186, 0.28) 8px);}
+[data-testid="presentation"] .waterfall-segment-reinvestments {  background: repeating-linear-gradient(-45deg, rgba(232, 184, 75, 0.4), rgba(232, 184, 75, 0.4) 4px, rgba(251, 113, 133, 0.3) 4px, rgba(251, 113, 133, 0.3) 8px);}
 [data-testid="presentation"] .waterfall-cap {  position: absolute;  background: #e2e8f0;  border-radius: 2px;}
 [data-testid="presentation"] .waterfall-label {  font-size: 10px;  color: #e2e8f0;  white-space: nowrap;}
 [data-testid="presentation"] .stage-returns-svg {  display: block;  width: 100%;  height: 150px;}

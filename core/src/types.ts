@@ -25,6 +25,9 @@ export interface RepaymentParams {
   balloon: number;
   firstCollectionYear?: number | null;
   collectionsOverrides?: Record<number, number>;
+  // v0.6.8 Task E (finding W21): the optional, user-authored basis note. Engine-blind by the
+  // pinned check; it surfaces in the app, the deck, and the PDF only.
+  basisNote?: string | null;
 }
 
 export interface Reinvestment {
@@ -88,6 +91,9 @@ export interface TariffConfig {
   rows: TariffRow[];
   fixedAnnualAmount: number | null;
   manualPrices: number[] | null;
+  // v0.6.8 Task E (finding W21): the optional, user-authored basis note. Engine-blind by the
+  // pinned check; it surfaces in the app, the deck, and the PDF only.
+  basisNote?: string | null;
 }
 
 export interface TariffYearInfo {

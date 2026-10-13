@@ -53,6 +53,20 @@ export function TariffSection(props: {
           <MoneyEditor dataField="tariffFixed" value={t.fixedAnnualAmount ?? 0} entryUnit={entryUnit} onChange={(v) => setTariff({ ...t, fixedAnnualAmount: v })} />
         </label>
       )}
+      {/* v0.6.8 Task E (finding W21): the optional, user-authored tariff basis note. Empty by
+          default, never required, no engine semantics (engine-blind by the pinned check); the
+          browser enforces the 500-character bound. Surfaced in the deck and the PDF. */}
+      <label>Basis note (optional){" "}
+        <input
+          data-field="tariffBasisNote"
+          className="muted"
+          type="text"
+          maxLength={500}
+          value={t.basisNote ?? ""}
+          placeholder="Optional note on how this block is meant — shown in the deck and PDF"
+          onChange={(e) => setTariff({ ...t, basisNote: e.target.value === "" ? null : e.target.value })}
+        />
+      </label>
       {t.mode !== "off" && (
         <>
           <h3>Volume grid {gridYears.length > 0 ? `(collection years ${gridYears[0]}–${gridYears[gridYears.length - 1]}, derived from the model span)` : ""}</h3>

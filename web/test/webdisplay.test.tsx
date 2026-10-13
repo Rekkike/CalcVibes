@@ -158,7 +158,7 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     expect(detailCell).toMatch(/,\d{2}/);
   });
 
-  it("PEAK-NAMED: every peak label names its series; the deck recovery peak carries its year (v0.6.7 re-anchor: the port peak is a recovery bucket sum at width 2, EUR)", async () => {
+  it("PEAK-NAMED: every peak label names its series; the deck recovery peak carries its year range (v0.6.8 re-anchor: the port peak is a recovery bucket sum at width 2, EUR)", async () => {
     const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
@@ -176,7 +176,8 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     }, new Array<number>(result.yearly.length).fill(0));
     const { buckets, width } = bucketSeries(inflows, 15);
     const peakIdx = buckets.reduce((bi, v, i) => (v > buckets[bi] ? i : bi), 0);
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx * width + 1, null)}`);
+    // v0.6.8 Task C: the peak label names the bucket range, not just its first year.
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), null)}`);
     fireEvent.click(byAction("exit-presentation"));
     fireEvent.click(byNav("results"));
     const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;

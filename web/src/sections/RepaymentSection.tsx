@@ -43,6 +43,20 @@ export function RepaymentSection(props: {
       {mode !== "A" && (
         <label>Payment per period <MoneyEditor dataField="modePayment" value={modePayment} entryUnit={entryUnit} onChange={setModePayment} /></label>
       )}
+      {/* v0.6.8 Task E (finding W21): the optional, user-authored repayment basis note. Empty by
+          default, never required, no engine semantics (engine-blind by the pinned check); the
+          browser enforces the 500-character bound. Surfaced in the deck and the PDF. */}
+      <label>Basis note (optional){" "}
+        <input
+          data-field="repaymentBasisNote"
+          className="muted"
+          type="text"
+          maxLength={500}
+          value={r.basisNote ?? ""}
+          placeholder="Optional note on how this block is meant — shown in the deck and PDF"
+          onChange={(e) => setRepayment({ basisNote: e.target.value === "" ? null : e.target.value })}
+        />
+      </label>
       <div data-testid="contracts-editor">
         <h3>Contracts (deals)</h3>
         <p className="muted">Each contract is a negotiated deal. Solved contracts share one per-period payment solved so the whole project hits the target; evaluated contracts carry a set payment or a per-year collections profile.</p>

@@ -51,7 +51,9 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
     expect(deck.slides[2].title).toBe("The investment");
     expect(deck.slides[3].title).toBe("The recovery — solved payments");
     expect(deck.slides[2].body.find((f) => f.label === "Total cost (nominal)")!.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "thousands"));
-    expect(deck.slides[3].body.find((f) => f.label === "Payment per period")!.value).toBe(deckMoneyForDisplay(result.paymentAmount as number, "SEK", "thousands"));
+    // v0.6.8 Task B: the fee-class figures close at the ones formatter — the payment
+    // reads as money, not as a scaled unit figure.
+    expect(deck.slides[3].body.find((f) => f.label === "Payment per period")!.value).toBe(moneyForDisplay(result.paymentAmount as number, "SEK", "ones"));
     expect(deck.slides[6].tiles?.find((t) => t.label === "Total collected")?.value).toBe(deckMoneyForDisplay(result.totalCollected, "SEK", "thousands"));
   });
 
@@ -72,7 +74,8 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
     const stResult = computeModel(stInputs);
     const stDeck = deckSlides(stInputs, stResult, { startYear: null, entryUnit: "thousands" });
     expect(stDeck.slides[3].title).toBe("The recovery — a stable tariff");
-    expect(stDeck.slides[3].body.find((f) => f.label === "Base price (first grid year terms)")!.value).toBe(deckMoneyForDisplay(stResult.tariffBaseUnitPrice as number, "SEK", "thousands"));
+    // v0.6.8 Task B: the stable base price is a fee-class figure at the ones formatter.
+    expect(stDeck.slides[3].body.find((f) => f.label === "Base price (first grid year terms)")!.value).toBe(moneyForDisplay(stResult.tariffBaseUnitPrice as number, "SEK", "ones"));
   });
 
   it("the profile branch title", () => {

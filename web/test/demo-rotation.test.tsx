@@ -129,23 +129,26 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const ts = r.tariffYears;
     expect(ts.length).toBe(21);
     ts.forEach((t, i) => expect(t.year).toBe(i + 3));
-    expect(ts[0].unitPrice).toBe(5807.937978374375);
-    expect(ts[1].unitPrice).toBe(9034.57018858236);
-    expect(ts[2].unitPrice).toBe(7227.656150865887);
-    expect(ts[3].unitPrice).toBe(6377.343662528724);
-    for (let i = 4; i <= 19; i++) expect(ts[i].unitPrice).toBe(5706.044329630964);
-    expect(ts[20].unitPrice).toBe(5230.54063549505);
+    expect(ts[0].unitPrice).toBe(5.807937978374375);
+    expect(ts[1].unitPrice).toBe(9.034570188582359);
+    expect(ts[2].unitPrice).toBe(7.227656150865887);
+    expect(ts[3].unitPrice).toBe(6.377343662528724);
+    for (let i = 4; i <= 19; i++) expect(ts[i].unitPrice).toBe(5.706044329630964);
+    expect(ts[20].unitPrice).toBe(5.23054063549505);
     expect(ts[0].required).toBe(1626222.633944825);
     for (let i = 1; i <= 19; i++) expect(ts[i].required).toBe(19514671.607337896);
     expect(ts[20].required).toBe(17888448.97339307);
-    expect(ts[0].weightedVolume).toBe(280);
-    expect(ts[1].weightedVolume).toBe(2160);
-    expect(ts[2].weightedVolume).toBe(2700);
-    expect(ts[3].weightedVolume).toBe(3060);
-    for (let i = 4; i < ts.length; i++) expect(ts[i].weightedVolume).toBe(3420);
-    // perRowCharges are per-call prices (perRowCharges is untouched by the Task C fix).
-    expect(ts[0].perRowCharges?.["r1"]).toBe(11615.87595674875);
-    expect(ts[0].perRowCharges?.["r2"]).toBe(5807.937978374375);
+    // v0.6.8 Task D re-anchor: the lift volumes are rescaled by 1,000 to yearly vessel moves
+    // (the composition-time miss of record); every solved figure is byte-identical, so only the
+    // volume-derived spellings move (unit price and per-row charges divide by the same 1,000).
+    expect(ts[0].weightedVolume).toBe(280000);
+    expect(ts[1].weightedVolume).toBe(2160000);
+    expect(ts[2].weightedVolume).toBe(2700000);
+    expect(ts[3].weightedVolume).toBe(3060000);
+    for (let i = 4; i < ts.length; i++) expect(ts[i].weightedVolume).toBe(3420000);
+    // perRowCharges are per-lift prices (perRowCharges structure is untouched; the values rescale).
+    expect(ts[0].perRowCharges?.["r1"]).toBe(11.61587595674875);
+    expect(ts[0].perRowCharges?.["r2"]).toBe(5.807937978374375);
   });
 
   it("PORT-GRID: the collections grid carries the two tariff rows with the post-fix yearly revenues; the column identities hold", () => {
@@ -212,14 +215,18 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const outflows = summary?.donuts?.find((d) => d.id === "outflows");
     const inflows = summary?.donuts?.find((d) => d.id === "inflows");
     expect(outflows?.segments.map((s) => s.value)).toEqual([12000000, 48000000, 48000000, 36000000, 16000000]);
-    expect(outflows?.disclosure).toBe("Operating lines are a separate consideration, not in the investment total.");
+    // v0.6.8 Task A.4 re-anchor: the repaired disclosure (the arithmetic-honest wording).
+    expect(outflows?.disclosure).toBe("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
     expect(inflows?.segments.map((s) => s.value)).toEqual([303574464.86520803, 86718967.28154981]);
     expect(sum(inflows?.segments.map((s) => s.value) ?? [])).toBeCloseTo(result.totalCollected, 6);
     const scenariosSlide = deck.slides.find((s) => s.name === "scenarios");
     expect(scenariosSlide?.targetChart?.mode).toBe("solved");
-    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target rises");
+    // v0.6.8 Task G.3 re-anchor: the target chart kicker names the rate basis.
+    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target IRR rises");
     expect(scenariosSlide?.targetChart?.points.map((p) => p.value)).toEqual([1440560.902541411, 1626222.633944825, 1828351.5172141492]);
     scenariosSlide?.targetChart?.points.forEach((p) => expect(p.met).toBe(true));
+    // v0.6.8 Task G.2 re-anchor: the scenarios comparison chart kicker names the varied parameter.
+    expect(scenariosSlide?.chart?.kicker).toBe("Longer terms lower the payment");
     // Rendered deck at entry unit "ones", set through the existing unit select.
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -234,7 +241,8 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     expect(tileValue("Cost NPV")).toBe("€193 986 917");
     expect(tileValue("Achieved IRR")).toBe("6.00%");
     expect(tileValue("Payback")).toBe("14.1 years");
-    expect(tileValue("Solved payment")).toBe("€1 626 223");
+    // v0.6.8 Task B re-anchor: the fee-class figures render at the ones unit (the fee closure).
+    expect(tileValue("Solved payment")).toBe("€1 626 222,63");
     expect(tileValue("Collected vs cost")).toBe("€390 293 432 vs €269 591 641");
     expect(tileValue("Verdict")).toBe("Target met");
     expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("€269 591 641");
@@ -243,9 +251,14 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — per-lift prices");
     expect(bodyFigureValue("recovery", "Payments")).toBe("240");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€1 626 223");
+    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€1 626 222,63");
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€390 293 432");
-    expect(bodyFigureValue("recovery", "Unit price Year 3")).toBe("€5 808");
+    expect(bodyFigureValue("recovery", "Unit price Year 3")).toBe("€5,81");
+    // v0.6.8 Task E.4: the port fixture carries both basis notes, disclosed verbatim on the
+    // recovery slide (the land fixture is the null-tolerance demo and gains none).
+    const recoverySlideEl = document.querySelector('[data-slide-name="recovery"]') as HTMLElement;
+    expect(recoverySlideEl.textContent).toContain("Tariff basis: Per-lift infrastructure surcharge recovering the full modeled program cost, including 20 years of operations and maintenance.");
+    expect(recoverySlideEl.textContent).toContain("Repayment basis: Monthly payments solved so the project earns the 6 percent target over 20 years; volumes are yearly vessel calls times lifts.");
     expect(bodyFigureValue("coverage", "Break-even year")).toBe("Year 15");
     expect(bodyFigureValue("coverage", "Nominal payback")).toBe("14.1 years");
     expect(bodyFigureValue("coverage", "Discounted payback (at WACC)")).toBe("18.4 years");
@@ -255,7 +268,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const outflowDonut = document.querySelector('[data-donut="outflows"]');
     expect(outflowDonut).toBeTruthy();
     expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(5);
-    expect(outflowDonut?.textContent).toContain("Operating lines are a separate consideration, not in the investment total.");
+    expect(outflowDonut?.textContent).toContain("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
     const inflowDonut = document.querySelector('[data-donut="inflows"]');
     expect(inflowDonut).toBeTruthy();
     expect(inflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(2);
@@ -264,7 +277,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const targetChart = document.querySelector('[data-slide-name="scenarios"] [data-testid="scenario-target-chart"]');
     expect(targetChart).toBeTruthy();
     expect(targetChart?.getAttribute("data-mode")).toBe("solved");
-    expect(targetChart?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("The payment rises as the target rises");
+    expect(targetChart?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("The payment rises as the target IRR rises");
     expect(targetChart?.querySelector('[data-target-label="4%"] .row-value')?.textContent).toBe("€1 440 561");
     expect(targetChart?.querySelector('[data-target-label="6%"] .row-value')?.textContent).toBe("€1 626 223");
     expect(targetChart?.querySelector('[data-target-label="8%"] .row-value')?.textContent).toBe("€1 828 352");
@@ -423,12 +436,17 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const outflows = summary?.donuts?.find((d) => d.id === "outflows");
     const inflows = summary?.donuts?.find((d) => d.id === "inflows");
     expect(outflows?.segments.map((s) => s.value)).toEqual([45000000, 320000000, 55000000]);
-    expect(outflows?.disclosure).toBe("Operating lines are a separate consideration, not in the investment total.");
+    // v0.6.8 Task A.4 re-anchor: the repaired disclosure (the arithmetic-honest wording).
+    expect(outflows?.disclosure).toBe("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
     expect(inflows?.segments.map((s) => s.value)).toEqual([663914798.4595231, 307291022.122572, 161363636.36363652]);
     expect(sum(inflows?.segments.map((s) => s.value) ?? [])).toBeCloseTo(result.totalCollected, 6);
     const scenariosSlide = deck.slides.find((s) => s.name === "scenarios");
     expect(scenariosSlide?.targetChart?.mode).toBe("solved");
-    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target rises");
+    // v0.6.8 Task G.3 re-anchor: the target chart kicker names the rate basis.
+    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target IRR rises");
+    // v0.6.8 Task G.2 re-anchor: with only the target axis set, the chart is the named-set
+    // fallback, and its kicker names the parameter it carries.
+    expect(scenariosSlide?.chart?.kicker).toBe("The named scenarios set the payment range");
     expect(scenariosSlide?.targetChart?.points.map((p) => p.value)).toEqual([2038046.5001234217, 2392623.66811084, 2767086.3813511045]);
     scenariosSlide?.targetChart?.points.forEach((p) => expect(p.met).toBe(true));
     // Rendered deck at entry unit "thousands", set through the existing unit select.
@@ -445,7 +463,8 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     expect(tileValue("Cost NPV")).toBe("NOK 456 582 k");
     expect(tileValue("Achieved IRR")).toBe("8.00%");
     expect(tileValue("Payback")).toBe("11.0 years");
-    expect(tileValue("Solved payment")).toBe("NOK 2 393 k");
+    // v0.6.8 Task B re-anchor: the fee-class figures render at the ones unit (the fee closure).
+    expect(tileValue("Solved payment")).toBe("NOK 2 392 623,67");
     expect(tileValue("Collected vs cost")).toBe("NOK 1 132 569 k vs NOK 599 071 k");
     expect(tileValue("Verdict")).toBe("Target met");
     expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("NOK 599 071 k");
@@ -454,8 +473,13 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — solved payments");
     expect(bodyFigureValue("recovery", "Payments")).toBe("360");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("NOK 2 393 k");
+    expect(bodyFigureValue("recovery", "Payment per period")).toBe("NOK 2 392 623,67");
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("NOK 1 132 569 k");
+    // v0.6.8 Task E.5 pin: the land fixture carries neither basis note — the recovery slide
+    // gains no note disclosures (the null-tolerance demo).
+    const landRecoverySlide = document.querySelector('[data-slide-name="recovery"]') as HTMLElement;
+    expect(landRecoverySlide.textContent).not.toContain("Tariff basis:");
+    expect(landRecoverySlide.textContent).not.toContain("Repayment basis:");
     expect(bodyFigureValue("coverage", "Break-even year")).toBe("Year 11");
     expect(bodyFigureValue("coverage", "Nominal payback")).toBe("11.0 years");
     expect(bodyFigureValue("coverage", "Discounted payback (at WACC)")).toBe("16.1 years");
@@ -465,7 +489,8 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const outflowDonut = document.querySelector('[data-donut="outflows"]');
     expect(outflowDonut).toBeTruthy();
     expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(3);
-    expect(outflowDonut?.textContent).toContain("Operating lines are a separate consideration, not in the investment total.");
+    // v0.6.8 Task A: the pinned donut disclosure wording.
+    expect(outflowDonut?.textContent).toContain("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
     const inflowDonut = document.querySelector('[data-donut="inflows"]');
     expect(inflowDonut).toBeTruthy();
     expect(inflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(3);
@@ -475,7 +500,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const targetChart = document.querySelector('[data-slide-name="scenarios"] [data-testid="scenario-target-chart"]');
     expect(targetChart).toBeTruthy();
     expect(targetChart?.getAttribute("data-mode")).toBe("solved");
-    expect(targetChart?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("The payment rises as the target rises");
+    expect(targetChart?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("The payment rises as the target IRR rises");
     expect(targetChart?.querySelector('[data-target-label="6%"] .row-value')?.textContent).toBe("NOK 2 038 k");
     expect(targetChart?.querySelector('[data-target-label="8%"] .row-value')?.textContent).toBe("NOK 2 393 k");
     expect(targetChart?.querySelector('[data-target-label="10%"] .row-value')?.textContent).toBe("NOK 2 767 k");

@@ -179,11 +179,21 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(caption?.textContent).not.toMatch(/\d/);
   });
 
-  it("WATERFALL-BUILD: one segment per cost line; the labels flow through the deck money variant", async () => {
-    // v0.6.7 re-anchor: the demo button loads the port fixture — five cost lines, EUR labels.
+  it("WATERFALL-BUILD: one segment per cost line plus the operating and reinvestment kinds; the labels flow through the deck money variant", async () => {
+    // v0.6.8 re-anchor: the waterfall is honest to the whole cost program. The demo button
+    // loads the port fixture — five capital lines plus the operating-lines segment, six
+    // segments in all, no reinvestments. The build is derived from the engine fields and
+    // closes exactly at the cap.
     const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const result = computeModel(shorePowerProject());
+    const reinvestments = (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0);
+    const expectedSegments = [
+      ...result.lineTotals.map((l) => ({ id: l.id, name: l.name, total: l.total, kind: "capital" as const })),
+      ...(result.operatingTotal > 0 ? [{ id: "operating", name: "Operating lines", total: result.operatingTotal, kind: "operating" as const }] : []),
+      ...(reinvestments > 0 ? [{ id: "reinvestments", name: "Reinvestments", total: reinvestments, kind: "reinvestments" as const }] : []),
+    ];
+    expect(expectedSegments.length).toBe(6);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -191,26 +201,28 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     const slide = document.querySelector('[data-slide-name="investment"]') as HTMLElement;
     const waterfall = slide.querySelector('[data-testid="cost-waterfall"]') as HTMLElement;
     const segments = waterfall.querySelectorAll("[data-waterfall-segment]");
-    expect(segments.length).toBe(result.lineTotals.length);
+    expect(segments.length).toBe(expectedSegments.length);
     const cap = Math.max(1e-12, result.totalCost);
     let accShare = 0;
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i] as HTMLElement;
-      const frac = result.lineTotals[i].total / cap;
+      const frac = expectedSegments[i].total / cap;
+      expect(seg.getAttribute("data-waterfall-kind")).toBe(expectedSegments[i].kind);
       expect(parseFloat(seg.style.height)).toBeCloseTo(frac * 100, 0);
       expect(parseFloat(seg.style.bottom)).toBeCloseTo(accShare * 100, 0);
       accShare += frac;
     }
+    expect(accShare).toBeCloseTo(1, 6);
     const capEl = waterfall.querySelector('[data-testid="waterfall-cap"]') as HTMLElement;
     expect(parseFloat(capEl.style.bottom)).toBeCloseTo(100, 0);
     for (const seg of Array.from(segments)) {
       expect((seg as HTMLElement).querySelector('[data-testid="waterfall-label"]')).toBe(null);
     }
     const labels = waterfall.querySelectorAll('[data-testid="waterfall-label"]');
-    expect(labels.length).toBe(result.lineTotals.length);
+    expect(labels.length).toBe(expectedSegments.length);
     for (let i = 0; i < labels.length; i++) {
-      expect(labels[i].textContent).toContain(result.lineTotals[i].name);
-      expect(labels[i].textContent).toContain(deckMoneyForDisplay(result.lineTotals[i].total, "EUR", "thousands"));
+      expect(labels[i].textContent).toContain(expectedSegments[i].name);
+      expect(labels[i].textContent).toContain(deckMoneyForDisplay(expectedSegments[i].total, "EUR", "thousands"));
     }
     expect(slide.querySelectorAll('[data-testid="composition-rows"]').length).toBe(1);
   });

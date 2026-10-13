@@ -5,7 +5,7 @@ import { deckSlides } from "../deck.js";
 import type { ScenarioTargetChart } from "../deck.js";
 import { deckMoneyForDisplay, percentTwoForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionRows, CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot } from "../charts.js";
+import { CompositionRows, CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot, ScenarioComparisonBars } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 
@@ -220,7 +220,21 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             {sl.name === "investment" && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="investment">
                 <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker={investmentKicker} />
-                <CostWaterfall lineTotals={result.lineTotals} total={result.totalCost} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
+                {/* v0.6.8 Task A (finding W18): the honest cost waterfall — the capital lines, then the
+                    operating segment, then the reinvestments segment when present, closing at the cap
+                    (totalCost). The reinvestments derivation is the one deck.ts established (no new
+                    engine field); the build is pinned to close exactly at the cap on every fixture. */}
+                <CostWaterfall
+                  segments={[
+                    ...result.lineTotals.map((l) => ({ id: l.id, name: l.name, total: l.total, kind: "capital" as const })),
+                    ...(result.operatingTotal > 0 ? [{ id: "operating", name: "Operating lines", total: result.operatingTotal, kind: "operating" as const }] : []),
+                    ...((result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0) > 0
+                      ? [{ id: "reinvestments", name: "Reinvestments", total: (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0), kind: "reinvestments" as const }]
+                      : []),
+                  ]}
+                  total={result.totalCost}
+                  valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
+                />
               </div>
             )}
             {sl.name === "recovery" && result !== null && (
@@ -240,10 +254,14 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.name === "scenarios" && sl.chart !== undefined && sl.chart.data.length > 0 && (
               <div data-testid="deck-chart-slot" data-slide-chart="scenarios">
-                <CompositionRows
-                  lineTotals={sl.chart.data.map((d, j) => ({ id: `sce-${j}`, name: d.label, total: d.value }))}
+                {/* v0.6.8 Task G (finding W23): the scenarios chart no longer reuses CompositionRows
+                    (the composition-share stamp is meaningless in a sensitivity comparison). Zero-based
+                    comparison bars, direct labels, no share column; the kicker is emitted by the deck
+                    model and names the varied parameter as an action title. */}
+                <ScenarioComparisonBars
+                  data={sl.chart.data}
                   valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
-                  kicker="Payments across the set scenario values"
+                  kicker={sl.chart.kicker}
                 />
               </div>
             )}
