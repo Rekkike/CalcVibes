@@ -1,0 +1,483 @@
+// Directive v0.6.7 — the realistic demo rotation: pins of record (Task D).
+// Every figure below was script-verified against the delivered engine before this file was
+// written. Exact double equality (toBe) is used wherever the engine returns the pinned double
+// verbatim; toBeCloseTo is used only where the directive prints a rounded spelling of the
+// engine scalar (the four operating-line totals and the land c2 remaining book value), with
+// the precision noted. The achieved IRR values are asserted at the engine's exact float
+// spellings (0.06000000000000005 and 0.07999999999999963), never the directive's 0.06/0.08
+// roundings — assert what the engine returns.
+import { describe, expect, it } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { App } from "../src/App.js";
+import { shorePowerProject, landNewbuildProject } from "../src/state.js";
+import { computeModel, entryToValue } from "../src/engine.js";
+import { deckSlides } from "../src/deck.js";
+import type { ModelInputs, ModelResult } from "../../core/src/types.js";
+
+const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
+const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
+
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+
+function solvedPayment(inputs: ModelInputs): number {
+  const r = computeModel(inputs);
+  expect(r.paymentAmount).not.toBeNull();
+  return r.paymentAmount as number;
+}
+
+function bodyFigureValue(slideName: string, label: string): string | null {
+  const slide = document.querySelector('[data-slide-name="' + slideName + '"]') as HTMLElement;
+  const figures = Array.from(slide.querySelectorAll(".deck-figure"));
+  for (const f of figures) {
+    if (f.querySelector(".deck-figure-label")?.textContent === label) {
+      return f.querySelector(".deck-figure-value")?.textContent ?? null;
+    }
+  }
+  return null;
+}
+
+function tileValue(label: string): string | null {
+  const tile = document.querySelector('[data-testid="summary-tiles"] [data-tile="' + label + '"]');
+  return tile?.querySelector(".stat-value")?.textContent ?? null;
+}
+
+function titleMetricValue(label: string): string | null {
+  const m = document.querySelector('[data-testid="title-metrics"] [data-title-metric="' + label + '"]');
+  return m?.querySelector(".metric-value")?.textContent ?? null;
+}
+
+function gridRow(result: ModelResult, id: string, kind: string) {
+  return result.collectionsGrid.find((r) => r.id === id && r.kind === kind);
+}
+
+function gridRowSum(result: ModelResult, id: string, kind: string): number {
+  const row = gridRow(result, id, kind);
+  expect(row).toBeDefined();
+  return sum((row as { amounts: number[] }).amounts);
+}
+
+function setEntryUnit(unit: string) {
+  fireEvent.change(document.querySelector('[data-field="entryUnit"]') as HTMLSelectElement, { target: { value: unit } });
+}
+
+function scenarioAxisValues(axis: string): string[] {
+  return Array.from(document.querySelectorAll('[data-field="scenario-' + axis + '"]')).map(
+    (i) => (i as HTMLInputElement).value
+  );
+}
+
+describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotterdam shore power)", () => {
+  it("PORT-ENGINE: computeModel(shorePowerProject()) returns the pinned scalars", () => {
+    const r = computeModel(shorePowerProject());
+    expect(r.totalCost).toBe(269591641.24463195);
+    expect(r.costNpv).toBe(193986917.11967131);
+    expect(r.paymentAmount).toBe(1626222.633944825);
+    expect(r.paymentCount).toBe(240);
+    expect(r.totalCollected).toBe(390293432.14675796);
+    expect(r.paybackYears).toBe(14.110973479529967);
+    // The directive prints 0.06; the engine's exact double is asserted (disclosed in the report).
+    expect(r.achievedIrr).toBe(0.06000000000000005);
+    expect(r.goalMet).toBe(true);
+    expect(r.signChanges).toBe(1);
+    expect(r.irrAmbiguous).toBe(false);
+    expect(r.headlineSource).toBe("monthly");
+    expect(r.npvAtWacc).toBe(27497141.22492155);
+    expect(r.mirr).toBe(0.04490275022718304);
+    expect(r.profitabilityIndex).toBe(1.1288815565352854);
+    expect(r.discountedPaybackYears).toBe(18.36849845472896);
+    expect(r.netGain).toBe(120701790.90212601);
+    expect(r.operatingTotal).toBe(109591641.24463195);
+    expect(r.horizon).toBeDefined();
+    expect(r.horizon?.totalMonths).toBe(276);
+    expect(r.horizon?.totalYears).toBe(23);
+    expect(r.firstPaymentMonth).toBe(36);
+    expect(r.lastPaymentMonth).toBe(275);
+    expect(r.lineTotals.map((l) => l.total)).toEqual([12000000, 48000000, 48000000, 36000000, 16000000]);
+    expect(r.residualAmountUsed).toBe(0);
+    const o1 = r.operatingLines.find((o) => o.id === "o1");
+    const o2 = r.operatingLines.find((o) => o.id === "o2");
+    expect(o1).toBeDefined();
+    expect(o2).toBeDefined();
+    // The directive prints 78905981.6961 / 30685659.5485; the engine scalars carry more digits.
+    expect(o1?.total).toBeCloseTo(78905981.6961, 4);
+    expect(o1?.effectiveWindow).toEqual([37, 275]);
+    expect(o2?.total).toBeCloseTo(30685659.5485, 4);
+    expect(o2?.effectiveWindow).toEqual([37, 275]);
+  });
+
+  it("PORT-BOOK: the charge schedule totals 160 000 000 with an 8 000 000 yearly charge from year 4 and a zero ending book", () => {
+    const r = computeModel(shorePowerProject());
+    const book = r.bookView;
+    expect(book).toBeDefined();
+    expect((book as NonNullable<ModelResult["bookView"]>).totalCharge).toBe(160000000);
+    const combined = (book as NonNullable<ModelResult["bookView"]>).combined;
+    for (let y = 4; y <= 23; y++) {
+      expect(combined.find((row) => row.year === y)?.charge).toBe(8000000);
+    }
+    const chargesAt4: Record<string, number> = { c1: 600000, c2: 2400000, c3: 2400000, c4: 1800000, c5: 800000 };
+    for (const line of (book as NonNullable<ModelResult["bookView"]>).lines) {
+      const y4 = line.years.find((row) => row.year === 4);
+      expect(y4).toBeDefined();
+      expect(y4?.charge).toBe(chargesAt4[line.id]);
+      const last = line.years[line.years.length - 1];
+      expect(last.ending).toBe(0);
+    }
+  });
+
+  it("PORT-TARIFF: 21 grid years (project years 3 through 23) with the pinned unit prices, required amounts, weighted volumes, and per-call prices", () => {
+    const r = computeModel(shorePowerProject());
+    const ts = r.tariffYears;
+    expect(ts.length).toBe(21);
+    ts.forEach((t, i) => expect(t.year).toBe(i + 3));
+    expect(ts[0].unitPrice).toBe(5807.937978374375);
+    expect(ts[1].unitPrice).toBe(9034.57018858236);
+    expect(ts[2].unitPrice).toBe(7227.656150865887);
+    expect(ts[3].unitPrice).toBe(6377.343662528724);
+    for (let i = 4; i <= 19; i++) expect(ts[i].unitPrice).toBe(5706.044329630964);
+    expect(ts[20].unitPrice).toBe(5230.54063549505);
+    expect(ts[0].required).toBe(1626222.633944825);
+    for (let i = 1; i <= 19; i++) expect(ts[i].required).toBe(19514671.607337896);
+    expect(ts[20].required).toBe(17888448.97339307);
+    expect(ts[0].weightedVolume).toBe(280);
+    expect(ts[1].weightedVolume).toBe(2160);
+    expect(ts[2].weightedVolume).toBe(2700);
+    expect(ts[3].weightedVolume).toBe(3060);
+    for (let i = 4; i < ts.length; i++) expect(ts[i].weightedVolume).toBe(3420);
+    // perRowCharges are per-call prices (perRowCharges is untouched by the Task C fix).
+    expect(ts[0].perRowCharges?.["r1"]).toBe(11615.87595674875);
+    expect(ts[0].perRowCharges?.["r2"]).toBe(5807.937978374375);
+  });
+
+  it("PORT-GRID: the collections grid carries the two tariff rows with the post-fix yearly revenues; the column identities hold", () => {
+    const r = computeModel(shorePowerProject());
+    expect(r.collectionsGrid.filter((row) => row.kind === "tariff").length).toBe(2);
+    expect(gridRowSum(r, "r1", "tariff")).toBe(303574464.86520803);
+    expect(gridRowSum(r, "r2", "tariff")).toBe(86718967.28154981);
+    const both = gridRowSum(r, "r1", "tariff") + gridRowSum(r, "r2", "tariff");
+    expect(Math.abs(both - r.totalCollected)).toBeLessThan(1e-6);
+    // Task C post-fix: every grid year's column sums to that year's inflow within 1e-6.
+    const rows = r.collectionsGrid.filter((row) => row.kind === "tariff");
+    for (let k = 0; k < r.yearly.length; k++) {
+      const column = sum(rows.map((row) => row.amounts[k] ?? 0));
+      expect(Math.abs(column - r.yearly[k].inflow)).toBeLessThan(1e-6);
+    }
+  });
+
+  it("PORT-SCENARIO: the preset axes' sensitivities return the pinned solved payments", () => {
+    const base = shorePowerProject();
+    const atTarget = (t: number) => solvedPayment({ ...base, targetIrr: t });
+    expect(atTarget(4)).toBe(1440560.902541411);
+    expect(atTarget(8)).toBe(1828351.5172141492);
+    const atTerm = (y: number) => solvedPayment({ ...base, repayment: { ...base.repayment, termYears: y } });
+    expect(atTerm(15)).toBe(1831394.2154840531);
+    expect(atTerm(25)).toBe(1460126.4927575013);
+    // The balloon axis entries are entry-unit values; at unit "millions" 8 and 16 scale to raw
+    // 8 000 000 and 16 000 000 at compute (the v0.6.6 amendment lesson of record).
+    const atBalloonEntry = (e: number) =>
+      solvedPayment({ ...base, repayment: { ...base.repayment, balloon: entryToValue(e, (base.entryUnit ?? "ones") as Parameters<typeof entryToValue>[1]) } });
+    expect(atBalloonEntry(0)).toBe(1626222.633944825);
+    expect(atBalloonEntry(8)).toBe(1608665.1352002623);
+    expect(atBalloonEntry(16)).toBe(1591107.6364556993);
+  });
+
+  it("PORT-LOADER: the button relabeled, the data-action unchanged, and the three preset axes surface in the Scenarios tab", async () => {
+    render(<App />);
+    const button = byAction("load-demo");
+    expect(button).toBeTruthy();
+    expect(button.textContent).toBe("Load shore power demo (Rotterdam)");
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(screen.getByText("Shore power example (Rotterdam)")).toBeTruthy();
+    });
+    fireEvent.click(byNav("scenarios"));
+    expect(scenarioAxisValues("target")).toEqual(["4", "6", "8"]);
+    expect(scenarioAxisValues("term")).toEqual(["15", "20", "25"]);
+    expect(scenarioAxisValues("balloon")).toEqual(["0", "8", "16"]);
+  });
+
+  it("PORT-DECK: the rendered deck at entry unit ones carries the pinned figures and donuts", async () => {
+    const inputs = shorePowerProject();
+    const result = computeModel(inputs);
+    const deck = deckSlides(inputs, result, {
+      startYear: null,
+      entryUnit: "ones",
+      scenarioTargets: [4, 6, 8],
+      scenarioTerms: [15, 20, 25],
+      scenarioBalloons: [0, 8, 16],
+    });
+    // Deck-model pins (exact doubles): the outflow donut segments, the post-fix inflow donut
+    // segments (the honest full circle), and the targetChart points.
+    const summary = deck.slides.find((s) => s.name === "summary");
+    expect(summary).toBeDefined();
+    const outflows = summary?.donuts?.find((d) => d.id === "outflows");
+    const inflows = summary?.donuts?.find((d) => d.id === "inflows");
+    expect(outflows?.segments.map((s) => s.value)).toEqual([12000000, 48000000, 48000000, 36000000, 16000000]);
+    expect(outflows?.disclosure).toBe("Operating lines are a separate consideration, not in the investment total.");
+    expect(inflows?.segments.map((s) => s.value)).toEqual([303574464.86520803, 86718967.28154981]);
+    expect(sum(inflows?.segments.map((s) => s.value) ?? [])).toBeCloseTo(result.totalCollected, 6);
+    const scenariosSlide = deck.slides.find((s) => s.name === "scenarios");
+    expect(scenariosSlide?.targetChart?.mode).toBe("solved");
+    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target rises");
+    expect(scenariosSlide?.targetChart?.points.map((p) => p.value)).toEqual([1440560.902541411, 1626222.633944825, 1828351.5172141492]);
+    scenariosSlide?.targetChart?.points.forEach((p) => expect(p.met).toBe(true));
+    // Rendered deck at entry unit "ones", set through the existing unit select.
+    render(<App />);
+    fireEvent.click(byAction("load-demo"));
+    setEntryUnit("ones");
+    fireEvent.click(byAction("present"));
+    await waitFor(() => {
+      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(8);
+    });
+    expect(titleMetricValue("Project cost")).toBe("€269 591 641");
+    expect(titleMetricValue("Target IRR")).toBe("6.00%");
+    expect(titleMetricValue("Investment term")).toBe("23 years");
+    expect(tileValue("Cost NPV")).toBe("€193 986 917");
+    expect(tileValue("Achieved IRR")).toBe("6.00%");
+    expect(tileValue("Payback")).toBe("14.1 years");
+    expect(tileValue("Solved payment")).toBe("€1 626 223");
+    expect(tileValue("Collected vs cost")).toBe("€390 293 432 vs €269 591 641");
+    expect(tileValue("Verdict")).toBe("Target met");
+    expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("€269 591 641");
+    expect(bodyFigureValue("investment", "Cost NPV at target (discounted)")).toBe("€193 986 917");
+    expect(bodyFigureValue("investment", "Operating lines total")).toBe("€109 591 641");
+    const recovery = document.querySelector('[data-slide-name="recovery"] h2');
+    expect(recovery?.textContent).toBe("The recovery — per-lift prices");
+    expect(bodyFigureValue("recovery", "Payments")).toBe("240");
+    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€1 626 223");
+    expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€390 293 432");
+    expect(bodyFigureValue("recovery", "Unit price Year 3")).toBe("€5 808");
+    expect(bodyFigureValue("coverage", "Break-even year")).toBe("Year 15");
+    expect(bodyFigureValue("coverage", "Nominal payback")).toBe("14.1 years");
+    expect(bodyFigureValue("coverage", "Discounted payback (at WACC)")).toBe("18.4 years");
+    expect(document.querySelector('[data-slide-name="deal"] [data-testid="deck-verdict"]')?.textContent).toBe(
+      "Target met — net gain €120 701 791."
+    );
+    const outflowDonut = document.querySelector('[data-donut="outflows"]');
+    expect(outflowDonut).toBeTruthy();
+    expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(5);
+    expect(outflowDonut?.textContent).toContain("Operating lines are a separate consideration, not in the investment total.");
+    const inflowDonut = document.querySelector('[data-donut="inflows"]');
+    expect(inflowDonut).toBeTruthy();
+    expect(inflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(2);
+    expect(inflowDonut?.textContent).toContain("Deep-sea container vessel (8-24k TEU)");
+    expect(inflowDonut?.textContent).toContain("Feeder & medium vessel (3-8k TEU)");
+    const targetChart = document.querySelector('[data-slide-name="scenarios"] [data-testid="scenario-target-chart"]');
+    expect(targetChart).toBeTruthy();
+    expect(targetChart?.getAttribute("data-mode")).toBe("solved");
+    expect(targetChart?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("The payment rises as the target rises");
+    expect(targetChart?.querySelector('[data-target-label="4%"] .row-value')?.textContent).toBe("€1 440 561");
+    expect(targetChart?.querySelector('[data-target-label="6%"] .row-value')?.textContent).toBe("€1 626 223");
+    expect(targetChart?.querySelector('[data-target-label="8%"] .row-value')?.textContent).toBe("€1 828 352");
+  });
+});
+
+describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøstårnet land newbuild)", () => {
+  it("LAND-ENGINE: computeModel(landNewbuildProject()) returns the pinned scalars", () => {
+    const r = computeModel(landNewbuildProject());
+    expect(r.totalCost).toBe(599071344.7435848);
+    expect(r.costNpv).toBe(456581761.2443387);
+    expect(r.paymentAmount).toBe(2392623.66811084);
+    expect(r.paymentCount).toBe(360);
+    expect(r.totalCollected).toBe(1132569456.9457316);
+    expect(r.paybackYears).toBe(10.995022730476373);
+    // The directive prints 0.08; the engine's exact double is asserted (disclosed in the report).
+    expect(r.achievedIrr).toBe(0.07999999999999963);
+    expect(r.goalMet).toBe(true);
+    expect(r.signChanges).toBe(1);
+    expect(r.irrAmbiguous).toBe(false);
+    expect(r.headlineSource).toBe("monthly");
+    expect(r.npvAtWacc).toBe(124487464.96126679);
+    expect(r.mirr).toBe(0.05696894496116012);
+    expect(r.profitabilityIndex).toBe(1.2511982726552373);
+    expect(r.discountedPaybackYears).toBe(16.092689255975813);
+    expect(r.netGain).toBe(533498112.2021469);
+    expect(r.operatingTotal).toBe(179071344.74358475);
+    expect(r.residualAmountUsed).toBe(161363636.36363652);
+    expect(r.horizon).toBeDefined();
+    expect(r.horizon?.totalMonths).toBe(276);
+    expect(r.horizon?.totalYears).toBe(23);
+    expect(r.firstPaymentMonth).toBe(36);
+    expect(r.lastPaymentMonth).toBe(275);
+    expect(r.lineTotals.map((l) => l.total)).toEqual([45000000, 320000000, 55000000]);
+    const o1 = r.operatingLines.find((o) => o.id === "o1");
+    const o2 = r.operatingLines.find((o) => o.id === "o2");
+    expect(o1).toBeDefined();
+    expect(o2).toBeDefined();
+    // The directive prints 105213164.0951 / 73858180.6485; the engine scalars carry more digits.
+    expect(o1?.total).toBeCloseTo(105213164.0951, 4);
+    expect(o1?.nominalSpan).toEqual([25, 264]);
+    expect(o1?.effectiveWindow).toEqual([36, 264]);
+    expect(o2?.total).toBeCloseTo(73858180.6485, 4);
+    expect(o2?.nominalSpan).toEqual([25, 264]);
+    expect(o2?.effectiveWindow).toEqual([36, 264]);
+  });
+
+  it("LAND-BOOK: the retained site, the charged construction and fit-out, and the book-value exit at year 23", () => {
+    const r = computeModel(landNewbuildProject());
+    const book = r.bookView;
+    expect(book).toBeDefined();
+    expect((book as NonNullable<ModelResult["bookView"]>).totalCharge).toBe(258636363.63636357);
+    const lines = (book as NonNullable<ModelResult["bookView"]>).lines;
+    const c1 = lines.find((l) => l.id === "c1");
+    const c2 = lines.find((l) => l.id === "c2");
+    const c3 = lines.find((l) => l.id === "c3");
+    expect(c1?.isRetained).toBe(true);
+    c1?.years.forEach((row) => expect(row.charge).toBe(0));
+    expect(c1?.years[c1.years.length - 1].ending).toBe(45000000);
+    for (let y = 3; y <= 23; y++) {
+      expect(c2?.years.find((row) => row.year === y)?.charge).toBe(9696969.696969697);
+    }
+    // c3 depreciates over 20 years from year 3: charged 2 750 000 in years 3 through 22,
+    // zero in year 23, ending exactly 0 at the close.
+    for (let y = 3; y <= 22; y++) {
+      expect(c3?.years.find((row) => row.year === y)?.charge).toBe(2750000);
+    }
+    expect(c3?.years.find((row) => row.year === 23)?.charge).toBe(0);
+    // The directive prints 116363636.363637 for the c2 remaining at year 23 (rounded spelling).
+    expect(c2?.years.find((row) => row.year === 23)?.ending).toBeCloseTo(116363636.363637, 5);
+    expect(c3?.years[c3.years.length - 1].ending).toBe(0);
+    expect((book as NonNullable<ModelResult["bookView"]>).remainingBookValueAtResidualYear).toBe(161363636.36363652);
+    expect((book as NonNullable<ModelResult["bookView"]>).gainOrLossOnSale).toBe(0);
+    expect(r.residualDisclosure).toBe("Assumes sale at remaining book value at year 23 for 161363636.36363652");
+  });
+
+  it("LAND-CONTRACTS: k1 runs 240 payments to month 276 and k2 120 payments to month 156", () => {
+    const r = computeModel(landNewbuildProject());
+    const k1 = r.contractsInfo?.find((c) => c.id === "k1");
+    const k2 = r.contractsInfo?.find((c) => c.id === "k2");
+    expect(k1?.paymentCount).toBe(240);
+    expect(k1?.endMonth).toBe(276);
+    expect(k2?.paymentCount).toBe(120);
+    expect(k2?.endMonth).toBe(156);
+  });
+
+  it("LAND-GRID: the contract rows and the residual row sum to the collected total within 1e-6", () => {
+    const r = computeModel(landNewbuildProject());
+    expect(gridRowSum(r, "k1", "contract")).toBe(663914798.4595231);
+    expect(gridRowSum(r, "k2", "contract")).toBe(307291022.122572);
+    expect(gridRowSum(r, "residual", "residual")).toBe(161363636.36363652);
+    const all = gridRowSum(r, "k1", "contract") + gridRowSum(r, "k2", "contract") + gridRowSum(r, "residual", "residual");
+    expect(Math.abs(all - r.totalCollected)).toBeLessThan(1e-6);
+  });
+
+  it("LAND-TERMPOSITIONS: the two term positions carry the pinned truncated views", () => {
+    const r = computeModel(landNewbuildProject());
+    const t1 = r.termPositions?.find((t) => t.contractId === "k1");
+    const t2 = r.termPositions?.find((t) => t.contractId === "k2");
+    expect(t1?.label).toBe("Hotel lease (Wood Hotel)");
+    expect(t1?.endMonth).toBe(276);
+    expect(t1?.truncatedIrr).toBe(0.07999999999999963);
+    expect(t1?.cumulativeNet).toBe(533498112.20214653);
+    expect(t1?.npvAtWacc).toBe(124487464.96126679);
+    expect(t1?.paybackSoFar).toBe(11);
+    expect(t2?.label).toBe("Office & restaurant leases");
+    expect(t2?.endMonth).toBe(156);
+    expect(t2?.truncatedIrr).toBe(0.03464720297898438);
+    expect(t2?.cumulativeNet).toBe(109448974.30258363);
+    expect(t2?.npvAtWacc).toBe(-36797038.28508617);
+    expect(t2?.paybackSoFar).toBe(11);
+  });
+
+  it("LAND-SCENARIO: the target axis is live; the term axis is inert in contracts mode (finding F1, pinned honestly)", () => {
+    const base = landNewbuildProject();
+    const atTarget = (t: number) => solvedPayment({ ...base, targetIrr: t });
+    expect(atTarget(6)).toBe(2038046.5001234217);
+    expect(atTarget(8)).toBe(2392623.66811084);
+    expect(atTarget(10)).toBe(2767086.3813511045);
+    // In contracts mode the repayment term does not drive the solved contract payments:
+    // 15, 20, and 25 years all yield the base payment — the documented inert behavior (F1).
+    const atTerm = (y: number) => solvedPayment({ ...base, repayment: { ...base.repayment, termYears: y } });
+    expect(atTerm(15)).toBe(2392623.66811084);
+    expect(atTerm(20)).toBe(2392623.66811084);
+    expect(atTerm(25)).toBe(2392623.66811084);
+  });
+
+  it("LAND-LOADER: the button relabeled, the data-action unchanged, the target axis preset, and the term and balloon axes untouched", async () => {
+    render(<App />);
+    const button = byAction("load-multi-lease-demo");
+    expect(button).toBeTruthy();
+    expect(button.textContent).toBe("Load land newbuild demo (Mjøstårnet)");
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(screen.getByText("Mjøstårnet example")).toBeTruthy();
+    });
+    fireEvent.click(byNav("scenarios"));
+    expect(scenarioAxisValues("target")).toEqual(["6", "8", "10"]);
+    // The loader leaves the term and balloon axes untouched (inert in contracts mode, finding F1).
+    expect(scenarioAxisValues("term")).toEqual([]);
+    expect(scenarioAxisValues("balloon")).toEqual([]);
+  });
+
+  it("LAND-DECK: the rendered deck at entry unit thousands carries the pinned figures and donuts", async () => {
+    const inputs = landNewbuildProject();
+    const result = computeModel(inputs);
+    const deck = deckSlides(inputs, result, {
+      startYear: null,
+      entryUnit: "thousands",
+      scenarioTargets: [6, 8, 10],
+      scenarioTerms: null,
+      scenarioBalloons: null,
+    });
+    const summary = deck.slides.find((s) => s.name === "summary");
+    expect(summary).toBeDefined();
+    const outflows = summary?.donuts?.find((d) => d.id === "outflows");
+    const inflows = summary?.donuts?.find((d) => d.id === "inflows");
+    expect(outflows?.segments.map((s) => s.value)).toEqual([45000000, 320000000, 55000000]);
+    expect(outflows?.disclosure).toBe("Operating lines are a separate consideration, not in the investment total.");
+    expect(inflows?.segments.map((s) => s.value)).toEqual([663914798.4595231, 307291022.122572, 161363636.36363652]);
+    expect(sum(inflows?.segments.map((s) => s.value) ?? [])).toBeCloseTo(result.totalCollected, 6);
+    const scenariosSlide = deck.slides.find((s) => s.name === "scenarios");
+    expect(scenariosSlide?.targetChart?.mode).toBe("solved");
+    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target rises");
+    expect(scenariosSlide?.targetChart?.points.map((p) => p.value)).toEqual([2038046.5001234217, 2392623.66811084, 2767086.3813511045]);
+    scenariosSlide?.targetChart?.points.forEach((p) => expect(p.met).toBe(true));
+    // Rendered deck at entry unit "thousands", set through the existing unit select.
+    render(<App />);
+    fireEvent.click(byAction("load-multi-lease-demo"));
+    setEntryUnit("thousands");
+    fireEvent.click(byAction("present"));
+    await waitFor(() => {
+      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(8);
+    });
+    expect(titleMetricValue("Project cost")).toBe("NOK 599 071 k");
+    expect(titleMetricValue("Target IRR")).toBe("8.00%");
+    expect(titleMetricValue("Investment term")).toBe("23 years");
+    expect(tileValue("Cost NPV")).toBe("NOK 456 582 k");
+    expect(tileValue("Achieved IRR")).toBe("8.00%");
+    expect(tileValue("Payback")).toBe("11.0 years");
+    expect(tileValue("Solved payment")).toBe("NOK 2 393 k");
+    expect(tileValue("Collected vs cost")).toBe("NOK 1 132 569 k vs NOK 599 071 k");
+    expect(tileValue("Verdict")).toBe("Target met");
+    expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("NOK 599 071 k");
+    expect(bodyFigureValue("investment", "Cost NPV at target (discounted)")).toBe("NOK 456 582 k");
+    expect(bodyFigureValue("investment", "Operating lines total")).toBe("NOK 179 071 k");
+    const recovery = document.querySelector('[data-slide-name="recovery"] h2');
+    expect(recovery?.textContent).toBe("The recovery — solved payments");
+    expect(bodyFigureValue("recovery", "Payments")).toBe("360");
+    expect(bodyFigureValue("recovery", "Payment per period")).toBe("NOK 2 393 k");
+    expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("NOK 1 132 569 k");
+    expect(bodyFigureValue("coverage", "Break-even year")).toBe("Year 11");
+    expect(bodyFigureValue("coverage", "Nominal payback")).toBe("11.0 years");
+    expect(bodyFigureValue("coverage", "Discounted payback (at WACC)")).toBe("16.1 years");
+    expect(document.querySelector('[data-slide-name="deal"] [data-testid="deck-verdict"]')?.textContent).toBe(
+      "Target met — net gain NOK 533 498 k."
+    );
+    const outflowDonut = document.querySelector('[data-donut="outflows"]');
+    expect(outflowDonut).toBeTruthy();
+    expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(3);
+    expect(outflowDonut?.textContent).toContain("Operating lines are a separate consideration, not in the investment total.");
+    const inflowDonut = document.querySelector('[data-donut="inflows"]');
+    expect(inflowDonut).toBeTruthy();
+    expect(inflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(3);
+    expect(inflowDonut?.textContent).toContain("Hotel lease (Wood Hotel)");
+    expect(inflowDonut?.textContent).toContain("Office & restaurant leases");
+    expect(inflowDonut?.textContent).toContain("Residual");
+    const targetChart = document.querySelector('[data-slide-name="scenarios"] [data-testid="scenario-target-chart"]');
+    expect(targetChart).toBeTruthy();
+    expect(targetChart?.getAttribute("data-mode")).toBe("solved");
+    expect(targetChart?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("The payment rises as the target rises");
+    expect(targetChart?.querySelector('[data-target-label="6%"] .row-value')?.textContent).toBe("NOK 2 038 k");
+    expect(targetChart?.querySelector('[data-target-label="8%"] .row-value')?.textContent).toBe("NOK 2 393 k");
+    expect(targetChart?.querySelector('[data-target-label="10%"] .row-value')?.textContent).toBe("NOK 2 767 k");
+  });
+});

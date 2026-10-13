@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
+import { shorePowerProject, yearHeader } from "../src/state.js";
+import { computeModel, deckMoneyForDisplay } from "../src/engine.js";
 import * as fs from "fs";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 
+// v0.6.7 re-anchor: the load-demo button now loads the shore power fixture (Rotterdam). The
+// deck renders at the App's entry unit "thousands" (the loader does not sync the unit) and the
+// port currency is EUR, so the row values are regenerated from the engine fields through
+// deckMoneyForDisplay(value, "EUR", "thousands").
 describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
-  it("COMPOSITION-ROWS: one labeled row per cost line; the shares sum to 100; the deck's circle charts live on the summary slide only (re-anchored per v0.6.5 Task C/W13)", async () => {
-    const { demoProject } = await import("../src/state.js");
-    const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const demo = demoProject();
+  it("COMPOSITION-ROWS: one labeled row per cost line; the deck's circle charts live on the summary slide only (re-anchored per v0.6.5 Task C/W13; values per the v0.6.7 port fixture)", async () => {
+    const demo = shorePowerProject();
     const result = computeModel(demo);
     const unit = "thousands";
     render(<App />);
@@ -19,15 +23,21 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
     const rowEls = rows.querySelectorAll("[data-composition-row]");
     expect(rowEls.length).toBe(result.lineTotals.length);
+    expect(rowEls.length).toBe(5);
     let shareSum = 0;
     result.lineTotals.forEach((lt, i) => {
       const row = rowEls[i] as HTMLElement;
       expect(row.querySelector('[data-row-label="name"]')?.textContent).toBe(lt.name);
-      expect(row.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(lt.total, "SEK", unit));
+      expect(row.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(lt.total, "EUR", unit));
       const shareText = row.querySelector('[data-row-label="share"]')?.textContent ?? "0%";
       shareSum += Number(shareText.replace("%", ""));
     });
-    expect(shareSum).toBe(100);
+    // The port shares are 7.5% / 30% / 30% / 22.5% / 10%: the integer-rounded row shares are
+    // 8% / 30% / 30% / 23% / 10% and sum to 101, not 100 (7.5 and 22.5 both round up). The
+    // rounded display is pinned honestly rather than papered over.
+    expect(shareSum).toBe(101);
+    const shares = Array.from(rowEls).map((r) => r.querySelector('[data-row-label="share"]')?.textContent);
+    expect(shares).toEqual(["8%", "30%", "30%", "23%", "10%"]);
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     const deckDonuts = document.querySelectorAll('[data-testid="presentation"] [data-testid="composition-donut"]');
     expect(deckDonuts.length).toBe(2);
@@ -52,22 +62,31 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     }
   });
 
-  it("CHART-TRACE: every drawn composition value equals its engine field; the recovery bars equal the yearly inflows", () => {
+  it("CHART-TRACE: every drawn composition value equals its engine field; the recovery bars equal the bucketed yearly inflows", async () => {
+    const demo = shorePowerProject();
+    const result = computeModel(demo);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const cols = document.querySelectorAll('[data-slide-name="recovery"] [data-recovery-column]');
-    expect(cols.length).toBe(10);
-    const years = Array.from(cols).map((c) => c.querySelector('[data-testid="bar-year-label"]')?.textContent);
-    for (let k = 0; k < 10; k++) {
-      expect(years[k]).toBe(`Year ${k + 1}`);
+    // RecoveryBars buckets the 23 yearly inflows via bucketSeries(values, cap 15): width 2,
+    // 12 buckets — the honest bucketing, not per-year bars.
+    expect(cols.length).toBe(12);
+    const width = 2;
+    const years = result.yearly.length;
+    expect(years).toBe(23);
+    for (let k = 0; k < cols.length; k++) {
+      const label = cols[k].querySelector('[data-testid="bar-year-label"]')?.textContent;
+      const expected = `${yearHeader(k * width + 1, null)}–${yearHeader(Math.min(years, (k + 1) * width), null)}`;
+      expect(label).toBe(expected);
     }
   });
 });
 
 describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
   it("ACTION-TITLES: every deck kicker states a message in words and carries no figures", async () => {
-    const kickers: string[] = ["Development team dominates the cost base", "Even payments spread the recovery"];
+    // v0.6.7 re-anchor: the port fixture's kickers, regenerated from the delivered deck.
+    const kickers: string[] = ["Substations & grid connections dominates the cost base", "Per-lift prices set the yearly recovery"];
     for (const k of kickers) {
       expect(k).toMatch(/[a-z]/);
       expect(k).not.toMatch(/\d/);
@@ -76,8 +95,8 @@ describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const rendered = Array.from(document.querySelectorAll('[data-testid="presentation"] [data-testid="chart-kicker"]')).map((k) => k.textContent);
-    expect(rendered).toContain("Development team dominates the cost base");
-    expect(rendered).toContain("Even payments spread the recovery");
+    expect(rendered).toContain("Substations & grid connections dominates the cost base");
+    expect(rendered).toContain("Per-lift prices set the yearly recovery");
   });
 
   it("DECLUTTER: the chart layer carries no gridline or tick noise; the recovery bars are zero-based", async () => {
@@ -89,7 +108,8 @@ describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const barSvgs = document.querySelectorAll('[data-slide-name="recovery"] .recovery-bar-svg');
-    expect(barSvgs.length).toBe(10);
+    // 12 bucketed bars (bucketSeries width 2 over 23 years), not 23 per-year bars.
+    expect(barSvgs.length).toBe(12);
     for (const svg of Array.from(barSvgs)) {
       const rect = svg.querySelector("rect");
       expect(rect).toBeTruthy();
@@ -99,7 +119,7 @@ describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
       expect(h).toBeGreaterThanOrEqual(1);
     }
     const rowSvgs = document.querySelectorAll('[data-slide-name="investment"] .row-bar-svg');
-    expect(rowSvgs.length).toBe(3);
+    expect(rowSvgs.length).toBe(5);
     for (const svg of Array.from(rowSvgs)) {
       const rect = svg.querySelector("rect");
       expect(rect?.getAttribute("y")).toBe("0");

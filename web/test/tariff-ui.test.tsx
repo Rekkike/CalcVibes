@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent, waitFor, screen } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { demoProject } from "../src/state.js";
 import { computeModel } from "../src/engine.js";
+import { serializeProject } from "../../core/src/fileio.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
@@ -13,8 +14,16 @@ const ROWS = [
   { id: "r2", label: "Loaded 40-ft", weight: 2, lifts: [150, 300, 300, 300, 300, 300, 300, 225] },
 ];
 
-function loadStable() {
-  fireEvent.click(byAction("load-demo"));
+// v0.6.7 re-anchor: the port loader presets a 21-column decompose tariff; this suite builds its own
+// eight-column stable tariff from a blank slate, so it opens the internal Alpha template via the
+// project-file route — the same project the old demo button loaded.
+async function loadStable() {
+  const text = serializeProject(demoProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  const file = new File([text], "project-alpha.calcvibes.json", { type: "application/json" });
+  fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [file] } });
+  await waitFor(() => {
+    expect(screen.getByText("Project Alpha")).toBeTruthy();
+  });
   fireEvent.click(byNav("tariff"));
   fireEvent.change(byField("tariffMode"), { target: { value: "stable" } });
   // add the two rows of record
@@ -30,17 +39,17 @@ function loadStable() {
 }
 
 describe("chunk 6: tariff section and results", () => {
-  it("renders the mode selector and the volume grid derived from the model span", () => {
+  it("renders the mode selector and the volume grid derived from the model span (v0.6.7 re-anchor: the Alpha template via the project-file route)", async () => {
     render(<App />);
-    loadStable();
+    await loadStable();
     const header = document.querySelector('[data-testid="tariff-rows"] thead');
     expect(header && header.textContent).toContain("3");
     expect(header && header.textContent).toContain("10");
   });
 
-  it("engine-emitted decomposition displays: unit price, revenue, weighted volume; null payment renders as not applicable", () => {
+  it("engine-emitted decomposition displays: unit price, revenue, weighted volume; null payment renders as not applicable (v0.6.7 re-anchor: the Alpha template via the project-file route)", async () => {
     render(<App />);
-    loadStable();
+    await loadStable();
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
     expect(dec).toBeTruthy();
     expect(dec && dec.textContent).toContain("842,97 tkr");
@@ -49,17 +58,17 @@ describe("chunk 6: tariff section and results", () => {
     expect(document.querySelector('[data-testid="payment-na"]')!.textContent).toContain("not applicable");
   });
 
-  it("per-lift charges display from engine-emitted data", () => {
+  it("per-lift charges display from engine-emitted data (v0.6.7 re-anchor: the Alpha template via the project-file route)", async () => {
     render(<App />);
-    loadStable();
+    await loadStable();
     const charges = document.querySelector('[data-testid="per-lift-charges"]');
     expect(charges && charges.textContent).toContain("Loaded 20-ft: 1,20 tkr");
     expect(charges && charges.textContent).toContain("Loaded 40-ft: 2,41 tkr");
   });
 
-  it("decompose mode keeps the solved payment and shows the required per year", () => {
+  it("decompose mode keeps the solved payment and shows the required per year (v0.6.7 re-anchor: the Alpha template via the project-file route)", async () => {
     render(<App />);
-    loadStable();
+    await loadStable();
     fireEvent.change(byField("tariffMode"), { target: { value: "decompose" } });
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
     expect(dec && dec.textContent).toContain("475,31 tkr");

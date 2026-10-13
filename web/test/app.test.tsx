@@ -24,9 +24,9 @@ describe("chunk 2: shell, blank start, demo load, validation panel", () => {
   it("loads the demo project labeled as a demo and renders the baseline headline statistics", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
-    expect(screen.getByText("Project Alpha")).toBeTruthy();
-    expect(byStat("paymentAmount").textContent).toBe("475 tkr");
-    expect(byStat("totalCost").textContent).toBe("7 850 tkr");
+    expect(screen.getByText("Shore power example (Rotterdam)")).toBeTruthy();
+    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
+    expect(byStat("totalCost").textContent).toBe("€269 592 k");
     expect(screen.queryByTestId("issues-summary")).toBeNull();
   });
 

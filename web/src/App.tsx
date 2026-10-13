@@ -4,7 +4,7 @@ import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
 import { EngineInputError } from "../../core/src/validate.js";
-import { blankCostLine, blankProject, demoProject, multiLeaseProject, nextCostId, solarParkProject } from "./state.js";
+import { blankCostLine, blankProject, landNewbuildProject, nextCostId, shorePowerProject, solarParkProject } from "./state.js";
 import type { CostLine } from "../../core/src/types.js";
 import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
@@ -200,8 +200,14 @@ export function App() {
               e.target.value = "";
             }}
           />
-          <button data-action="load-demo" onClick={() => setInputs(demoProject())}>Load demo project (Project Alpha)</button>
-          <button data-action="load-multi-lease-demo" onClick={() => setInputs(multiLeaseProject())}>Load multi-lease demo</button>
+          {/* v0.6.7 Task B: the realistic demo rotation. The port loader presets the three scenario axes
+              (the balloon entries are entry-unit values; at unit millions, 8 and 16 scale to raw
+              balloons of 8 000 000 and 16 000 000 at compute). The land loader presets the target
+              axis only; the term and balloon axes are inert in contracts mode (finding F1), so
+              presetting them would be dishonest. The entry-unit select is untouched: only
+              project-file open syncs the unit. */}
+          <button data-action="load-demo" onClick={() => { setInputs(shorePowerProject()); setScenarioTargets([4, 6, 8]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 8, 16]); }}>Load shore power demo (Rotterdam)</button>
+          <button data-action="load-multi-lease-demo" onClick={() => { setInputs(landNewbuildProject()); setScenarioTargets([6, 8, 10]); }}>Load land newbuild demo (Mjøstårnet)</button>
           {/* v0.6.6 Task B: the third loader presets the scenario axes (the amendment of record: the balloon
               entries are entry-unit values; at unit thousands, 1000 and 2000 scale to raw balloons of
               1 000 000 and 2 000 000 at compute). The other two loaders are untouched: additive only. */}

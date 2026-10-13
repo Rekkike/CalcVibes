@@ -3,7 +3,7 @@ import { render, fireEvent } from "@testing-library/react";
 import fs from "node:fs";
 import { App } from "../src/App.js";
 import { computeModel, deckMoneyForDisplay, percentForDisplay, deckYearsForDisplay } from "../src/engine.js";
-import { demoProject } from "../src/state.js";
+import { demoProject, shorePowerProject } from "../src/state.js";
 import { deckSlides } from "../src/deck.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
@@ -49,15 +49,15 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     expect(document.querySelector('[data-testid="cost-inflow-columns"]')).toBeNull();
   });
 
-  it("OVERVIEW-SUMMARY: the Overview metric cards and summary chart bind to engine fields through the formatters", () => {
-    const result = computeModel(demoProject());
+  it("OVERVIEW-SUMMARY: the Overview metric cards and summary chart bind to engine fields through the formatters (v0.6.7 re-anchor: the port demo, EUR)", () => {
+    const result = computeModel(shorePowerProject());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("overview"));
     const cards = document.querySelector('[data-testid="metric-cards"]') as HTMLElement;
     expect(cards).toBeTruthy();
-    expect(cards.querySelector('[data-metric="totalCost"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "thousands"));
-    expect(cards.querySelector('[data-metric="requiredPayment"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.paymentAmount as number, "SEK", "thousands"));
+    expect(cards.querySelector('[data-metric="totalCost"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.totalCost, "EUR", "thousands"));
+    expect(cards.querySelector('[data-metric="requiredPayment"] .metric-value')?.textContent).toBe(deckMoneyForDisplay(result.paymentAmount as number, "EUR", "thousands"));
     expect(cards.querySelector('[data-metric="achievedIrr"] .metric-value')?.textContent).toBe(percentForDisplay(result.achievedIrr, 2));
     expect(cards.querySelector('[data-metric="payback"] .metric-value')?.textContent).toBe(deckYearsForDisplay(result.paybackYears as number));
     expect(cards.querySelector(".metric-label")?.textContent).toBeTruthy();
@@ -93,7 +93,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     expect(css).toMatch(/\[data-testid="presentation"\] \.deck-slide\b[^{]*\{[^}]*min-height/);
   });
 
-  it("DECK-CHROME and NUMBERED-KICKERS: every non-title slide carries its numbered kicker; the title slide carries the three-metric row", async () => {
+  it("DECK-CHROME and NUMBERED-KICKERS: every non-title slide carries its numbered kicker; the title slide carries the three-metric row (v0.6.7 re-anchor: the port preset axes mount the eighth slide, so seven numbered kickers render)", async () => {
     const { demoProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay, percentTwoForDisplay } = await import("../src/engine.js");
     const result = computeModel(demoProject());
@@ -108,7 +108,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const kickers = document.querySelectorAll('[data-testid="slide-kicker"]');
-    expect(kickers.length).toBe(6);
+    expect(kickers.length).toBe(7);
     expect(kickers[0].textContent).toMatch(/^01 — /);
     const titleMetrics = document.querySelector('[data-testid="title-metrics"]') as HTMLElement;
     expect(titleMetrics).toBeTruthy();
@@ -153,14 +153,14 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6R", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.6");
+    expect(VERSION).toBe("v0.6.7");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.6");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.7");
   });
 
-  it("CHART-TRACE and ACTION-TITLES stand: the signed chart values equal the engine yearly rows; the deck titles carry no figures on the coverage slide", () => {
-    const result = computeModel(demoProject());
+  it("CHART-TRACE and ACTION-TITLES stand: the signed chart values equal the engine yearly rows; the deck titles carry no figures on the coverage slide (v0.6.7 re-anchor: the port demo)", () => {
+    const result = computeModel(shorePowerProject());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
@@ -172,7 +172,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
       const row = result.yearly.find((y) => y.year === year);
       expect(row).toBeTruthy();
     }
-    const deck = deckSlides(demoProject(), result, { startYear: null, entryUnit: "ones" });
+    const deck = deckSlides(shorePowerProject(), result, { startYear: null, entryUnit: "ones" });
     expect(deck.slides[4].title).not.toMatch(/\d/);
   });
 });

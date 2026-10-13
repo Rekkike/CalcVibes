@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { computeModel, moneyForDisplay } from "../src/engine.js";
-import { demoProject, multiLeaseProject } from "../src/state.js";
+import { demoProject, multiLeaseProject, shorePowerProject } from "../src/state.js";
 import { bucketSeries, bucketWidthFor } from "../src/charts.js";
 import type { ModelInputs } from "../../core/src/types.js";
 
@@ -26,18 +26,18 @@ describe("v0.6.1 chunk 1 — the worksuite surfaces", () => {
     expect(document.querySelector('[data-testid="scenarios"]')).toBeTruthy();
   });
 
-  it("ENTRY-UNIT: the Results stats and the yearly table render unit-scaled figures consistent with the deck", async () => {
+  it("ENTRY-UNIT: the Results stats and the yearly table render unit-scaled figures consistent with the deck (v0.6.7 re-anchor: the port demo, EUR)", async () => {
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(demoProject());
+    const result = computeModel(shorePowerProject());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.change(document.querySelector('[data-field="entryUnit"]') as HTMLSelectElement, { target: { value: "millions" } });
     fireEvent.click(byNav("results"));
-    expect(document.querySelector('[data-stat="totalCost"]')?.textContent).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "millions"));
-    expect(document.querySelector('[data-stat="yearly-cost"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cost, "SEK", "millions"));
-    const cumCells = document.querySelectorAll('[data-stat="yearly-cumulative"]'); expect(cumCells[cumCells.length - 1]?.textContent).toBe(deckMoneyForDisplay(result.yearly[result.yearly.length - 1].cumulative, "SEK", "millions"));
+    expect(document.querySelector('[data-stat="totalCost"]')?.textContent).toBe(deckMoneyForDisplay(result.totalCost, "EUR", "millions"));
+    expect(document.querySelector('[data-stat="yearly-cost"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cost, "EUR", "millions"));
+    const cumCells = document.querySelectorAll('[data-stat="yearly-cumulative"]'); expect(cumCells[cumCells.length - 1]?.textContent).toBe(deckMoneyForDisplay(result.yearly[result.yearly.length - 1].cumulative, "EUR", "millions"));
     fireEvent.click(byNav("detail"));
-    expect(document.querySelector('[data-testid="cost-grid"] td.table-value-cell')?.textContent).toBe(moneyForDisplay(result.costGrid[0].amounts[0], "SEK", "millions"));
+    expect(document.querySelector('[data-testid="cost-grid"] td.table-value-cell')?.textContent).toBe(moneyForDisplay(result.costGrid[0].amounts[0], "EUR", "millions"));
   });
 
   it("ADAPTIVE-BINNING: a 54-year horizon yields at most 20 columns; the widths are 1/2/5/10", () => {

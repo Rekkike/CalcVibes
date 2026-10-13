@@ -252,12 +252,13 @@ describe("GRID battery", () => {
     expect(prof?.amounts.slice(0, 6)).toEqual([0, 0, 1000000, 2000000, 3000000, 4000000]);
   });
 
-  it("GRID-RECON: the five identities at 1e-6 across four configurations", () => {
+  it("GRID-RECON: the five identities at 1e-6 across five configurations (the fifth is the v0.6.7 multi-row decompose, red on the pre-fix engine)", () => {
     const configs: ModelInputs[] = [
       base(),
       withProfile(),
       { ...base(), maintenance: { mode: "percent", percentPerYear: 0.5 }, operatingLines: [{ id: "o1", label: "Rent", amount: 120000, startYear: 3, yearCount: 8, escalation: 0 }] },
       { ...base(), tariff: { mode: "fixed", escalationPerYear: 2, rows: [], fixedAnnualAmount: 600000, manualPrices: null } },
+      { ...base(), tariff: { mode: "decompose", escalationPerYear: 0, rows: [{ id: "r1", label: "L20", weight: 1, lifts: [400, 800, 800, 800, 800, 800, 800, 800, 800, 600] }, { id: "r2", label: "L40", weight: 2, lifts: [150, 300, 300, 300, 300, 300, 300, 300, 300, 225] }], fixedAnnualAmount: null, manualPrices: null } },
     ];
     for (const cfg of configs) {
       const r = computeModel(cfg);

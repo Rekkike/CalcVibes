@@ -207,11 +207,12 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     }
   });
 
-  it("CHART-WHOLE: the recovery bars carry complete year labels equal to the year headers", async () => {
-    const { demoProject } = await import("../src/state.js");
+  it("CHART-WHOLE: the recovery bars carry complete year labels equal to the year headers (v0.6.7 re-anchor: the port recovery buckets at width 2)", async () => {
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
-    const result = computeModel(demoProject());
+    const { bucketSeries } = await import("../src/charts.js");
+    const result = computeModel(shorePowerProject());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -219,16 +220,20 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const bars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]') as SVGElement;
     const yearLabels = bars.querySelectorAll('[data-testid="bar-year-label"]');
-    expect(yearLabels.length).toBe(result.yearly.length);
+    const { width } = bucketSeries(new Array<number>(result.yearly.length).fill(0), 15);
+    expect(yearLabels.length).toBe(Math.ceil(result.yearly.length / width));
     for (let k = 0; k < yearLabels.length; k++) {
-      expect((yearLabels[k] as SVGTextElement).textContent).toBe(yearHeader(k + 1, null));
+      expect((yearLabels[k] as SVGTextElement).textContent).toBe(width === 1
+        ? yearHeader(k + 1, null)
+        : `${yearHeader(k * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (k + 1) * width), null)}`);
     }
   });
 
-  it("CHART-PURPOSE: every deck chart carries its kicker title, its labels, and its total", async () => {
-    const { demoProject } = await import("../src/state.js");
+  it("CHART-PURPOSE: every deck chart carries its kicker title, its labels, and its total (v0.6.7 re-anchor: the port cost base and per-lift recovery, EUR at entry thousands)", async () => {
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const demo = demoProject();
+    const { bucketSeries } = await import("../src/charts.js");
+    const demo = shorePowerProject();
     const result = computeModel(demo);
     const unit = "thousands";
     render(<App />);
@@ -236,16 +241,17 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const investmentRows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
-    expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Development team dominates the cost base");
-    expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(3);
+    expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Substations & grid connections dominates the cost base");
+    expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(5);
     const firstRow = investmentRows?.querySelector("[data-composition-row]");
     expect(firstRow?.querySelector('[data-row-label="name"]')?.textContent).toBe(result.lineTotals[0].name);
-    expect(firstRow?.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(result.lineTotals[0].total, "SEK", unit));
+    expect(firstRow?.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(result.lineTotals[0].total, "EUR", unit));
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const recoveryBars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]');
-    expect(recoveryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Even payments spread the recovery");
-    expect(recoveryBars?.querySelectorAll('[data-testid="bar-year-label"]').length).toBe(10);
+    expect(recoveryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Per-lift prices set the yearly recovery");
+    const { width } = bucketSeries(new Array<number>(result.yearly.length).fill(0), 15);
+    expect(recoveryBars?.querySelectorAll('[data-testid="bar-year-label"]').length).toBe(Math.ceil(result.yearly.length / width));
     expect(recoveryBars?.querySelector('[data-testid="peak-label"]')).toBeTruthy();
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
@@ -253,29 +259,28 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     const summaryHurdle = document.querySelector('[data-summary-chart="hurdle"]');
     const summaryBars = document.querySelector('[data-summary-chart="bars"]');
     expect(summaryHurdle?.querySelector('[data-testid="hurdle-target-dot"]')).toBeTruthy();
-    expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Even payments spread the recovery");
+    expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Per-lift prices set the yearly recovery");
   });
 
-  it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force", async () => {
-    const { demoProject } = await import("../src/state.js");
+  it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force (v0.6.7 re-anchor: the port peak is a recovery bucket sum at width 2)", async () => {
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const demo = demoProject();
+    const { yearHeader } = await import("../src/state.js");
+    const { bucketSeries } = await import("../src/charts.js");
+    const demo = shorePowerProject();
     const result = computeModel(demo);
     const unit = "thousands";
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const peak = Array.from(document.querySelectorAll('[data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
-    const peakValue = Math.max(...result.collectionsGrid.reduce((acc, row) => {
+    const rawInflows = result.collectionsGrid.reduce((acc, row) => {
       for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
       return acc;
-    }, new Array<number>(result.yearly.length).fill(0)));
-    const { yearHeader } = await import("../src/state.js");
-    const peakYear = result.collectionsGrid.reduce((acc, row) => {
-      for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
-      return acc;
-    }, new Array<number>(result.yearly.length).fill(0)).reduce((bi, v, i, arr) => (v > arr[bi] ? i : bi), 0) + 1;
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(peakValue, "SEK", unit)} in ${yearHeader(peakYear, null)}`);
+    }, new Array<number>(result.yearly.length).fill(0));
+    const { buckets, width } = bucketSeries(rawInflows, 15);
+    const peakIdx = buckets.indexOf(Math.max(...buckets));
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", unit)} in ${yearHeader(peakIdx * width + 1, null)}`);
   });
 
   it("PEAK-PRINT: the print stylesheet carries the peak-label ink variant", () => {

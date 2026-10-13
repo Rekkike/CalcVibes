@@ -57,25 +57,29 @@ describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", ()
 
 describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => {
   it("ANSWER-BAND: the statement equals its computed branch for the met case, tone-coded", async () => {
-    const { demoProject } = await import("../src/state.js");
+    // v0.6.7 re-anchor: the demo button loads the port fixture; the met-case branch is asserted
+    // against its engine fields (achieved IRR 6% against the target 6%).
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, percentForDisplay, roundForDisplay } = await import("../src/engine.js");
-    const demo = demoProject();
-    const result = computeModel(demo);
+    const port = shorePowerProject();
+    const result = computeModel(port);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
     const band = document.querySelector('[data-testid="answer-band"]') as HTMLElement;
     expect(band.className).toContain("tone-ok");
     const statement = document.querySelector('[data-testid="goal-check"]')?.textContent ?? "";
-    expect(statement).toContain(`achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(demo.targetIrr, 2)}%`);
+    expect(statement).toContain(`achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(port.targetIrr, 2)}%`);
     expect(statement).toContain("target achieved");
   });
 
   it("KPI-ROW: each card value equals its engine field through the display formatters; the absent-financing branch is honest", async () => {
-    const { demoProject } = await import("../src/state.js");
+    // v0.6.7 re-anchor: the demo button loads the port fixture (EUR); the KPI values flow through
+    // the display formatters at the results band's unit default.
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, percentForDisplay, roundForDisplay, deckMoneyForDisplay, deckYearsForDisplay } = await import("../src/engine.js");
-    const demo = demoProject();
-    const result = computeModel(demo);
+    const port = shorePowerProject();
+    const result = computeModel(port);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
@@ -83,24 +87,25 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     expect(cards.length).toBe(4);
     const byLabel = (l: string) => cards.find((c) => c.querySelector(".kpi-label")?.textContent === l) as HTMLElement;
     expect(byLabel("Achieved IRR").querySelector(".kpi-value")?.textContent).toBe(percentForDisplay(result.achievedIrr, 2));
-    expect(byLabel("Achieved IRR").querySelector(".kpi-chip")?.textContent).toBe(`vs ${roundForDisplay(demo.targetIrr, 2)}% target`);
+    expect(byLabel("Achieved IRR").querySelector(".kpi-chip")?.textContent).toBe(`vs ${roundForDisplay(port.targetIrr, 2)}% target`);
     expect(byLabel("Achieved IRR").className).toContain("tone-ok");
-    expect(byLabel("NPV at WACC").querySelector(".kpi-value")?.textContent).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", "ones"));
+    expect(byLabel("NPV at WACC").querySelector(".kpi-value")?.textContent).toBe(deckMoneyForDisplay(result.npvAtWacc, "EUR", "ones"));
     expect(byLabel("Payback (nominal)").querySelector(".kpi-value")?.textContent).toBe(deckYearsForDisplay(result.paybackYears as number));
     expect(byLabel("Min DSCR").querySelector(".kpi-value")?.textContent).toBe("not applicable");
   });
 
   it("FIGURE-BAND: the three figures equal their engine fields through the deck money variant; the note renders verbatim", async () => {
-    const { demoProject } = await import("../src/state.js");
+    // v0.6.7 re-anchor: the demo button loads the port fixture (EUR).
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(demoProject());
+    const result = computeModel(shorePowerProject());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
     const band = document.querySelector('[data-testid="figure-band"]') as HTMLElement;
     expect(band.querySelectorAll(".figure-item").length).toBe(3);
     expect(band.querySelector('[data-testid="figure-band"] .figure-value') === null ? null : Array.from(band.querySelectorAll(".figure-value")).map((e) => e.textContent))
-      .toEqual([deckMoneyForDisplay(result.totalCost, "SEK", "ones"), deckMoneyForDisplay(result.totalCollected, "SEK", "ones"), deckMoneyForDisplay(result.netGain, "SEK", "ones")]);
+      .toEqual([deckMoneyForDisplay(result.totalCost, "EUR", "ones"), deckMoneyForDisplay(result.totalCollected, "EUR", "ones"), deckMoneyForDisplay(result.netGain, "EUR", "ones")]);
     expect(band.querySelector(".caveat")?.textContent).toBe("Nominal figures are undiscounted; the cost NPV and achieved IRR are discounted.");
   });
 
@@ -175,9 +180,10 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
   });
 
   it("WATERFALL-BUILD: one segment per cost line; the labels flow through the deck money variant", async () => {
-    const { demoProject } = await import("../src/state.js");
+    // v0.6.7 re-anchor: the demo button loads the port fixture — five cost lines, EUR labels.
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(demoProject());
+    const result = computeModel(shorePowerProject());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -204,7 +210,7 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(labels.length).toBe(result.lineTotals.length);
     for (let i = 0; i < labels.length; i++) {
       expect(labels[i].textContent).toContain(result.lineTotals[i].name);
-      expect(labels[i].textContent).toContain(deckMoneyForDisplay(result.lineTotals[i].total, "SEK", "thousands"));
+      expect(labels[i].textContent).toContain(deckMoneyForDisplay(result.lineTotals[i].total, "EUR", "thousands"));
     }
     expect(slide.querySelectorAll('[data-testid="composition-rows"]').length).toBe(1);
   });
@@ -217,11 +223,12 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     const plot = document.querySelector('[data-testid="hurdle-plot"]') as HTMLElement;
     const targetDot = plot.querySelector('[data-testid="hurdle-target-dot"]') as HTMLElement;
     const achievedDot = plot.querySelector('[data-testid="hurdle-achieved-dot"]') as HTMLElement;
-    const { demoProject } = await import("../src/state.js");
+    // v0.6.7 re-anchor: the demo button loads the port fixture; the two dots map its fields.
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
-    const demo = demoProject();
-    const res = computeModel(demo);
-    const target = demo.targetIrr;
+    const port = shorePowerProject();
+    const res = computeModel(port);
+    const target = port.targetIrr;
     const achieved = (res.achievedIrr ?? 0) * 100;
     const scale = Math.max(target, achieved) * 1.15;
     expect(parseFloat(targetDot.style.left)).toBeCloseTo((target / scale) * 100, 0);
@@ -253,9 +260,10 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
   });
 
   it("TAKEAWAY-KICKERS: the investment kicker names the dominant line from the argmax over the engine lineTotals", async () => {
-    const { demoProject } = await import("../src/state.js");
+    // v0.6.7 re-anchor: the port fixture's dominant line is "Substations & grid connections".
+    const { shorePowerProject } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
-    const result = computeModel(demoProject());
+    const result = computeModel(shorePowerProject());
     const dominant = result.lineTotals.reduce((b, l) => (l.total > b.total ? l : b), result.lineTotals[0]);
     render(<App />);
     fireEvent.click(byAction("load-demo"));

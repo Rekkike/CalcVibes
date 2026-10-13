@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { moneyForDisplay } from "../src/engine.js";
 import { demoProject } from "../src/state.js";
 import { computeModel } from "../src/engine.js";
+import { serializeProject } from "../../core/src/fileio.js";
 import type { TariffRow } from "../../core/src/types.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
@@ -15,8 +16,22 @@ const ROWS: TariffRow[] = [
   { id: "r2", label: "Loaded 40-ft", weight: 2, lifts: [150, 300, 300, 300, 300, 300, 300, 225] },
 ];
 
-function loadRows(mode: string) {
-  fireEvent.click(byAction("load-demo"));
+// v0.6.7 re-anchor: the load-demo button now loads the port fixture, which presets a
+// 21-column decompose tariff; this suite builds its own 8-column ROWS from a blank tariff,
+// so the setup loads the internal Alpha template via the project-file route instead
+// (the tariff section adapts minimally: the row-building flow is unchanged).
+async function openAlpha() {
+  const text = serializeProject(demoProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  const file = new File([text], "project-alpha.calcvibes.json", { type: "application/json" });
+  fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [file] } });
+  await waitFor(() => {
+    expect(screen.getByText("Project Alpha")).toBeTruthy();
+  });
+}
+
+async function loadRows(mode: string, afterOpen?: () => void) {
+  await openAlpha();
+  if (afterOpen) afterOpen();
   fireEvent.click(byNav("tariff"));
   fireEvent.change(byField("tariffMode"), { target: { value: mode } });
   for (const row of ROWS) {
@@ -31,11 +46,11 @@ function loadRows(mode: string) {
 }
 
 describe("Task C-3: per-lift charges render engine data verbatim", () => {
-  it("the rendered values equal the engine result data; no recomputation in the component", () => {
+  it("the rendered values equal the engine result data; no recomputation in the component", async () => {
     const engineResult = computeModel({ ...demoProject(), tariff: { mode: "stable", escalationPerYear: 2, rows: ROWS, fixedAnnualAmount: null, manualPrices: null } });
     const expected = (engineResult.tariffYears[0].perRowCharges as Record<string, number>).r2;
     render(<App />);
-    loadRows("stable");
+    await loadRows("stable");
     const li = document.querySelector('[data-row-charge="r2"]');
     expect(li && li.textContent).toContain("2,41 tkr");
     expect(li && li.textContent).toContain(moneyForDisplay(expected, "SEK", "thousands"));
@@ -43,17 +58,17 @@ describe("Task C-3: per-lift charges render engine data verbatim", () => {
 });
 
 describe("Task D: manual price inputs and validation surfacing", () => {
-  it("manual mode renders one price input per grid column", () => {
+  it("manual mode renders one price input per grid column", async () => {
     render(<App />);
-    loadRows("stable");
+    await loadRows("stable");
     fireEvent.change(byField("tariffMode"), { target: { value: "manual" } });
     const inputs = document.querySelectorAll('[data-field="manualPrice"]');
     expect(inputs.length).toBe(8);
   });
 
-  it("validation surfaces a wrong-length message naming both counts", () => {
+  it("validation surfaces a wrong-length message naming both counts", async () => {
     render(<App />);
-    loadRows("stable");
+    await loadRows("stable");
     fireEvent.change(byField("tariffMode"), { target: { value: "manual" } });
     expect(document.querySelectorAll('[data-field="manualPrice"]').length).toBe(8);
     const inputs = document.querySelectorAll('[data-field="manualPrice"]');
@@ -64,9 +79,9 @@ describe("Task D: manual price inputs and validation surfacing", () => {
     expect(inputs.length).toBe(8);
   });
 
-  it("a negative manual price surfaces an error naming the column", () => {
+  it("a negative manual price surfaces an error naming the column", async () => {
     render(<App />);
-    loadRows("stable");
+    await loadRows("stable");
     fireEvent.change(byField("tariffMode"), { target: { value: "manual" } });
     const inputs = document.querySelectorAll('[data-field="manualPrice"]');
     fireEvent.change(inputs[1] as HTMLElement, { target: { value: "-5" } });
@@ -76,10 +91,11 @@ describe("Task D: manual price inputs and validation surfacing", () => {
 });
 
 describe("Task E-1: one flow of time across both surfaces", () => {
-  it("with startYear 2026 both grids label the first collection year 2028", () => {
+  it("with startYear 2026 both grids label the first collection year 2028 (v0.6.7 re-anchor: the start year is set through the load hook, after the Alpha open and before the tariff navigation, so the file-open settings restore cannot race it back to null)", async () => {
     render(<App />);
-    fireEvent.change(document.querySelector('[data-field="startYear"]') as HTMLElement, { target: { value: "2026" } });
-    loadRows("decompose");
+    await loadRows("decompose", () => {
+      fireEvent.change(document.querySelector('[data-field="startYear"]') as HTMLElement, { target: { value: "2026" } });
+    });
     const rowsHeader = document.querySelector('[data-testid="tariff-rows"] thead');
     expect(rowsHeader && rowsHeader.textContent).toContain("2028");
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
@@ -87,9 +103,9 @@ describe("Task E-1: one flow of time across both surfaces", () => {
     expect(firstRow && firstRow.textContent).toContain("2028");
   });
 
-  it("with the start year unset both label Year 3", () => {
+  it("with the start year unset both label Year 3", async () => {
     render(<App />);
-    loadRows("decompose");
+    await loadRows("decompose");
     const rowsHeader = document.querySelector('[data-testid="tariff-rows"] thead');
     expect(rowsHeader && rowsHeader.textContent).toContain("Year 3");
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');

@@ -47,7 +47,8 @@ describe("Task B: TOKEN-SET / surfaces / typography (structural)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     const hint = document.querySelector('[data-testid="length-hint"]');
-    expect(hint && hint.textContent).toContain("120 months (10 years)");
+    // v0.6.7 re-anchor: the port fixture derives a 276-month (23-year) horizon.
+    expect(hint && hint.textContent).toContain("276 months (23 years)");
   });
 
   it("COLL-LABELS: the collections editor rows carry calendar-year labels via the shared helper", () => {
@@ -98,8 +99,9 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     expect(chart).toBeTruthy();
     const costBars = chart.querySelectorAll('[data-chart-bar="cost"]');
     const inflowBars = chart.querySelectorAll('[data-chart-bar="inflow"]');
-    expect(costBars.length).toBe(10);
-    expect(inflowBars.length).toBe(10);
+    // v0.6.7 re-anchor: the port fixture renders one bar pair per engine year (23 years).
+    expect(costBars.length).toBe(23);
+    expect(inflowBars.length).toBe(23);
     expect((costBars[0] as SVGPolygonElement).getAttribute("fill")).toBe("#fb7185");
     expect((inflowBars[0] as SVGPolygonElement).getAttribute("fill")).toBe("#34d399");
     const zeroY = chart.querySelector('[data-testid="zero-baseline"]')?.getAttribute("y1");
@@ -130,17 +132,18 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
     const rows = document.querySelector('[data-testid="composition-rows-wrap"] [data-testid="composition-rows"]') as HTMLElement;
-    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(3);
+    // v0.6.7 re-anchor: the port fixture carries five cost lines.
+    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(5);
     const donut = document.querySelector('[data-testid="composition-donut"]') as HTMLElement;
     expect(donut).toBeTruthy();
     const segments = donut.querySelectorAll("[data-donut-segment]");
-    expect(segments.length).toBe(3);
+    expect(segments.length).toBe(5);
     const colors = new Set(Array.from(segments).map((sg) => (sg as SVGPathElement).getAttribute("stroke")));
-    expect(colors.size).toBe(3);
+    expect(colors.size).toBe(5);
     expect(donut.querySelector("svg text")).toBeNull();
     expect(donut.querySelector('[data-testid="donut-center-total"]')).toBeTruthy();
     const labels = donut.querySelectorAll('[data-testid="donut-label"]');
-    expect(labels.length).toBe(3);
+    expect(labels.length).toBe(5);
     for (const label of Array.from(labels)) {
       expect(donut.querySelector("svg")?.contains(label)).toBe(false);
     }
@@ -157,7 +160,8 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     expect(investmentSlot.querySelector('[data-testid="composition-rows"]')).toBeTruthy();
     expect(recoverySlot.querySelector('[data-testid="recovery-bars"]')).toBeTruthy();
     const bars = recoverySlot.querySelectorAll('[data-recovery-column]');
-    expect(bars.length).toBe(10);
+    // v0.6.7 re-anchor: 23 inflow years bucket at width 2 under the cap of 15 — 12 columns.
+    expect(bars.length).toBe(12);
   });
 
   it("CHART-TRACE: the mapped values equal the engine fields (perturb the mapping and this fails)", async () => {

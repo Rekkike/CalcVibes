@@ -163,7 +163,7 @@ describe("v0.6.5 Task C: the paired composition donuts (W13)", () => {
     expect(infl.segments.reduce((a, s) => a + s.value, 0)).toBeCloseTo(mlr.totalCollected, 6);
   });
 
-  it("C-RENDER: the rendered summary carries the two donuts with labels outside the geometry, no viewbox text, and the full circle for the single-segment case", () => {
+  it("C-RENDER: the rendered summary carries the two donuts with labels outside the geometry, no viewbox text (v0.6.7 re-anchor: the port inflow carries the two post-fix tariff rows, so the single-segment full-circle case no longer arises from the demo button)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -172,15 +172,15 @@ describe("v0.6.5 Task C: the paired composition donuts (W13)", () => {
     expect(wrap).toBeTruthy();
     expect(wrap.querySelectorAll('[data-testid="composition-donut"]').length).toBe(2);
     const inflow = wrap.querySelector('[data-donut="inflows"]') as HTMLElement;
-    expect(inflow.querySelectorAll("[data-donut-segment]").length).toBe(1);
+    expect(inflow.querySelectorAll("[data-donut-segment]").length).toBe(2);
     expect(inflow.querySelector("svg text")).toBeNull();
     for (const label of Array.from(inflow.querySelectorAll('[data-testid="donut-label"]'))) {
       expect((inflow.querySelector("svg") as SVGSVGElement).contains(label)).toBe(false);
     }
-    expect(inflow.querySelector('[data-testid="donut-center-total"]')?.textContent).toBe("13 309 tkr");
-    expect(inflow.querySelector('[data-donut-label="payments"]')?.textContent).toContain("Payment stream");
+    expect(inflow.querySelector('[data-testid="donut-center-total"]')?.textContent).toBe("€390 293 k");
+    expect(inflow.querySelector('[data-donut-label="r1"]')?.textContent).toContain("Deep-sea container vessel (8-24k TEU)");
     const outflow = wrap.querySelector('[data-donut="outflows"]') as HTMLElement;
-    expect(outflow.querySelectorAll("[data-donut-segment]").length).toBe(3);
+    expect(outflow.querySelectorAll("[data-donut-segment]").length).toBe(5);
     expect(outflow.querySelector("svg text")).toBeNull();
   });
 });
@@ -203,12 +203,12 @@ describe("v0.6.5 Task E: the scale-adaptive chart labels (W12)", () => {
     // the clamp is bounded [15, 85] in the model
     const deckSrc = fs.readFileSync("src/deck.ts", "utf8");
     expect(deckSrc).toContain("Math.min(85, Math.max(15");
-    // rendered: the coverage slot carries the crossing x and the label rule reads it
+    // rendered: the coverage slot carries the crossing x and the label rule reads it (v0.6.7 re-anchor: the port crossing)
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slot = document.querySelector('[data-slide-name="coverage"] [data-slide-chart="coverage"]') as HTMLElement;
-    expect(slot.style.getPropertyValue("--deck-crossing-x")).toBe("66.7%");
+    expect(slot.style.getPropertyValue("--deck-crossing-x")).toBe("63.6%");
     expect(document.querySelector('[data-testid="stage-returns-crossing"]')).toBeTruthy();
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\[data-testid="presentation"\] \.line-years\s*\{/);
@@ -222,7 +222,7 @@ describe("v0.6.5 Task E: the scale-adaptive chart labels (W12)", () => {
 });
 
 describe("v0.6.5 Task F: the static navigation chrome (W14)", () => {
-  it("F-CHROME-RENDER: the chrome is fixed at the bottom with the counter on screen; the arrows dim at the ends, never disappear; the action names and dots stand", () => {
+  it("F-CHROME-RENDER: the chrome is fixed at the bottom with the counter on screen; the arrows dim at the ends, never disappear; the action names and dots stand (v0.6.7 re-anchor: the port preset axes mount the eighth scenarios slide)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -237,15 +237,15 @@ describe("v0.6.5 Task F: the static navigation chrome (W14)", () => {
     expect(prev.className).toContain("stage-nav-button-disabled");
     expect(prev.textContent).toBe("‹");
     expect(next.textContent).toBe("›");
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 7");
-    expect(nav.querySelectorAll("[data-dot]").length).toBe(7);
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 8");
+    expect(nav.querySelectorAll("[data-dot]").length).toBe(8);
     expect(next.getAttribute("aria-disabled")).toBe("false");
-    for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("7 / 7");
+    for (let i = 0; i < 7; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("8 / 8");
     expect(next.getAttribute("aria-disabled")).toBe("true");
     expect(next.className).toContain("stage-nav-button-disabled");
     expect(prev.getAttribute("aria-disabled")).toBe("false");
-    expect(document.querySelectorAll('[data-dot="6"].stage-dot-active').length).toBe(1);
+    expect(document.querySelectorAll('[data-dot="7"].stage-dot-active').length).toBe(1);
   });
 
   it("F-SWIPE-SOURCE: the swipe handlers attach with a threshold and the dominant-axis test; the chrome reserves the safe area", () => {

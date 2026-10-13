@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { demoProject } from "../src/state.js";
 import { computeModel } from "../src/engine.js";
+import { serializeProject } from "../../core/src/fileio.js";
+
+// v0.6.7 re-anchor: the load-demo button now loads the port fixture, whose leveraged-solve
+// cash flow has a single sign change, so the FN-1 ambiguity case (56 sign changes) is
+// re-pointed to the internal Alpha template via the project-file route.
+async function openAlpha() {
+  const text = serializeProject(demoProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  const file = new File([text], "project-alpha.calcvibes.json", { type: "application/json" });
+  fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [file] } });
+  await waitFor(() => {
+    expect(screen.getByText("Project Alpha")).toBeTruthy();
+  });
+}
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
@@ -28,7 +41,7 @@ describe("chunk 5 web task 1: financing section", () => {
     expect(document.querySelector('[data-field="finGrace"]')).toBeTruthy();
     expect(document.querySelector('[data-field="finStart"]')).toBeTruthy();
     expect(document.querySelector('[data-field="finAmortization"]')).toBeTruthy();
-    expect(document.querySelectorAll('[data-field="finLineShare"]').length).toBe(3);
+    expect(document.querySelectorAll('[data-field="finLineShare"]').length).toBe(5);
     expect(document.querySelector('[data-field="finLeveraged"]')).toBeTruthy();
   });
 
@@ -43,9 +56,11 @@ describe("chunk 5 web task 1: financing section", () => {
 });
 
 describe("chunk 5 web tasks 2-3: results panels and disclosures", () => {
-  it("the equity panel renders engine-emitted data with the ambiguity disclosure (FN-1 class, 56 sign changes)", () => {
+  it("the equity panel renders engine-emitted data with the ambiguity disclosure (FN-1 class, 56 sign changes; re-pointed to the Alpha template via the project-file route)", async () => {
     render(<App />);
-    enableFinancing();
+    await openAlpha();
+    fireEvent.click(byNav("financing"));
+    fireEvent.click(byField("finEnabled"));
     fireEvent.click(byNav("results"));
     expect(byStat("equityOutlay").textContent).toBe("3139944");
     expect(byStat("equityNpvAtWacc").textContent).toBe("1593384.3");
@@ -55,18 +70,19 @@ describe("chunk 5 web tasks 2-3: results panels and disclosures", () => {
     expect(byStat("equityIrr").textContent).toContain("20.00612%");
   });
 
-  it("the debt schedule and DSCR tables render engine data; the minimum DSCR is highlighted", () => {
+  it("the debt schedule and DSCR tables render engine data; the minimum DSCR is highlighted (v0.6.7 re-anchor: the port fixture, 60% share of the 160 M cost base)", () => {
     render(<App />);
     enableFinancing();
     fireEvent.click(byNav("results"));
     const debt = document.querySelector('[data-testid="debt-schedule"]');
-    expect(debt && debt.textContent).toContain("285287.37");
-    expect(debt && debt.textContent).toContain("615109.58");
+    expect(debt && debt.textContent).toContain("5582088.66");
+    expect(debt && debt.textContent).toContain("12035570.33");
+    expect(debt && debt.textContent).toContain("17617658.99");
     const dscr = document.querySelector('[data-testid="dscr-table"]');
-    expect(dscr && dscr.textContent).toContain("1.5837");
+    expect(dscr && dscr.textContent).toContain("1.1077");
     const minRow = dscr && dscr.querySelector('[data-dscr-min="true"]');
     expect(minRow).toBeTruthy();
-    expect(document.querySelector('[data-testid="min-dscr"]')?.textContent).toContain("1.5837");
+    expect(document.querySelector('[data-testid="min-dscr"]')?.textContent).toContain("1.1077");
   });
 
   it("the zero-outlay note renders in place of the null equity IRR (FN-5 class)", () => {
@@ -91,7 +107,7 @@ describe("chunk 5 web task 4: leveraged toggle behavior", () => {
     enableFinancing();
     fireEvent.click(byField("finLeveraged"));
     fireEvent.click(byNav("overview"));
-    expect(byStat("paymentAmount").textContent).toBe("411 tkr");
+    expect(byStat("paymentAmount").textContent).toBe("\u20ac1 630 k");
   });
 
   it("FIN-LEVERAGED-MODE surfaces for fixed tariff mode", () => {

@@ -27,25 +27,25 @@ describe("chunk 7: section parity and presentation", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("475,31 tkr");
-    expect(byStat("paymentCount").textContent).toBe("28");
+    expect(byStat("paymentAmount").textContent).toBe("€1 626,22 k");
+    expect(byStat("paymentCount").textContent).toBe("240");
     expect(byStat("repaymentStartYear").textContent).toBe("3");
-    expect(byStat("totalCollected").textContent).toBe("13 308,66 tkr");
+    expect(byStat("totalCollected").textContent).toBe("€390 293,43 k");
   });
 
   it("results section renders the yearly table, composition, metrics, and goal check", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
-    expect(screen.getByTestId("yearly-table").querySelectorAll("tbody tr").length).toBe(10);
-    expect(screen.getByTestId("cost-composition").textContent).toContain("Development team");
-    expect(byStat("paybackYears").textContent).toBe("6.95961");
-    expect(byStat("achievedIrr").textContent).toBe("12%");
+    expect(screen.getByTestId("yearly-table").querySelectorAll("tbody tr").length).toBe(23);
+    expect(screen.getByTestId("cost-composition").textContent).toContain("Substations & grid connections");
+    expect(byStat("paybackYears").textContent).toBe("14.11097");
+    expect(byStat("achievedIrr").textContent).toBe("6%");
     expect(screen.getByTestId("goal-check").textContent).toContain("target achieved");
     expect(screen.queryByTestId("irr-ambiguity-warning")).toBeNull();
   });
 
-  it("presentation mode navigates seven slides by keyboard and exits on Escape", () => {
+  it("presentation mode navigates eight slides by keyboard and exits on Escape", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -62,7 +62,9 @@ describe("chunk 7: section parity and presentation", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("6");
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("6");
+    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("7");
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("7");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("presentation")).toBeNull();
     expect(byStat("paymentAmount")).toBeTruthy();
@@ -72,8 +74,8 @@ describe("chunk 7: section parity and presentation", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("475,31 tkr");
+    expect(byStat("paymentAmount").textContent).toBe("€1 626,22 k");
     fireEvent.change(byField("termYears"), { target: { value: "3" } });
-    expect(byStat("paymentAmount").textContent).toBe("903,14 tkr");
+    expect(byStat("paymentAmount").textContent).toBe("€5 468,64 k");
   });
 });

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { computeModel } from "../src/engine.js";
-import { demoProject } from "../src/state.js";
+import { demoProject, shorePowerProject } from "../src/state.js";
 import { buildWorkbook, readWorkbook } from "../src/xlsx.js";
 import type { ModelInputs } from "../../core/src/types.js";
 
@@ -87,23 +87,16 @@ describe("v0.6 chunk 4 — the web surfaces", () => {
     expect(hint?.textContent).toContain("Derived horizon:");
     const derivation = document.querySelector('[data-testid="horizon-derivation"]') as HTMLElement;
     expect(derivation).toBeTruthy();
-    const result = computeModel(demoProject());
+    const result = computeModel(shorePowerProject());
     for (const hc of result.horizon!.constituents) {
       const el = derivation.querySelector('[data-constituent="' + hc.label + '"]');
       expect(el?.textContent).toContain("month " + hc.month);
     }
   });
 
-  it("BOOK-VIEW and TERM-POSITIONS render through the engine on the Results surface", () => {
+  it("BOOK-VIEW and TERM-POSITIONS render through the engine on the Results surface (v0.6.7 re-anchor: the land fixture via load-multi-lease-demo; tariff and contracts are mutually exclusive, so the port demo cannot host this case)", () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
-    fireEvent.click(byNav("costs"));
-    const firstRow = document.querySelector('[data-kind="cost"]') as HTMLElement;
-    fireEvent.change(firstRow.querySelector('[data-field="category"]') as unknown as HTMLSelectElement, { target: { value: "capex" } });
-    fireEvent.change(firstRow.querySelector('[data-field="line-depreciation-mode"]') as unknown as HTMLSelectElement, { target: { value: "straight-line" } });
-    fireEvent.click(byNav("repayment"));
-    const editor = document.querySelector('[data-testid="contracts-editor"]') as HTMLElement;
-    fireEvent.click(editor.querySelector('[data-action="add-contract"]') as HTMLElement);
+    fireEvent.click(byAction("load-multi-lease-demo"));
     fireEvent.click(byNav("results"));
     const book = document.querySelector('[data-testid="book-schedule"]') as HTMLElement;
     expect(book).toBeTruthy();
@@ -199,7 +192,7 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.6");
+    expect(VERSION).toBe("v0.6.7");
   });
 
   it("WATERFALL-FORM: the build-up is vertical floats to a solid cap with the labels outside the geometry", () => {
@@ -235,13 +228,13 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
     expect(margin?.getAttribute("data-hurdle-mode")).toBe("solved");
   });
 
-  it("MULTI-LEASE-FIXTURE: the second demo loads and computes through the engine with the calculated residual", async () => {
+  it("MULTI-LEASE-FIXTURE: the second demo loads and computes through the engine with the calculated residual (v0.6.7 re-anchor: the Mj\u00f8st\u00e5rnet land newbuild)", async () => {
     const { computeModel } = await import("../src/engine.js");
-    const { multiLeaseProject } = await import("../src/state.js");
-    const inputs = multiLeaseProject();
+    const { landNewbuildProject } = await import("../src/state.js");
+    const inputs = landNewbuildProject();
     const result = computeModel(inputs);
-    expect(result.termPositions!.length).toBe(3);
-    expect(result.contractsInfo!.length).toBe(3);
+    expect(result.termPositions!.length).toBe(2);
+    expect(result.contractsInfo!.length).toBe(2);
     expect(result.horizon!.totalMonths).toBeGreaterThan(0);
     expect(result.bookView!.residualMode).toBe("calculated");
     expect(result.residualAmountUsed).toBe(result.bookView!.remainingBookValueAtResidualYear);
@@ -250,8 +243,8 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
     fireEvent.click(byAction("load-multi-lease-demo"));
     fireEvent.click(byNav("results"));
     const termRows = document.querySelectorAll('[data-testid="term-positions"] tbody tr');
-    expect(termRows.length).toBe(3);
+    expect(termRows.length).toBe(2);
     const firstLabel = (termRows[0] as HTMLElement).querySelector('[data-term-label]')?.textContent;
-    expect(firstLabel).toContain("Project position at the end of Contract one");
+    expect(firstLabel).toContain("Project position at the end of Hotel lease (Wood Hotel)");
   });
 });

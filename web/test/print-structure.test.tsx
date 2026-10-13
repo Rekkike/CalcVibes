@@ -6,16 +6,16 @@ import * as fs from "fs";
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 
 describe("Task B: full-deck print rendering", () => {
-  it("all seven slide sections are mounted in the presentation DOM with active flags", () => {
+  it("all eight slide sections are mounted in the presentation DOM with active flags (v0.6.7 re-anchor: the port loader presets the scenario axes, so the deck carries eight slides)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slides = document.querySelectorAll('[data-testid="presentation"] .deck-slide');
-    expect(slides.length).toBe(7);
+    expect(slides.length).toBe(8);
     const names = Array.from(slides).map((s) => (s as HTMLElement).getAttribute("data-slide-name"));
-    expect(names).toEqual(["title", "summary", "investment", "recovery", "coverage", "returns", "deal"]);
+    expect(names).toEqual(["title", "summary", "investment", "recovery", "coverage", "returns", "deal", "scenarios"]);
     const active = Array.from(slides).map((s) => (s as HTMLElement).getAttribute("data-slide-active"));
-    expect(active).toEqual(["true", "false", "false", "false", "false", "false", "false"]);
+    expect(active).toEqual(["true", "false", "false", "false", "false", "false", "false", "false"]);
     // navigation chrome per slide: header and footer
     for (const s of slides) {
       expect((s as HTMLElement).querySelector(".deck-slide-header")).toBeTruthy();
@@ -41,6 +41,6 @@ describe("Task E: composition, one figure (re-anchored to the composition rows p
     expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
     const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
     expect(rows).toBeTruthy();
-    expect((rows as HTMLElement).querySelectorAll("[data-composition-row]").length).toBe(3);
+    expect((rows as HTMLElement).querySelectorAll("[data-composition-row]").length).toBe(5);
   });
 });

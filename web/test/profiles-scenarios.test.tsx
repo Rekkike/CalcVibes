@@ -6,6 +6,19 @@ import { spreadFill } from "../src/state.js";
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
+// v0.6.7 re-anchor: the port loader presets the scenario axes (targets [4, 6, 8], terms [15, 20, 25],
+// balloons [0, 8, 16]); the SCE battery enters its own axes, so it clears the presets first.
+// Each Remove click re-renders and reindexes the buttons, so the first button is clicked until the axis is empty.
+const clearPresetAxes = () => {
+  for (const label of ["target", "term", "balloon"]) {
+    let btn = document.querySelector('[data-action="scenario-remove-' + label + '"]');
+    while (btn) {
+      fireEvent.click(btn as HTMLElement);
+      btn = document.querySelector('[data-action="scenario-remove-' + label + '"]');
+    }
+  }
+};
+
 describe("SPREAD-FILL (amendment)", () => {
   it("an exact total fills equal amounts", () => {
     expect(spreadFill(338000000, 1, 4)).toEqual({ 1: 84500000, 2: 84500000, 3: 84500000, 4: 84500000 });
@@ -57,10 +70,11 @@ describe("Profile editor (Task B UI)", () => {
 });
 
 describe("SCE battery (Task D)", () => {
-  it("SCE-EMPTY (re-anchored per AXES-1): the axes are empty by default and the tables render the honest empty state", () => {
+  it("SCE-EMPTY (re-anchored per AXES-1): the axes are empty by default and the tables render the honest empty state (v0.6.7 re-anchor: the port presets are cleared first)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
+    clearPresetAxes();
     expect(document.querySelectorAll('[data-field="scenario-target"]').length).toBe(0);
     expect(document.querySelectorAll('[data-field="scenario-term"]').length).toBe(0);
     expect(document.querySelectorAll('[data-field="scenario-balloon"]').length).toBe(0);
@@ -68,10 +82,11 @@ describe("SCE battery (Task D)", () => {
     expect(document.querySelector('[data-testid="term-target-table"]')).toBeNull();
     expect(document.querySelector('[data-testid="balloon-term-table"]')).toBeNull();
   });
-  it("SCE-LIST: entering targets [3, 5, 7] and terms [5, 7, 9] renders the pinned rows", () => {
+  it("SCE-LIST: entering targets [3, 5, 7] and terms [5, 7, 9] renders the pinned rows (v0.6.7 re-anchor: the port base, term-5 column, entry unit thousands, EUR)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
+    clearPresetAxes();
     for (const v of ["3", "5", "7"]) {
       fireEvent.click(document.querySelector('[data-action="scenario-add-target"]') as HTMLElement);
       const inputs = document.querySelectorAll('[data-field="scenario-target"]');
@@ -87,14 +102,15 @@ describe("SCE battery (Task D)", () => {
     const rowText = (r: HTMLElement) => Array.from(r.querySelectorAll("td")).map((td) => td.textContent).join("|");
     expect(rows.length).toBe(3);
     expect(rowText(rows[0] as HTMLElement)).toContain("3%");
-    expect(rowText(rows[0] as HTMLElement)).toContain("439,51 tkr");
-    expect(rowText(rows[1] as HTMLElement)).toContain("472,77 tkr");
-    expect(rowText(rows[2] as HTMLElement)).toContain("507,62 tkr");
+    expect(rowText(rows[0] as HTMLElement)).toContain("€3 349,51 k");
+    expect(rowText(rows[1] as HTMLElement)).toContain("€3 533,51 k");
+    expect(rowText(rows[2] as HTMLElement)).toContain("€3 723,35 k");
   });
-  it("SCE-ZERO: the 0 percent row renders the nominal identity", () => {
+  it("SCE-ZERO: the 0 percent row renders the nominal identity (v0.6.7 re-anchor: the port base)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
+    clearPresetAxes();
     for (const v of ["0", "3", "5"]) {
       fireEvent.click(document.querySelector('[data-action="scenario-add-target"]') as HTMLElement);
       const inputs = document.querySelectorAll('[data-field="scenario-target"]');
@@ -108,12 +124,13 @@ describe("SCE battery (Task D)", () => {
     const tt = document.querySelector('[data-testid="term-target-table"]') as HTMLElement;
     const firstRow = tt.querySelector("tbody tr") as HTMLElement;
     expect(firstRow.textContent).toContain("0%");
-    expect(firstRow.textContent).toContain("392,49 tkr");
+    expect(firstRow.textContent).toContain("€3 084,52 k");
   });
-  it("SCE-VALID: each invalid construct surfaces the named error", () => {
+  it("SCE-VALID: each invalid construct surfaces the named error (v0.6.7 re-anchor: the port presets are cleared first)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
+    clearPresetAxes();
     fireEvent.click(document.querySelector('[data-action="scenario-add-target"]') as HTMLElement);
     const targetInputs = document.querySelectorAll('[data-field="scenario-target"]') as NodeListOf<HTMLInputElement>;
     fireEvent.change(targetInputs[0], { target: { value: "-5" } });

@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
+import { demoProject } from "../src/state.js";
+import { serializeProject } from "../../core/src/fileio.js";
 import * as fs from "fs";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
+
+// v0.6.7 re-anchor helper: the equity-ambiguity disclosure case of record lives on the internal
+// Alpha template, which the demo buttons no longer load (the port fixture's equity flow has one
+// sign change, so the ambiguity warning cannot arise from the demo button); open it through the
+// project-file route.
+async function openAlpha() {
+  const text = serializeProject(demoProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [new File([text], "project-alpha.calcvibes.json", { type: "application/json" })] } });
+  await waitFor(() => {
+    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Project Alpha");
+  });
+}
 
 describe("Task G: the deck design system (structural pins)", () => {
   it("the stylesheet defines the token custom properties", () => {
@@ -29,7 +43,8 @@ describe("Task G: the deck design system (structural pins)", () => {
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
     const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
-    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(3);
+    // v0.6.7 re-anchor: the port fixture carries five cost lines.
+    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(5);
     expect(rows.querySelectorAll('[data-testid="donut-segment-label"]').length).toBe(0);
   });
 
@@ -38,7 +53,9 @@ describe("Task G: the deck design system (structural pins)", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slides = document.querySelectorAll('[data-testid="presentation"] .deck-slide');
-    expect(slides.length).toBe(7);
+    // v0.6.7 re-anchor: the port loader presets the scenario axes, so the deck carries the
+    // scenarios slide as an eighth slide.
+    expect(slides.length).toBe(8);
     for (const s of slides) {
       expect((s as HTMLElement).querySelector(".deck-slide-header")).toBeTruthy();
       expect((s as HTMLElement).querySelector(".deck-slide-footer")).toBeTruthy();
@@ -48,9 +65,12 @@ describe("Task G: the deck design system (structural pins)", () => {
     expect(css).toMatch(/\[data-testid="presentation"\] \.deck-slide-header\s*\{[^}]*color:\s*#e2e8f0/);
   });
 
-  it("the financing variant renders its disclosures (the ambiguity warning stays distinct but calm)", () => {
+  it("the financing variant renders its disclosures (the ambiguity warning stays distinct but calm)", async () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
+    // v0.6.7 re-anchor: the ambiguity warning is pinned on the internal Alpha template via the
+    // project-file route; the port fixture's equity flow is unambiguous, so its deal slide carries
+    // no ambiguity disclosure.
+    await openAlpha();
     fireEvent.click(document.querySelector('[data-nav="financing"]') as HTMLElement);
     fireEvent.click(document.querySelector('[data-field="finEnabled"]') as HTMLElement);
     fireEvent.click(byAction("present"));

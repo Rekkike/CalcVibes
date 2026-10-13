@@ -1,14 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent, waitFor, screen } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { moneyForDisplay } from "../src/engine.js";
 import { RootErrorBoundary } from "../src/ErrorBoundary.js";
+import { shorePowerProject } from "../src/state.js";
+import { serializeProject } from "../../core/src/fileio.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 const byStat = (v: string) => document.querySelector('[data-stat="' + v + '"]') as HTMLElement;
 const byField = (v: string) => document.querySelector('[data-field="' + v + '"]') as HTMLElement;
 const allByField = (v: string) => Array.from(document.querySelectorAll('[data-field="' + v + '"]')) as HTMLElement[];
+
+// v0.6.7 re-anchor: the port loader presets the scenario axes (targets [4, 6, 8], terms [15, 20, 25],
+// balloons [0, 8, 16]). The axes tests clear the presets first; the deck tests open the port project
+// through the project-file route with null axes, because cleared axes leave empty lists that the
+// validator flags as issues, and the deck is suppressed while issues are present.
+const clearPresetAxes = () => {
+  for (const label of ["target", "term", "balloon"]) {
+    let btn = document.querySelector('[data-action="scenario-remove-' + label + '"]');
+    while (btn) {
+      fireEvent.click(btn as HTMLElement);
+      btn = document.querySelector('[data-action="scenario-remove-' + label + '"]');
+    }
+  }
+};
+
+async function openPortNoAxes() {
+  const text = serializeProject(shorePowerProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  const file = new File([text], "port.calcvibes.json", { type: "application/json" });
+  fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [file] } });
+  await waitFor(() => {
+    expect(screen.getByText("Shore power example (Rotterdam)")).toBeTruthy();
+  });
+}
 
 describe("v0.6.2 chunk 1: the editing boundary", () => {
   it("UNIT-EDIT-1: typing 1000 at unit thousands yields totalCost 1000000 with app and deck display in tkr", () => {
@@ -35,28 +60,28 @@ describe("v0.6.2 chunk 1: the editing boundary", () => {
     expect(byStat("totalCost").textContent).toBe("1 000 kr");
   });
 
-  it("UNIT-EDIT-3: the loaded template stores actuals while editors display valueToEntry (thousands)", () => {
+  it("UNIT-EDIT-3: the loaded template stores actuals while editors display valueToEntry (thousands) (v0.6.7 re-anchor: the port demo, EUR; the overview uses the deck display class)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
     const amount = allByField("amount")[0] as HTMLInputElement;
-    expect(Number(amount.value)).toBeCloseTo(1800000 / 1000, 6);
+    expect(Number(amount.value)).toBeCloseTo(6000000 / 1000, 6);
     fireEvent.click(byNav("overview"));
-    expect(byStat("paymentAmount").textContent).toBe("475 tkr");
+    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
   });
 });
 
 describe("v0.6.2 chunk 1: the cost model line totals (W3)", () => {
-  it("LT-1: the template line totals render through the money formatter at unit ones", () => {
+  it("LT-1: the template line totals render through the money formatter at unit ones (v0.6.7 re-anchor: the port line totals, EUR)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.change(document.querySelector('[data-field="entryUnit"]') as HTMLElement, { target: { value: "ones" } });
     fireEvent.click(byNav("costs"));
     const cells = Array.from(document.querySelectorAll('[data-testid="line-total"]'));
     expect(cells.length).toBeGreaterThan(0);
-    expect(cells[0].textContent).toBe("5 563 620,00 kr");
-    expect(cells[1].textContent).toBe("1 836 240,00 kr");
-    expect(cells[2].textContent).toBe("450 000,00 kr");
+    expect(cells[0].textContent).toBe("€12 000 000,00");
+    expect(cells[1].textContent).toBe("€48 000 000,00");
+    expect(cells[2].textContent).toBe("€48 000 000,00");
   });
 
   it("LT-2: the profile-only fixture renders 420000 as 420,00 tkr, never empty", () => {
@@ -171,7 +196,7 @@ describe("v0.6.2 chunk 1: NO-SCI and calendar-aware year entry (W1)", () => {
 });
 
 describe("v0.6.2 chunk 1: the Details-tab book grid (W5)", () => {
-  it("DET-1 and DET-2: the grid renders engine bookView figures and the combined rows reconcile", () => {
+  it("DET-1 and DET-2: the grid renders engine bookView figures and the combined rows reconcile (v0.6.7 re-anchor: the per-year sum identity on the port book view)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("detail"));
@@ -180,19 +205,23 @@ describe("v0.6.2 chunk 1: the Details-tab book grid (W5)", () => {
     expect(document.querySelector('[data-testid="book-view-disclosure"]')?.textContent).toContain("never enters the cash flows");
     const perLine = document.querySelector('[data-testid="book-per-line"]') as HTMLElement;
     const combined = document.querySelector('[data-testid="book-combined"]') as HTMLElement;
-    expect(perLine.querySelectorAll("tr").length).toBeGreaterThan(0);
-    expect(combined.querySelectorAll("tr").length).toBeGreaterThan(0);
     const perLineRows = Array.from(perLine.querySelectorAll("tr")).map((tr) => Array.from(tr.querySelectorAll("td")).map((td) => (td.textContent ?? "").trim()));
     const combinedRows = Array.from(combined.querySelectorAll("tr")).map((tr) => Array.from(tr.querySelectorAll("td")).map((td) => (td.textContent ?? "").trim()));
-    expect(perLineRows.length).toBeGreaterThan(0);
-    expect(combinedRows.length).toBeGreaterThan(0);
-    const chargesEqual = (a: string, b: string) => parseFloat(a.replace(/[\s\u00a0]/g, "").replace(",", ".")) === parseFloat(b.replace(/[\s\u00a0]/g, "").replace(",", "."));
-    let reconciled = 0;
+    expect(perLineRows.filter((r) => r.length >= 4).length).toBeGreaterThan(0);
+    expect(combinedRows.filter((r) => r.length >= 4).length).toBeGreaterThan(0);
+    const num = (s: string) => parseFloat(s.replace(/[^\d,.-]/g, "").replace(/,/g, ".")) || 0;
+    let reconciledYears = 0;
+    let coveredYears = 0;
     for (const row of combinedRows) {
-      const yearIdx = perLineRows.findIndex((pr) => pr.length >= 5 && pr[1] === row[0] && chargesEqual(pr[3], row[2]));
-      if (yearIdx >= 0) reconciled += 1;
+      if (row.length < 4) continue;
+      const year = row[0];
+      const contributors = perLineRows.filter((pr) => pr.length >= 4 && pr[1] === year);
+      if (contributors.length === 0) continue;
+      coveredYears += 1;
+      const sum = contributors.reduce((acc, pr) => acc + num(pr[3]), 0);
+      if (Math.abs(sum - num(row[2])) <= 0.05 * contributors.length) reconciledYears += 1;
     }
-    expect(reconciled).toBeGreaterThan(0);
+    expect(reconciledYears).toBe(coveredYears);
   });
 });
 
@@ -225,10 +254,11 @@ describe("v0.6.2 chunk 1: the depreciation start-year surface (W6, web side)", (
 });
 
 describe("v0.6.2 chunk 2: the scenario axes (Round 23 ruling)", () => {
-  it("AXES-1: the default state is three empty axes with the empty-state notice", () => {
+  it("AXES-1: the default state is three empty axes with the empty-state notice (v0.6.7 re-anchor: the port presets are cleared first)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
+    clearPresetAxes();
     expect(document.querySelectorAll('[data-field="scenario-target"]').length).toBe(0);
     expect(document.querySelectorAll('[data-field="scenario-term"]').length).toBe(0);
     expect(document.querySelectorAll('[data-field="scenario-balloon"]').length).toBe(0);
@@ -308,18 +338,18 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     expect(deck.provenance?.join(" ")).toContain("no scenarios set");
   });
 
-  it("DECK-SCE-2 (app): the presentation provenance line discloses the absent scenarios slide", () => {
+  it("DECK-SCE-2 (app): the presentation provenance line discloses the absent scenarios slide (v0.6.7 re-anchor: the port project opened via the file route with null axes; the loader presets the axes, and cleared axes leave flagged empty lists that suppress the deck)", async () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
+    await openPortNoAxes();
     fireEvent.click(byAction("present"));
     expect(document.querySelectorAll('[data-slide-name="scenarios"]').length).toBe(0);
     expect(document.querySelector('[data-testid="deck-provenance"]')?.textContent).toContain("no scenarios set");
     expect(document.querySelectorAll("[data-dot]").length).toBe(7);
   });
 
-  it("DECK-SCE-1 (app): setting axis values mounts the eighth slide, the kicker, the deck chart, and eight dots", () => {
+  it("DECK-SCE-1 (app): setting axis values mounts the eighth slide, the kicker, the deck chart, and eight dots (v0.6.7 re-anchor: the port project opened via the file route with null axes)", async () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
+    await openPortNoAxes();
     fireEvent.click(byNav("scenarios"));
     fireEvent.click(document.querySelector('[data-action="scenario-add-term"]') as HTMLElement);
     fireEvent.change(document.querySelector('[data-field="scenario-term"]') as HTMLInputElement, { target: { value: "20" } });

@@ -832,10 +832,14 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     } else {
       for (const row of inp.tariff?.rows ?? []) {
         const amounts = zeroRow();
-        for (const t of tariffInfos) {
-          const charge = t.perRowCharges?.[row.id];
-          if (t.year >= 1 && t.year <= totalYearsForGrid) amounts[t.year - 1] += charge ?? 0;
-        }
+        // v0.6.7 Task C: the row's amount for a tariff year is its true yearly revenue — the
+        // year's required (or revenue) times the row's share of that year's weighted volume —
+        // guarded to 0 when the weighted volume is 0. perRowCharges stays per-call (followup.test).
+        tariffInfos.forEach((t, k) => {
+          const share = t.weightedVolume > 0 ? (row.weight * (row.lifts[k] ?? 0)) / t.weightedVolume : 0;
+          const amount = (t.required ?? t.revenue) * share;
+          if (t.year >= 1 && t.year <= totalYearsForGrid) amounts[t.year - 1] += amount;
+        });
         collectionsGrid.push({ id: row.id, name: row.label, kind: "tariff", amounts });
       }
     }

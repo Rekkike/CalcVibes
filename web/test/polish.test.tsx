@@ -17,16 +17,16 @@ describe("Task A: CONTRAST", () => {
 });
 
 describe("Task B: CHART-LABEL / ONE-COMPOSITION / PEAK-LABEL", () => {
-  it("the Cost section renders the composition rows with names, shares, and values (re-anchored per v0.5.7)", () => {
+  it("the Cost section renders the composition rows with names, shares, and values (re-anchored per v0.5.7; v0.6.7 re-anchor: the port cost base, EUR at entry thousands)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
     const rows = document.querySelector('[data-testid="composition-rows-wrap"] [data-testid="composition-rows"]') as HTMLElement;
     const rowEls = rows.querySelectorAll("[data-composition-row]");
-    expect(rowEls.length).toBe(3);
-    expect(rowEls[0].querySelector('[data-row-label="name"]')?.textContent).toContain("Development team");
-    expect(rowEls[0].querySelector('[data-row-label="share"]')?.textContent).toContain("71%");
-    expect(rowEls[0].querySelector('[data-row-label="value"]')?.textContent).toContain("5 563");
+    expect(rowEls.length).toBe(5);
+    expect(rowEls[0].querySelector('[data-row-label="name"]')?.textContent).toContain("Engineering, permits & studies");
+    expect(rowEls[0].querySelector('[data-row-label="share"]')?.textContent).toContain("8%");
+    expect(rowEls[0].querySelector('[data-row-label="value"]')?.textContent).toContain("12 000");
   });
 
   it("the deck investment slide carries exactly one composition figure (re-anchored per v0.6.5 Task C/W13: the donut lives on the summary slide only)", () => {
@@ -145,10 +145,10 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
 
   it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.6");
+    expect(VERSION).toBe("v0.6.7");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.6");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.7");
   });
 });
 

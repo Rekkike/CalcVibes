@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
+import { demoProject } from "../src/state.js";
+import { serializeProject } from "../../core/src/fileio.js";
+
+// v0.6.7 re-anchor: the load-demo button now loads the port fixture, whose collections mode is
+// a multi-row tariff decompose; tariff collection modes and collections profiles are mutually
+// exclusive, so the profile behaviors are re-pointed to the internal Alpha template via the
+// project-file route.
+async function openAlpha() {
+  const text = serializeProject(demoProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  const file = new File([text], "project-alpha.calcvibes.json", { type: "application/json" });
+  fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [file] } });
+  await waitFor(() => {
+    expect(screen.getByText("Project Alpha")).toBeTruthy();
+  });
+}
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
@@ -30,9 +45,9 @@ describe("Collections editor (Task B web)", () => {
     expect(sum).toBeCloseTo(10000.001, 6);
   });
 
-  it("the SCE-PROFILE note renders in place of the two payment-solve tables when a profile is present", () => {
+  it("the SCE-PROFILE note renders in place of the two payment-solve tables when a profile is present (re-pointed to the Alpha template via the project-file route)", async () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
+    await openAlpha();
     fireEvent.click(byNav("repayment"));
     const editor = document.querySelector('[data-testid="collections-editor"]') as HTMLElement;
     editor.querySelector("details")?.setAttribute("open", "true");
@@ -46,7 +61,7 @@ describe("Collections editor (Task B web)", () => {
 });
 
 describe("Yearly detail section (Task D web)", () => {
-  it("renders both grids with totals rows and the payment-stream row visible", () => {
+  it("renders both grids with totals rows and the two tariff rows visible (v0.6.7 re-anchor: the port fixture presets a multi-row decompose tariff)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("detail"));
@@ -55,16 +70,19 @@ describe("Yearly detail section (Task D web)", () => {
     expect(costGrid).toBeTruthy();
     expect(colGrid).toBeTruthy();
     expect(costGrid.querySelector('[data-grid-row="cost:c1"]')).toBeTruthy();
-    expect(colGrid.querySelector('[data-grid-row="payments:payments"]')).toBeTruthy();
+    expect(colGrid.querySelector('[data-grid-row="tariff:r1"]')).toBeTruthy();
+    expect(colGrid.querySelector('[data-grid-row="tariff:r2"]')).toBeTruthy();
     expect(costGrid.querySelector('[data-grid-totals="true"]')).toBeTruthy();
     expect(colGrid.querySelector('[data-grid-totals="true"]')).toBeTruthy();
-    const psRow = colGrid.querySelector('[data-grid-row="payments:payments"]') as HTMLElement;
-    expect(psRow.textContent).toContain("475,31 tkr");
+    const r1Row = colGrid.querySelector('[data-grid-row="tariff:r1"]') as HTMLElement;
+    expect(r1Row.textContent).toContain("\u20ac303 574,46 k");
+    const r2Row = colGrid.querySelector('[data-grid-row="tariff:r2"]') as HTMLElement;
+    expect(r2Row.textContent).toContain("\u20ac86 718,97 k");
   });
 
-  it("profile mode shows the profile row in the collections grid", () => {
+  it("profile mode shows the profile row in the collections grid (re-pointed to the Alpha template via the project-file route)", async () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
+    await openAlpha();
     fireEvent.click(byNav("repayment"));
     const editor = document.querySelector('[data-testid="collections-editor"]') as HTMLElement;
     editor.querySelector("details")?.setAttribute("open", "true");
