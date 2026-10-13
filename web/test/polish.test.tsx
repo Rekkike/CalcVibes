@@ -25,7 +25,7 @@ describe("Task B: CHART-LABEL / ONE-COMPOSITION / PEAK-LABEL", () => {
     const rowEls = rows.querySelectorAll("[data-composition-row]");
     expect(rowEls.length).toBe(5);
     expect(rowEls[0].querySelector('[data-row-label="name"]')?.textContent).toContain("Engineering, permits & studies");
-    expect(rowEls[0].querySelector('[data-row-label="share"]')?.textContent).toContain("8%");
+    expect(rowEls[0].querySelector('[data-row-label="share"]')?.textContent).toContain("7.5%");
     expect(rowEls[0].querySelector('[data-row-label="value"]')?.textContent).toContain("12 000");
   });
 
@@ -145,10 +145,10 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
 
   it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.8");
+    expect(VERSION).toBe("v0.6.9");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.8");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.9");
   });
 });
 

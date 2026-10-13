@@ -192,7 +192,7 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.8");
+    expect(VERSION).toBe("v0.6.9");
   });
 
   it("WATERFALL-FORM: the build-up is vertical floats to a solid cap with the labels outside the geometry", () => {
@@ -211,7 +211,9 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
     const labels = waterfall.querySelectorAll('[data-testid="waterfall-label"]');
     expect(labels.length).toBe(segments.length);
     const css = fs.readFileSync("src/index.css", "utf8");
-    expect(css).toMatch(/\[data-testid="presentation"\] \.waterfall-track\s*\{[^}]*height:\s*120px/);
+    // v0.6.9 Task A: the track widens to 240px and spans the full slide width.
+    expect(css).toMatch(/\[data-testid="presentation"\] \.waterfall-track\s*\{[^}]*height:\s*240px/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.waterfall-track\s*\{[^}]*width:\s*100%/);
   });
 
   it("HURDLE-SOLVED-DISCLOSURE: the solved-mode branch renders at equality; the evaluated case clears", async () => {

@@ -100,6 +100,33 @@ export function deckYearsForDisplay(years: number): string {
   return roundForDisplay(years, 1).toFixed(1) + " years";
 }
 
+// v0.6.9 Task F (finding W28): the magnitude-aware fee display — a small value shows its
+// euros and cents despite the entry-unit setting (the fee-class exemption, |value| < 1000);
+// a coarse value takes the entry unit's form. The boundary is pinned: 15000 at entry
+// millions renders "€0,0 M" (the honest coarse form — the exemption covers only |value| < 1000).
+export function feeForDisplay(value: number, currency: CurrencyCode = "SEK", entryUnit: EntryUnit = "ones"): string {
+  if (Math.abs(value) < 1000) {
+    return moneyForDisplay(value, currency, "ones");
+  }
+  if (entryUnit === "millions") {
+    const scaled = Math.abs(value) / 1000000;
+    const body = scaled.toFixed(1).replace(".", ",");
+    const negative = value < 0 ? "-" : "";
+    if (currency === "SEK") return `${negative}${body} Mkr`;
+    const prefix =
+      currency === "EUR" ? "\u20ac" :
+      currency === "USD" ? "$" :
+      currency === "GBP" ? "\u00a3" :
+      currency === "NOK" ? "NOK " :
+      "DKK ";
+    return `${negative}${prefix}${body} M`;
+  }
+  if (entryUnit === "thousands") {
+    return deckMoneyForDisplay(value, currency, "thousands");
+  }
+  return deckMoneyForDisplay(value, currency, "ones");
+}
+
 export function percentTwoForDisplay(rate: number): string {
   return roundForDisplay(rate * 100, 2).toFixed(2) + "%";
 }
@@ -112,4 +139,4 @@ export function dscrTwoForDisplay(value: number): string {
   return roundForDisplay(value, 2).toFixed(2);
 }
 
-export const VERSION = "v0.6.8";
+export const VERSION = "v0.6.9";

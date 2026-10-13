@@ -27,7 +27,9 @@ describe("Task G: the deck design system (structural pins)", () => {
     expect(css).toMatch(/--ink:/);
     expect(css).toMatch(/--mut:/);
     expect(css).toMatch(/--card:/);
-    expect(css).toMatch(/--content-width:\s*56rem/);
+    // v0.6.9 Task C/W24: the content width token split — the app shell widens, the deck stays.
+    expect(css).toMatch(/--app-content-width:\s*110rem/);
+    expect(css).toMatch(/--deck-content-width:\s*56rem/);
   });
 
   it("figure values are right-aligned via the alignment class", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
-import { moneyForDisplay } from "../src/engine.js";
+import { feeForDisplay } from "../src/engine.js";
 import { demoProject } from "../src/state.js";
 import { computeModel } from "../src/engine.js";
 import { serializeProject } from "../../core/src/fileio.js";
@@ -52,8 +52,8 @@ describe("Task C-3: per-lift charges render engine data verbatim", () => {
     render(<App />);
     await loadRows("stable");
     const li = document.querySelector('[data-row-charge="r2"]');
-    expect(li && li.textContent).toContain("2,41 tkr");
-    expect(li && li.textContent).toContain(moneyForDisplay(expected, "SEK", "thousands"));
+    expect(li && li.textContent).toContain("2 tkr");
+    expect(li && li.textContent).toContain(feeForDisplay(expected, "SEK", "thousands"));
   });
 });
 
@@ -103,11 +103,12 @@ describe("Task E-1: one flow of time across both surfaces", () => {
     expect(firstRow && firstRow.textContent).toContain("2028");
   });
 
-  it("with the start year unset both label Year 3", async () => {
+  it("with the start year unset the volume grid carries the short token; the results table keeps Year 3 (v0.6.9 Task D re-anchor)", async () => {
     render(<App />);
     await loadRows("decompose");
     const rowsHeader = document.querySelector('[data-testid="tariff-rows"] thead');
-    expect(rowsHeader && rowsHeader.textContent).toContain("Year 3");
+    expect(rowsHeader && rowsHeader.textContent).toContain("Y3");
+    expect(document.querySelector('[data-testid="tariff-rows"] thead [data-short-year="true"]')).not.toBeNull();
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
     const firstRow = dec && dec.querySelector("tbody tr td");
     expect(firstRow && firstRow.textContent).toContain("Year 3");

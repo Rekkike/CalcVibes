@@ -102,9 +102,9 @@ describe("SCE battery (Task D)", () => {
     const rowText = (r: HTMLElement) => Array.from(r.querySelectorAll("td")).map((td) => td.textContent).join("|");
     expect(rows.length).toBe(3);
     expect(rowText(rows[0] as HTMLElement)).toContain("3%");
-    expect(rowText(rows[0] as HTMLElement)).toContain("€3 349,51 k");
-    expect(rowText(rows[1] as HTMLElement)).toContain("€3 533,51 k");
-    expect(rowText(rows[2] as HTMLElement)).toContain("€3 723,35 k");
+    expect(rowText(rows[0] as HTMLElement)).toContain("€3 350 k");
+    expect(rowText(rows[1] as HTMLElement)).toContain("€3 534 k");
+    expect(rowText(rows[2] as HTMLElement)).toContain("€3 723 k");
   });
   it("SCE-ZERO: the 0 percent row renders the nominal identity (v0.6.7 re-anchor: the port base)", () => {
     render(<App />);
@@ -124,7 +124,7 @@ describe("SCE battery (Task D)", () => {
     const tt = document.querySelector('[data-testid="term-target-table"]') as HTMLElement;
     const firstRow = tt.querySelector("tbody tr") as HTMLElement;
     expect(firstRow.textContent).toContain("0%");
-    expect(firstRow.textContent).toContain("€3 084,52 k");
+    expect(firstRow.textContent).toContain("€3 085 k");
   });
   it("SCE-VALID: each invalid construct surfaces the named error (v0.6.7 re-anchor: the port presets are cleared first)", () => {
     render(<App />);

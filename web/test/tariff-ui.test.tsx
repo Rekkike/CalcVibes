@@ -53,7 +53,7 @@ describe("chunk 6: tariff section and results", () => {
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
     expect(dec).toBeTruthy();
     expect(dec && dec.textContent).toContain("842,97 tkr");
-    expect(dec && dec.textContent).toContain("1,20 tkr");
+    expect(dec && dec.textContent).toContain("1 tkr");
     expect(document.querySelector('[data-testid="payment-na"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="payment-na"]')!.textContent).toContain("not applicable");
   });
@@ -62,8 +62,8 @@ describe("chunk 6: tariff section and results", () => {
     render(<App />);
     await loadStable();
     const charges = document.querySelector('[data-testid="per-lift-charges"]');
-    expect(charges && charges.textContent).toContain("Loaded 20-ft: 1,20 tkr");
-    expect(charges && charges.textContent).toContain("Loaded 40-ft: 2,41 tkr");
+    expect(charges && charges.textContent).toContain("Loaded 20-ft: 1 tkr");
+    expect(charges && charges.textContent).toContain("Loaded 40-ft: 2 tkr");
   });
 
   it("decompose mode keeps the solved payment and shows the required per year (v0.6.7 re-anchor: the Alpha template via the project-file route)", async () => {
@@ -71,8 +71,9 @@ describe("chunk 6: tariff section and results", () => {
     await loadStable();
     fireEvent.change(byField("tariffMode"), { target: { value: "decompose" } });
     const dec = document.querySelector('[data-testid="tariff-decomposition"]');
+    // v0.6.9 Task F: the per-lift charges and unit prices close at the fee formatter.
     expect(dec && dec.textContent).toContain("475,31 tkr");
-    expect(dec && dec.textContent).toContain("0,68 tkr");
+    expect(dec && dec.textContent).toContain("679,01 kr");
     expect(document.querySelector('[data-testid="payment-na"]')).toBeNull();
   });
 

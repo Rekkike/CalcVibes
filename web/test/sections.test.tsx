@@ -27,7 +27,7 @@ describe("chunk 7: section parity and presentation", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("€1 626,22 k");
+    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
     expect(byStat("paymentCount").textContent).toBe("240");
     expect(byStat("repaymentStartYear").textContent).toBe("3");
     expect(byStat("totalCollected").textContent).toBe("€390 293,43 k");
@@ -74,8 +74,8 @@ describe("chunk 7: section parity and presentation", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("€1 626,22 k");
+    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
     fireEvent.change(byField("termYears"), { target: { value: "3" } });
-    expect(byStat("paymentAmount").textContent).toBe("€5 468,64 k");
+    expect(byStat("paymentAmount").textContent).toBe("€5 469 k");
   });
 });

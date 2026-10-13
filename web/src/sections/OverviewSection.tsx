@@ -1,5 +1,5 @@
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
-import { roundForDisplay, percentForDisplay, deckMoneyForDisplay, deckYearsForDisplay } from "../engine.js";
+import { roundForDisplay, percentForDisplay, deckMoneyForDisplay, deckYearsForDisplay, feeForDisplay } from "../engine.js";
 import { SignedCashflowChart } from "../charts.js";
 import { yearHeader } from "../state.js";
 
@@ -17,6 +17,8 @@ export function OverviewSection(props: {
   const { inputs, result, startYear, setStartYear, startYearError, setProjectName, setTargetIrr, setProjectLength, entryUnit = "ones" } = props;
   const currency = (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK";
   const money = (v: number) => deckMoneyForDisplay(v, currency, entryUnit);
+  // v0.6.9 Task F (finding W28): the payment-per-period figure renders through feeForDisplay.
+  const fee = (v: number) => feeForDisplay(v, currency, entryUnit);
   return (
     <section data-testid="overview">
       <h2>Overview</h2>
@@ -81,7 +83,7 @@ export function OverviewSection(props: {
         <dl data-testid="headline-stats">
           <dt>Total cost</dt><dd data-stat="totalCost">{money(result.totalCost)}</dd>
           <dt>Cost NPV at target</dt><dd data-stat="costNpv">{money(result.costNpv)}</dd>
-          <dt>Payment per period</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : money(result.paymentAmount)}</dd>
+          <dt>Payment per period</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : fee(result.paymentAmount)}</dd>
           <dt>Payments</dt><dd data-stat="paymentCount">{result.paymentCount}</dd>
           <dt>Total collected</dt><dd data-stat="totalCollected">{money(result.totalCollected)}</dd>
           <dt>Net gain</dt><dd data-stat="netGain">{money(result.netGain)}</dd>

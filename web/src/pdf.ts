@@ -113,7 +113,9 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
 
 // v0.6.5 Task B/W11: the scenarios target chart on the print route — zero-based bars, verdict
 // colors in print ink, the break-even target marked as the crossing with its caption.
-function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace): number {
+// v0.6.9 Task G (finding W29): the vertical geometry scales by `scale` (default 1) so the
+// scenarios slide can reserve its block heights and fit whole within the content band.
+function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace, scale = 1): number {
   const n = Math.max(1, tc.points.length);
   const barW = Math.min(20, 200 / n);
   doc.setFontSize(8);
@@ -122,32 +124,32 @@ function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number,
   doc.setTextColor(0, 0, 0);
   if (tc.mode === "solved") {
     const maxV = Math.max(1e-12, ...tc.points.map((p) => p.value));
-    const baseline = y + 30;
+    const baseline = y + 30 * scale;
     doc.setDrawColor(229, 229, 234);
     doc.line(20, baseline, 220, baseline);
     tc.points.forEach((p, i) => {
-      const h = (Math.max(0, p.value) / maxV) * 22;
+      const h = (Math.max(0, p.value) / maxV) * 22 * scale;
       doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
       doc.rect(20 + i * (barW + 2), baseline - h, barW, h, "F");
     });
     tc.points.forEach((p, i) => {
       doc.setFontSize(6);
       doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-      doc.text(p.label, 20 + i * (barW + 2) + barW / 2, baseline + 4, { align: "center", maxWidth: barW + 2 });
+      doc.text(p.label, 20 + i * (barW + 2) + barW / 2, baseline + 4 * scale, { align: "center", maxWidth: barW + 2 });
       const valText = deckMoneyForDisplay(p.value, currency, unit);
-      doc.text(valText, 20 + i * (barW + 2) + barW / 2, baseline + 8, { align: "center", maxWidth: barW + 6 });
+      doc.text(valText, 20 + i * (barW + 2) + barW / 2, baseline + 8 * scale, { align: "center", maxWidth: barW + 6 });
       doc.setTextColor(0, 0, 0);
       if (trace) {
         trace.drawnFigures[trace.drawnFigures.length - 1]?.push(p.label);
         trace.drawnFigures[trace.drawnFigures.length - 1]?.push(valText);
       }
     });
-    return 46;
+    return 46 * scale;
   }
-  const zeroY = y + 18;
+  const zeroY = y + 18 * scale;
   const maxAbs = Math.max(1e-12, ...tc.points.map((p) => Math.abs(p.value)));
   tc.points.forEach((p, i) => {
-    const h = (Math.abs(p.value) / maxAbs) * 12;
+    const h = (Math.abs(p.value) / maxAbs) * 12 * scale;
     const col = p.met ? PRINT_OK : PRINT_BAD;
     doc.setFillColor(col[0], col[1], col[2]);
     if (p.value >= 0) doc.rect(20 + i * (barW + 2), zeroY - h, barW, h, "F");
@@ -162,23 +164,23 @@ function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number,
     const bx = 20 + frac * 200;
     doc.setDrawColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
     doc.setLineWidth(0.6);
-    doc.line(bx, y + 8, bx, y + 30);
+    doc.line(bx, y + 8 * scale, bx, y + 30 * scale);
     doc.setLineWidth(0.2);
     const caption = `break-even at ${percentTwoForDisplay(tc.breakEvenTarget)}`;
     doc.setFontSize(7);
     doc.setTextColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
-    doc.text(caption, bx, y + 34, { align: frac > 0.5 ? "right" : "left", maxWidth: 100 });
+    doc.text(caption, bx, y + 34 * scale, { align: frac > 0.5 ? "right" : "left", maxWidth: 100 });
     doc.setTextColor(0, 0, 0);
     if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(caption);
   }
   tc.points.forEach((p, i) => {
     doc.setFontSize(6);
     doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-    doc.text(`${p.label} ${p.met ? "met" : "not met"}`, 20 + i * (barW + 2) + barW / 2, y + 40, { align: "center", maxWidth: barW + 8 });
+    doc.text(`${p.label} ${p.met ? "met" : "not met"}`, 20 + i * (barW + 2) + barW / 2, y + 40 * scale, { align: "center", maxWidth: barW + 8 });
     doc.setTextColor(0, 0, 0);
     if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${p.label} ${p.met ? "met" : "not met"}`);
   });
-  return 48;
+  return 48 * scale;
 }
 
 export function buildDeckPdf(model: DeckModel, projectName: string): jsPDF;
@@ -192,6 +194,35 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     if (footerPage > 0) doc.addPage();
     footerPage += 1;
     const slideFirstPage = footerPage;
+    // v0.6.9 Task G (finding W29): the scenarios slide reserves its block heights before
+    // drawing — the body, the disclosures, the rows chart, and the target chart are measured
+    // up front and the chart heights scale so the whole slide fits within
+    // CONTENT_TOP..CONTENT_BOTTOM; no continuation page is created within the slide. The
+    // measurement uses the exact font states the drawing paths use (body at 12, disclosures
+    // at 9), so the reservation is exact for the fixtures of record.
+    const allowBreak = slide.name !== "scenarios";
+    let sceChartScale = 1;
+    if (!allowBreak) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      const bodyH = slide.body.reduce(
+        (a, fig) => a + FIGURE_LINE_HEIGHT * (doc.splitTextToSize(`${fig.label}: ${fig.value}${fig.disclosure !== undefined ? ` (${fig.disclosure})` : ""}`, 220) as string[]).length,
+        0,
+      );
+      doc.setFontSize(9);
+      const discH = slide.disclosures.reduce((a, d) => a + DISCLOSURE_LINE_HEIGHT * (doc.splitTextToSize(d, 220) as string[]).length, 0);
+      const rows = slide.chart !== undefined && slide.chart.kind === "rows" ? slide.chart.data.length : 0;
+      const rowsH = rows > 0 ? 7 * rows + 2 : 0;
+      const targetH = slide.targetChart !== undefined && slide.targetChart.points.length >= 2 ? (slide.targetChart.mode === "solved" ? 46 : 48) : 0;
+      const chartsH = rowsH + targetH;
+      const available = CONTENT_BOTTOM - CONTENT_TOP - bodyH - discH;
+      if (chartsH > 0 && available < chartsH) {
+        // The charts scale to the measured space; the floor keeps a pathological fixture from
+        // collapsing the diagrams entirely (disclosed in the completion report).
+        sceChartScale = Math.max(0.35, available / chartsH);
+      }
+      doc.setFontSize(12);
+    }
     doc.setFillColor(16, 53, 88);
     doc.rect(0, 0, 297, 14, "F");
     doc.setTextColor(255, 255, 255);
@@ -263,7 +294,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       const line = `${fig.label}: ${fig.value}${fig.disclosure !== undefined ? ` (${fig.disclosure})` : ""}`;
       const lines = doc.splitTextToSize(line, 220);
       const needed = FIGURE_LINE_HEIGHT * lines.length;
-      if (y + needed > CONTENT_BOTTOM) {
+      if (allowBreak && y + needed > CONTENT_BOTTOM) {
         doc.addPage();
         footerPage += 1;
         y = CONTENT_TOP;
@@ -298,7 +329,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     for (const d of slide.disclosures) {
       const lines = doc.splitTextToSize(d, 220);
       const needed = DISCLOSURE_LINE_HEIGHT * lines.length;
-      if (y + needed > CONTENT_BOTTOM) {
+      if (allowBreak && y + needed > CONTENT_BOTTOM) {
         doc.addPage();
         footerPage += 1;
         y = CONTENT_TOP;
@@ -425,8 +456,11 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           doc.line(px, py, x, yy);
         }
       });
-      doc.setFontSize(6);
-      doc.setTextColor(113, 114, 115);
+      // v0.6.9 Task H.1 (finding W30): the coverage year labels draw at the print ink
+      // PRINT_MUT (12.82:1 against white) at font 7 — the pale 6pt ink (113,114,115, 4.82:1)
+      // is retired at this, the print route's faintest surviving site.
+      doc.setFontSize(7);
+      doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
       covData.forEach((d, di) => {
         const x = 20 + (di / Math.max(1, covData.length - 1)) * 200;
         doc.text(d.label, x, y + 36, { align: "center", maxWidth: 20 });
@@ -437,6 +471,10 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       y += 50;
     } else if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0) {
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
+      // v0.6.9 Task G: on the scenarios slide the row height scales to the reserved space
+      // (sceChartScale is 1 everywhere else, including the investment slide's rows chart).
+      const rowStep = 7 * sceChartScale;
+      const rowGap = 2 * sceChartScale;
       let rowY = y;
       slide.chart.data.forEach((d) => {
         const sharePct = Math.round((d.value / chartTotal) * 100);
@@ -452,9 +490,9 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${d.label} ${sharePct}%`);
           trace.drawnFigures[trace.drawnFigures.length - 1]?.push(valText);
         }
-        rowY += 7;
+        rowY += rowStep;
       });
-      y = rowY + 2;
+      y = rowY + rowGap;
     } else if (slide.chart && slide.chart.kind === "donut" && slide.chart.data.length > 0) {
       let accY = y;
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
@@ -482,9 +520,11 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       y += 50;
     }
     // v0.6.5 Task B/W11: the scenarios target chart joins the print route.
+    // v0.6.9 Task G: the scenarios slide never breaks here — the reserved, scaled height
+    // is guaranteed within the content band by the up-front measurement above.
     if (slide.targetChart !== undefined && slide.targetChart.points.length >= 2) {
-      if (y + 50 > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
-      y += drawPrintScenarioTarget(doc, slide.targetChart, y, model.currency ?? "SEK", model.unit ?? "ones", trace);
+      if (allowBreak && y + 50 > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+      y += drawPrintScenarioTarget(doc, slide.targetChart, y, model.currency ?? "SEK", model.unit ?? "ones", trace, sceChartScale);
     }
     doc.setFontSize(10);
     doc.setDrawColor(229, 229, 234);

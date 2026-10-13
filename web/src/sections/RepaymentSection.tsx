@@ -1,5 +1,5 @@
 import type { ContractParams, ModelInputs, ModelResult } from "../../../core/src/types.js";
-import { moneyForDisplay, entryToValue } from "../engine.js";
+import { moneyForDisplay, entryToValue, feeForDisplay } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
 import { blankContract, nextContractId, spreadFill, yearHeader } from "../state.js";
@@ -19,6 +19,8 @@ export function RepaymentSection(props: {
   const { inputs, result, setRepayment, setContracts, mode, setMode, modePayment, setModePayment, startYear = null, entryUnit } = props;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
   const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
+  // v0.6.9 Task F (finding W28): the solved payment figure renders through feeForDisplay.
+  const fee = (v: number) => feeForDisplay(v, currency, entryUnit);
   const r = inputs.repayment;
   const num = (key: keyof ModelInputs["repayment"]) => (e: { target: { value: string } }) =>
     setRepayment({ [key]: parseFloat(e.target.value) || 0 } as Partial<ModelInputs["repayment"]>);
@@ -232,7 +234,7 @@ export function RepaymentSection(props: {
       )}
       {result !== null && (
         <dl data-testid="repayment-summary">
-          <dt>Solved payment</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : money(result.paymentAmount)}</dd>
+          <dt>Solved payment</dt><dd data-stat="paymentAmount">{result.paymentAmount === null ? "not applicable (collection mode)" : fee(result.paymentAmount)}</dd>
           <dt>Payment count</dt><dd data-stat="paymentCount">{result.paymentCount}</dd>
           <dt>First payment year</dt><dd data-stat="repaymentStartYear">{result.repaymentStartYear}</dd>
           <dt>Total collected</dt><dd data-stat="totalCollected">{money(result.totalCollected)}</dd>

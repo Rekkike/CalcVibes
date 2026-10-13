@@ -32,12 +32,12 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
       const shareText = row.querySelector('[data-row-label="share"]')?.textContent ?? "0%";
       shareSum += Number(shareText.replace("%", ""));
     });
-    // The port shares are 7.5% / 30% / 30% / 22.5% / 10%: the integer-rounded row shares are
-    // 8% / 30% / 30% / 23% / 10% and sum to 101, not 100 (7.5 and 22.5 both round up). The
-    // rounded display is pinned honestly rather than papered over.
-    expect(shareSum).toBe(101);
+    // v0.6.9 Task E/H: the port shares render at one decimal — 7.5% / 30.0% / 30.0% / 22.5% / 10.0%,
+    // summing to 100.0 exactly; the accent bar fill is pinned to the stage chart accent.
+    expect(shareSum).toBe(100);
     const shares = Array.from(rowEls).map((r) => r.querySelector('[data-row-label="share"]')?.textContent);
-    expect(shares).toEqual(["8%", "30%", "30%", "23%", "10%"]);
+    expect(shares).toEqual(["7.5%", "30.0%", "30.0%", "22.5%", "10.0%"]);
+    expect(rowEls[0]?.querySelector(".row-bar-svg rect")?.getAttribute("fill")).toBe("#38bdf8");
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     const deckDonuts = document.querySelectorAll('[data-testid="presentation"] [data-testid="composition-donut"]');
     expect(deckDonuts.length).toBe(2);

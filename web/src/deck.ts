@@ -1,5 +1,5 @@
 import type { ModelInputs, ModelResult, TariffRow } from "../../core/src/types.js";
-import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue } from "./engine.js";
+import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
 import { yearHeader } from "./state.js";
@@ -105,7 +105,10 @@ export function deckSlides(
   // (two decimals, grouped, no unit token) instead of collapsing under the coarse global entry
   // unit (the witnessed "€0 M" unit price and "€2 M" payment). Program-scale figures keep the
   // entry unit; their semantics are unchanged.
-  const fee = (v: number) => moneyForDisplay(v, currency, "ones");
+  // v0.6.9 Task F (finding W28): the fee closure becomes the magnitude-aware feeForDisplay —
+  // a small value shows its euros and cents despite the entry unit; a coarse value takes the
+  // entry unit's form (the deck's fee-class figures and the scenario comparison values).
+  const fee = (v: number) => feeForDisplay(v, currency, unit);
   const startYear = opts.startYear;
   const leveraged = result.leveragedSolve;
   const tariffCollectionMode = inputs.tariff !== undefined && inputs.tariff.mode !== "off" && inputs.tariff.mode !== "decompose";
@@ -175,7 +178,10 @@ export function deckSlides(
     body: investmentBody,
     // v0.6.8 Task A.4: the composition shares on this slide are of the capital program; the
     // disclosed 101 percent artifact (the port's five shares read 8/30/30/23/10) is named.
-    disclosures: ["Composition shares are of the capital program; integer rounding can differ from 100 percent."],
+    // v0.6.9 Task E (finding W27): the one-decimal shares sum to exactly 100.0 on every
+    // fixture (the pinned checks), so the integer-rounding caveat would be a false
+    // disclosure; the capital-program basis stays stated.
+    disclosures: ["Composition shares are of the capital program."],
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
   });
 

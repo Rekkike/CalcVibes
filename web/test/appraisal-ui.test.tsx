@@ -95,9 +95,10 @@ describe("chunk 7: modes, scenarios, sensitivity in the UI", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    expect(byStat("basePayment").textContent).toBe("€1 626,22 k");
-    expect(byStat("optPayment").textContent).toBe("€1 299,27 k");
-    expect(byStat("pesPayment").textContent).toBe("€2 002,40 k");
+    // v0.6.9 Task F: the scenario payment cells close at the fee formatter (thousands).
+    expect(byStat("basePayment").textContent).toBe("€1 626 k");
+    expect(byStat("optPayment").textContent).toBe("€1 299 k");
+    expect(byStat("pesPayment").textContent).toBe("€2 002 k");
   });
 
   it("sensitivity view renders the tornado and both two-way tables (v0.6.7 re-anchor: the port loader presets the axes, so the tables compute)", () => {
@@ -113,11 +114,11 @@ describe("chunk 7: modes, scenarios, sensitivity in the UI", () => {
     const tt = screen.getByTestId("term-target-table");
     expect(tt.querySelectorAll("tbody tr").length).toBe(3);
     const ttBase = tt.querySelectorAll("tbody tr")[1].querySelectorAll("td")[2].textContent;
-    expect(ttBase).toBe("€1 626,22 k");
+    expect(ttBase).toBe("€1 626 k");
     const bt = screen.getByTestId("balloon-term-table");
     expect(bt.querySelectorAll("tbody tr").length).toBe(3);
     const btBase = bt.querySelectorAll("tbody tr")[1].querySelectorAll("td")[1].textContent;
-    expect(btBase).toBe("€1 626,22 k");
+    expect(btBase).toBe("€1 626 k");
     expect(screen.queryByTestId("term-target-empty")).toBeNull();
     expect(screen.queryByTestId("balloon-term-empty")).toBeNull();
   });

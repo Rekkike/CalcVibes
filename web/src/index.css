@@ -8,7 +8,8 @@
 }
 
 [data-testid="presentation"] .deck-slide {
-  max-width: var(--content-width);
+  /* v0.6.9 Task C (finding W24): the deck keeps its deliberate stage width as its own token. */
+  max-width: var(--deck-content-width);
   margin: 0 auto;
   padding: var(--space-5) var(--space-4);
   min-height: 70vh;}
@@ -84,7 +85,9 @@
   font-family: var(--font);
   color: var(--ink);
   background: var(--card);
-  max-width: var(--content-width);
+  /* v0.6.9 Task C (finding W24): the workspace uses the available width up to 110rem and stays
+     fluid below it; the deck keeps its own deliberate stage width (--deck-content-width). */
+  max-width: var(--app-content-width);
   margin: 0 auto;
   padding: var(--space-4) var(--space-3);
 }
@@ -282,7 +285,10 @@
   --space-3: 1rem;
   --space-4: 1.5rem;
   --space-5: 2.5rem;
-  --content-width: 56rem;
+  /* v0.6.9 Task C (finding W24): the shared token splits — the workspace width and the deck's
+     stage width are separate design rulings now, not one accidental shared value. */
+  --app-content-width: 110rem;
+  --deck-content-width: 56rem;
 }
 
 .app-root {
@@ -624,11 +630,11 @@
 
 
 
-/* ===== v0.5.8 Task C: the deck charts (waterfall, coverage, hurdle); the waterfall re-formed to the B4 vertical build-up at v0.6 ===== */
-[data-testid="presentation"] .waterfall-label-list {  list-style: none;  margin: 0 0 var(--space-1);  padding: 0;}
-[data-testid="presentation"] .waterfall-track {  position: relative;  height: 120px;  width: 64px;  margin: var(--space-2) 0;}
-[data-testid="presentation"] .waterfall-segment {  position: absolute;  left: 12px;  width: 40px;  background: rgba(0, 116, 186, 0.75);  border-top: 2px solid var(--stage, #081c33);}
-[data-testid="presentation"] .waterfall-segment:last-of-type {  border-top: none;}
+/* ===== v0.5.8 Task C: the deck charts (waterfall, coverage, hurdle); the waterfall re-formed to the B4 vertical build-up at v0.6; the classical stepped waterfall at v0.6.9 (Task A, finding W26 — the fluid track, the offset floating steps, the labels below) ===== */
+[data-testid="presentation"] .waterfall-track {  position: relative;  height: 240px;  width: 100%;  margin: var(--space-2) 0;}
+[data-testid="presentation"] .waterfall-segment {  position: absolute;  background: rgba(0, 116, 186, 0.75);}
+/* v0.6.9 Task A: the label list is the labels of record, wrapping to full width below the track. */
+[data-testid="presentation"] .waterfall-label-list {  list-style: none;  display: flex;  flex-wrap: wrap;  gap: var(--space-1) var(--space-2);  margin: var(--space-2) 0 0;  padding: 0;}
 /* v0.6.8 Task A (finding W18): the operating and reinvestments segments carry visually distinct
    fills (hatched / lighter) so the investment basis and the operating basis are never conflated. */
 [data-testid="presentation"] .waterfall-segment-operating {  background: repeating-linear-gradient(45deg, rgba(52, 211, 153, 0.35), rgba(52, 211, 153, 0.35) 4px, rgba(0, 116, 186, 0.28) 4px, rgba(0, 116, 186, 0.28) 8px);}
@@ -1022,11 +1028,19 @@
   white-space: nowrap;
 }
 
+/* v0.6.9 Task B (finding W26): the scrollable bucket grid — the same honest-overflow pattern
+   as the app's .editor-scroll, so the axis labels never overlap at phone width. */
+[data-testid="presentation"] .recovery-scroll {
+  overflow-x: auto;
+  width: 100%;
+}
+
 [data-testid="presentation"] .recovery-grid {
   display: flex;
   align-items: flex-end;
   gap: var(--space-1);
   width: 100%;
+  min-width: 480px;
 }
 
 [data-testid="presentation"] .recovery-column {
@@ -1273,4 +1287,64 @@
 [data-testid="presentation"] main {  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));}
 @media print {
   [data-testid="presentation"] footer.stage-nav {  display: none;}
+}
+
+/* ===== v0.6.9 Task B (finding W26): the deck's first width breakpoints — the red proof was
+   that the deck carried only print media queries; the mobile treatment below is scoped to the
+   presentation. The app-root queries (360/380/480) and the print queries above are untouched. ===== */
+@media (max-width: 480px) {
+  [data-testid="presentation"] .deck-slide {
+    padding: var(--space-3) var(--space-2);
+    min-height: auto;
+  }
+  [data-testid="presentation"] .chart-kicker {
+    font-size: 0.85rem;
+  }
+  [data-testid="presentation"] .donut-geometry {
+    width: 132px;
+    height: 132px;
+    flex: 0 0 132px;
+  }
+  [data-testid="presentation"] .donut-svg {
+    width: 132px;
+    height: 132px;
+  }
+  [data-testid="presentation"] .waterfall-track {
+    height: 180px;
+  }
+  [data-testid="presentation"] .stage-returns-svg {
+    min-height: 120px;
+  }
+  [data-testid="presentation"] .summary-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+  [data-testid="presentation"] .bar-year-label,
+  [data-testid="presentation"] .peak-label {
+    font-size: 10px;
+  }
+}
+
+/* ===== v0.6.9 Task C (finding W24): the two-column sections at the wide workspace breakpoint —
+   the shapes that are an inputs block plus a results block render side-by-side (results right,
+   a stable minimum column). The volume grids and full-width tables keep the full column. ===== */
+@media (min-width: 80rem) {
+  .app-root [data-testid="overview-summary"] {
+    display: grid;
+    grid-template-columns: minmax(28rem, 2fr) minmax(0, 3fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .app-root section[data-testid="repayment"] {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(22rem, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .app-root section[data-testid="repayment"] > * {
+    grid-column: 1;
+  }
+  .app-root section[data-testid="repayment"] > [data-testid="repayment-summary"] {
+    grid-column: 2;
+    grid-row: 1;
+  }
 }

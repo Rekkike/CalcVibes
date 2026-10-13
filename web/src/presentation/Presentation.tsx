@@ -3,9 +3,10 @@ import type { CSSProperties } from "react";
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { deckSlides } from "../deck.js";
 import type { ScenarioTargetChart } from "../deck.js";
-import { deckMoneyForDisplay, percentTwoForDisplay } from "../engine.js";
+import { deckMoneyForDisplay, feeForDisplay, percentTwoForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
 import { CompositionRows, CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot, ScenarioComparisonBars } from "../charts.js";
+import { STAGE_CHART_COLORS } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 
@@ -48,7 +49,9 @@ function ScenarioTargetBars(props: { chart: ScenarioTargetChart; currency: Curre
           {chart.points.map((p) => (
             <li key={p.label} data-target-label={p.label} className="scenario-target-label">
               <span className="row-name">{p.label}</span>
-              <span className="row-value">{deckMoneyForDisplay(p.value, currency, entryUnit)}</span>
+              {/* v0.6.9 Task F (finding W28): the solved-mode payment values render through the
+                  magnitude-aware feeForDisplay (the pinned target strings "€1,4 M" et al.). */}
+              <span className="row-value">{feeForDisplay(p.value, currency, entryUnit)}</span>
             </li>
           ))}
         </ul>
@@ -219,7 +222,10 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.name === "investment" && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="investment">
-                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker={investmentKicker} />
+                {/* v0.6.9 Task H (finding W30): the deck's composition accent bars consume the
+                    stage accent (8.01:1 on the always-dark stage); the app keeps #0074ba on its
+                    card surfaces (4.99:1 against white) — no app accent change. */}
+                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker={investmentKicker} accent={STAGE_CHART_COLORS.accent} />
                 {/* v0.6.8 Task A (finding W18): the honest cost waterfall — the capital lines, then the
                     operating segment, then the reinvestments segment when present, closing at the cap
                     (totalCost). The reinvestments derivation is the one deck.ts established (no new
@@ -260,7 +266,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                     model and names the varied parameter as an action title. */}
                 <ScenarioComparisonBars
                   data={sl.chart.data}
-                  valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
+                  valueFor={(t) => feeForDisplay(t, currency, entryUnit)}
                   kicker={sl.chart.kicker}
                 />
               </div>

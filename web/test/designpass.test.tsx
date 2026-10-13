@@ -215,6 +215,23 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(accShare).toBeCloseTo(1, 6);
     const capEl = waterfall.querySelector('[data-testid="waterfall-cap"]') as HTMLElement;
     expect(parseFloat(capEl.style.bottom)).toBeCloseTo(100, 0);
+    // v0.6.9 Task A: the stepped geometry — each segment owns an equal slot, fills 60 percent
+    // of it, and the cap spans the full width; adjacent steps never overlap.
+    const stepEls = waterfall.querySelectorAll("[data-waterfall-step]");
+    expect(stepEls.length).toBe(6);
+    const slot = 100 / expectedSegments.length;
+    for (let i = 0; i < stepEls.length; i++) {
+      const seg = stepEls[i] as HTMLElement;
+      expect(seg.getAttribute("data-waterfall-step")).toBe(String(i));
+      expect(parseFloat(seg.style.left)).toBeCloseTo(i * slot, 6);
+      expect(parseFloat(seg.style.width)).toBeCloseTo(0.6 * slot, 6);
+      if (i < stepEls.length - 1) {
+        expect(parseFloat(seg.style.left) + parseFloat(seg.style.width)).toBeLessThanOrEqual((i + 1) * slot + 1e-9);
+      }
+    }
+    const lastSeg = stepEls[stepEls.length - 1] as HTMLElement;
+    expect(parseFloat(lastSeg.style.bottom) + parseFloat(lastSeg.style.height)).toBeCloseTo(100, 0);
+    expect(capEl.style.width).toBe("100%");
     for (const seg of Array.from(segments)) {
       expect((seg as HTMLElement).querySelector('[data-testid="waterfall-label"]')).toBe(null);
     }
@@ -225,6 +242,38 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
       expect(labels[i].textContent).toContain(deckMoneyForDisplay(expectedSegments[i].total, "EUR", "thousands"));
     }
     expect(slide.querySelectorAll('[data-testid="composition-rows"]').length).toBe(1);
+  });
+
+  it("WATERFALL-CLOSURE: the segment program closes at the cap on all five fixtures (v0.6.9 Task A.4 re-pin)", async () => {
+    const { demoProject, multiLeaseProject, solarParkProject, shorePowerProject, landNewbuildProject } = await import("../src/state.js");
+    const { computeModel } = await import("../src/engine.js");
+    const pinnedTotals: Record<string, number> = {
+      template: 7849860,
+      "multi-lease": 118000000,
+      solar: 18733048.32214572,
+      port: 269591641.24463195,
+      land: 599071344.7435848,
+    };
+    const fixtures = [
+      ["template", demoProject],
+      ["multi-lease", multiLeaseProject],
+      ["solar", solarParkProject],
+      ["port", shorePowerProject],
+      ["land", landNewbuildProject],
+    ] as const;
+    for (const [name, make] of fixtures) {
+      const result = computeModel(make());
+      expect(result.totalCost).toBeCloseTo(pinnedTotals[name], 6);
+      const reinvestments = (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0);
+      const segments = [
+        ...result.lineTotals.map((l) => ({ total: l.total, kind: "capital" as const })),
+        ...(result.operatingTotal > 0 ? [{ total: result.operatingTotal, kind: "operating" as const }] : []),
+        ...(reinvestments > 0 ? [{ total: reinvestments, kind: "reinvestments" as const }] : []),
+      ];
+      expect(segments.length).toBeGreaterThanOrEqual(1);
+      const segSum = segments.reduce((a, s) => a + s.total, 0);
+      expect(segSum).toBeCloseTo(result.totalCost, 6);
+    }
   });
 
   it("HURDLE-TRACE: the two dots map the engine achieved IRR and the input target on one zero-based scale; the tone flips with goalMet", async () => {

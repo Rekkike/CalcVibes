@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
-import { computeModel, deckMoneyForDisplay, deckYearsForDisplay, moneyForDisplay, percentTwoForDisplay } from "../src/engine.js";
+import { computeModel, deckMoneyForDisplay, deckYearsForDisplay, feeForDisplay, percentTwoForDisplay } from "../src/engine.js";
 import { deckSlides } from "../src/deck.js";
 import { demoProject } from "../src/state.js";
 
@@ -36,8 +36,8 @@ describe("v0.6.4 Part B: the executive summary infographic slide", () => {
     expect(byLabel("Payback")?.rawValue).toBe(6.959606064286818);
     expect(byLabel("Payback")?.value).toBe(deckYearsForDisplay(6.959606064286818));
     expect(byLabel("Solved payment")?.rawValue).toBe(475309.1340746104);
-    // v0.6.8 Task B: the solved payment summary tile closes at the fee formatter (ones).
-    expect(byLabel("Solved payment")?.value).toBe(moneyForDisplay(475309.1340746104, "SEK", "ones"));
+    // v0.6.9 Task F: the solved payment summary tile closes at the fee formatter (ones) — 475 309 kr.
+    expect(byLabel("Solved payment")?.value).toBe(feeForDisplay(475309.1340746104, "SEK", "ones"));
   });
 
   it("SUMMARY-BLOCKS: the summary presents visual blocks only — collected versus cost, the verdict tile, and no prose", () => {

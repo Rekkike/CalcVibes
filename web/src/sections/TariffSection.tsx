@@ -1,5 +1,5 @@
 import type { ModelInputs, ModelResult, TariffConfig, TariffRow } from "../../../core/src/types.js";
-import { computeModel, moneyForDisplay } from "../engine.js";
+import { computeModel, moneyForDisplay, feeForDisplay } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
 import { useMemo } from "react";
@@ -15,6 +15,9 @@ export function TariffSection(props: {
   const { inputs, result, setTariff, startYear, entryUnit } = props;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
   const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
+  // v0.6.9 Task F (finding W28): the fee-class surfaces (the unit price column and the per-row
+  // per-lift charges) render through the magnitude-aware feeForDisplay at the app's entry unit.
+  const fee = (v: number) => feeForDisplay(v, currency, entryUnit);
   const t = inputs.tariff ?? { mode: "off" as const, escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null };
   const spanYears = useMemo(() => {
     if (result) return result.tariffYears.map((y) => y.year);
@@ -70,11 +73,18 @@ export function TariffSection(props: {
       {t.mode !== "off" && (
         <>
           <h3>Volume grid {gridYears.length > 0 ? `(collection years ${gridYears[0]}–${gridYears[gridYears.length - 1]}, derived from the model span)` : ""}</h3>
+          {/* v0.6.9 Task D (finding W25): the volume grid gains the .editor-scroll wrapper —
+              parity with the cost grid (scroll, sticky header, sticky first column) so the
+              per-year headers never bleed outside the card at the capped width. */}
+          <div className="editor-scroll" data-testid="tariff-editor-scroll">
           <table data-testid="tariff-rows">
             <thead>
               <tr>
                 <th>Descriptor</th><th>Weight</th>
-                {gridYears.map((y) => <th key={y}>{yearHeader(y, startYear)}</th>)}
+                {/* v0.6.9 Task D: the compact per-year headers — the short token (Y3, Y4, …)
+                    via yearHeader's null-startYear path when no start year is set; the
+                    bare-year form is already compact and unchanged. */}
+                {gridYears.map((y) => <th key={y} {...(startYear === null ? { "data-short-year": "true" } : {})}>{startYear === null ? `Y${y}` : yearHeader(y, startYear)}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -97,6 +107,7 @@ export function TariffSection(props: {
               ))}
             </tbody>
           </table>
+          </div>
           <button data-action="add-tariff-row" onClick={() => setTariff({ ...t, rows: [...t.rows, { id: "r" + (t.rows.length + 1), label: "", weight: 1, lifts: [] }] })}>Add tariff row</button>
         </>
       )}
@@ -127,7 +138,7 @@ export function TariffSection(props: {
                   <td>{yearHeader(y.year, startYear)}</td>
                   <td>{y.required === null ? "—" : money(y.required)}</td>
                   <td>{money(y.weightedVolume)}</td>
-                  <td>{y.unitPrice === null ? "—" : money(y.unitPrice)}</td>
+                  <td>{y.unitPrice === null ? "—" : fee(y.unitPrice)}</td>
                   <td>{money(y.revenue)}</td>
                 </tr>
               ))}
@@ -138,7 +149,7 @@ export function TariffSection(props: {
               <h4>Per-lift charges (engine-emitted)</h4>
               <ul data-testid="per-lift-charges">
                 {t.rows.map((row) => (
-                  <li key={row.id} data-row-charge={row.id}>{row.label}: {money((result.tariffYears[0].perRowCharges as Record<string, number>)[row.id])}</li>
+                  <li key={row.id} data-row-charge={row.id}>{row.label}: {fee((result.tariffYears[0].perRowCharges as Record<string, number>)[row.id])}</li>
                 ))}
               </ul>
             </>

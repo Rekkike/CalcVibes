@@ -242,7 +242,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     expect(tileValue("Achieved IRR")).toBe("6.00%");
     expect(tileValue("Payback")).toBe("14.1 years");
     // v0.6.8 Task B re-anchor: the fee-class figures render at the ones unit (the fee closure).
-    expect(tileValue("Solved payment")).toBe("€1 626 222,63");
+    expect(tileValue("Solved payment")).toBe("€1 626 223");
     expect(tileValue("Collected vs cost")).toBe("€390 293 432 vs €269 591 641");
     expect(tileValue("Verdict")).toBe("Target met");
     expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("€269 591 641");
@@ -251,7 +251,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — per-lift prices");
     expect(bodyFigureValue("recovery", "Payments")).toBe("240");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€1 626 222,63");
+    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€1 626 223");
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€390 293 432");
     expect(bodyFigureValue("recovery", "Unit price Year 3")).toBe("€5,81");
     // v0.6.8 Task E.4: the port fixture carries both basis notes, disclosed verbatim on the
@@ -464,7 +464,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     expect(tileValue("Achieved IRR")).toBe("8.00%");
     expect(tileValue("Payback")).toBe("11.0 years");
     // v0.6.8 Task B re-anchor: the fee-class figures render at the ones unit (the fee closure).
-    expect(tileValue("Solved payment")).toBe("NOK 2 392 623,67");
+    expect(tileValue("Solved payment")).toBe("NOK 2 393 k");
     expect(tileValue("Collected vs cost")).toBe("NOK 1 132 569 k vs NOK 599 071 k");
     expect(tileValue("Verdict")).toBe("Target met");
     expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("NOK 599 071 k");
@@ -473,7 +473,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — solved payments");
     expect(bodyFigureValue("recovery", "Payments")).toBe("360");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("NOK 2 392 623,67");
+    expect(bodyFigureValue("recovery", "Payment per period")).toBe("NOK 2 393 k");
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("NOK 1 132 569 k");
     // v0.6.8 Task E.5 pin: the land fixture carries neither basis note — the recovery slide
     // gains no note disclosures (the null-tolerance demo).

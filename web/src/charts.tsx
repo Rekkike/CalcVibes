@@ -11,6 +11,10 @@ export const STAGE_CHART_COLORS = {
   gridline: "rgba(148,163,184,0.16)",
   axisText: "#e2e8f0",
   zeroLine: "rgba(148,163,184,0.45)",
+  // v0.6.9 Task H (finding W30): the stage accent — 8.01:1 on the always-dark stage
+  // (#081c33), computed with the WCAG relative-luminance formula. The app keeps #0074ba
+  // on its card surfaces (4.99:1 against white); the deck chart surfaces consume the stage accent.
+  accent: "#38bdf8",
 };
 
 export const STAGE_GOLD = "#e8b84b";
@@ -71,8 +75,10 @@ export function CompositionRows(props: {
   lineTotals: LineTotal[];
   valueFor: (total: number) => string;
   kicker?: string;
+  accent?: string;
 }) {
-  const { lineTotals, valueFor, kicker } = props;
+  const { lineTotals, valueFor, kicker, accent } = props;
+  const barFill = accent ?? CHART_COLORS.accentBar;
   const total = Math.max(1e-12, lineTotals.reduce((a, l) => a + l.total, 0));
   const rows = lineTotals.map((l) => ({ ...l, sharePct: l.total / total }));
   return (
@@ -81,10 +87,13 @@ export function CompositionRows(props: {
       {rows.map((r) => (
         <div key={r.id} data-composition-row={r.id} className="composition-row">
           <span data-row-label="name" className="row-name">{r.name}</span>
-          <span data-row-label="share" className="row-share">{Math.round(r.sharePct * 100)}%</span>
+          {/* v0.6.9 Task E (finding W27): the share renders at one decimal — the integer form's
+              accumulation to 101 percent on the port was the finding; one decimal sums to 100.0
+              on every fixture (the pinned checks). */}
+          <span data-row-label="share" className="row-share">{(Math.round(r.sharePct * 1000) / 10).toFixed(1)}%</span>
           <div className="row-bar-track">
             <svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" className="row-bar-svg">
-              <rect x={0} y={0} width={100 * r.sharePct} height={8} fill={CHART_COLORS.accentBar} rx={2} />
+              <rect x={0} y={0} width={100 * r.sharePct} height={8} fill={barFill} rx={2} />
             </svg>
           </div>
           <span data-row-label="value" className="row-value">{valueFor(r.total)}</span>
@@ -112,7 +121,9 @@ export function ScenarioComparisonBars(props: {
           <span data-scenario-label={d.label} className="row-name">{d.label}</span>
           <div className="row-bar-track">
             <svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" className="row-bar-svg">
-              <rect x={0} y={0} width={100 * (Math.abs(d.value) / max)} height={8} fill={CHART_COLORS.accentBar} rx={2} />
+              {/* v0.6.9 Task H (finding W30): the deck-only comparison bars consume the stage accent
+                  (8.01:1 on the stage); the app keeps #0074ba on its card surfaces. */}
+              <rect x={0} y={0} width={100 * (Math.abs(d.value) / max)} height={8} fill={STAGE_CHART_COLORS.accent} rx={2} />
             </svg>
           </div>
           <span data-scenario-value={d.label} className="row-value">{valueFor(d.value)}</span>
@@ -209,16 +220,20 @@ export function RecoveryBars(props: {
   return (
     <div data-testid="recovery-bars" className="chart-block">
       {kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{kicker}</p>}
-      <div className="recovery-grid">
-        {inflows.map((v, k) => (
-          <div key={k} data-recovery-column={k} data-bucket-width={width} className="recovery-column">
-            <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? (width === 1 ? `${peakFor(v)} in ${labelFor(k * width + 1)}` : `${peakFor(v)} in ${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}`) : "\u00a0"}</span>
-            <svg viewBox={`0 0 10 ${Math.max(1, Math.round((v / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
-              <rect x={0} y={0} width={10} height={Math.max(1, Math.round((v / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
-            </svg>
-            <span data-testid="bar-year-label" {...(width > 1 && k % thinStep !== 0 ? { "data-thinned": "true" } : {})} className="bar-year-label">{width === 1 ? labelFor(k + 1) : (k % thinStep === 0 ? `${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}` : "\u00a0")}</span>
-          </div>
-        ))}
+      {/* v0.6.9 Task B (finding W26): the scrollable bucket grid — the honest-overflow pattern
+          (the app's .editor-scroll) so the axis labels never overlap at phone width. */}
+      <div data-testid="recovery-scroll" className="recovery-scroll">
+        <div className="recovery-grid">
+          {inflows.map((v, k) => (
+            <div key={k} data-recovery-column={k} data-bucket-width={width} className="recovery-column">
+              <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? (width === 1 ? `${peakFor(v)} in ${labelFor(k * width + 1)}` : `${peakFor(v)} in ${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}`) : "\u00a0"}</span>
+              <svg viewBox={`0 0 10 ${Math.max(1, Math.round((v / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
+                <rect x={0} y={0} width={10} height={Math.max(1, Math.round((v / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
+              </svg>
+              <span data-testid="bar-year-label" {...(width > 1 && k % thinStep !== 0 ? { "data-thinned": "true" } : {})} className="bar-year-label">{width === 1 ? labelFor(k + 1) : (k % thinStep === 0 ? `${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}` : "\u00a0")}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -276,22 +291,23 @@ export interface WaterfallSegment {
 // the capital lines, then the operating segment, then the reinvestments segment when present — and
 // the build closes exactly at the cap (totalCost). The operating and reinvestments segments carry a
 // visually distinct class so the investment basis and the operating basis are never conflated.
+// v0.6.9 Task A (finding W26): the classical stepped waterfall — with n segments the slot is
+// 100/n percent; segment i renders left = i*slot, width = 0.6*slot (a floating step), gaining
+// data-waterfall-step; the vertical extents are unchanged (bottom = cumulative-before, height =
+// segment share of the cap) so the closure pins survive verbatim; the cap spans the full track.
 export function CostWaterfall(props: { segments: WaterfallSegment[]; total: number; valueFor: (v: number) => string; }) {
   const { segments, total, valueFor } = props;
   const cap = Math.max(1e-12, total);
+  const n = Math.max(1, segments.length);
+  const slot = 100 / n;
   let acc = 0;
   return (
     <div data-testid="cost-waterfall" className="chart-block">
-      <ul className="waterfall-label-list">
-        {segments.map((s) => (
-          <li key={s.id} data-testid="waterfall-label" data-waterfall-kind={s.kind} className="waterfall-label">{s.name} {valueFor(s.total)}</li>
-        ))}
-      </ul>
       <div className="waterfall-track">
-        {segments.map((s) => {
+        {segments.map((s, i) => {
           const frac = s.total / cap;
           const seg = (
-            <div key={s.id} data-waterfall-segment={s.id} data-waterfall-kind={s.kind} className={"waterfall-segment" + (s.kind === "capital" ? "" : " waterfall-segment-" + s.kind)} style={{ bottom: `${(acc / cap) * 100}%`, height: `${frac * 100}%` }}>
+            <div key={s.id} data-waterfall-segment={s.id} data-waterfall-kind={s.kind} data-waterfall-step={i} className={"waterfall-segment" + (s.kind === "capital" ? "" : " waterfall-segment-" + s.kind)} style={{ bottom: `${(acc / cap) * 100}%`, height: `${frac * 100}%`, left: `${i * slot}%`, width: `${0.6 * slot}%` }}>
             </div>
           );
           acc += s.total;
@@ -299,6 +315,11 @@ export function CostWaterfall(props: { segments: WaterfallSegment[]; total: numb
         })}
         <div data-testid="waterfall-cap" className="waterfall-cap" style={{ bottom: "100%", width: "100%", height: "4px" }} />
       </div>
+      <ul className="waterfall-label-list">
+        {segments.map((s) => (
+          <li key={s.id} data-testid="waterfall-label" data-waterfall-kind={s.kind} className="waterfall-label">{s.name} {valueFor(s.total)}</li>
+        ))}
+      </ul>
     </div>
   );
 }
