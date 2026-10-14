@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { computeModel } from "../src/engine.js";
-import { demoProject, shorePowerProject, shorePowerProgram } from "../src/state.js";
+import { demoProject, shorePowerProgram } from "../src/state.js";
 import { buildWorkbook, readWorkbook } from "../src/xlsx.js";
 import type { ModelInputs } from "../../core/src/types.js";
 

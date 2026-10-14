@@ -3,7 +3,7 @@ import { render, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { projectFileName } from "../src/projectFile.js";
 import { parseProject, serializeProject } from "../../core/src/fileio.js";
-import { demoProject, shorePowerProject, shorePowerProgram } from "../src/state.js";
+import { demoProject, shorePowerProgram } from "../src/state.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
