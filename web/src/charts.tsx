@@ -313,12 +313,17 @@ export function CostWaterfall(props: { segments: WaterfallSegment[]; total: numb
           acc += s.total;
           return seg;
         })}
-        <div data-testid="waterfall-cap" className="waterfall-cap" style={{ bottom: "100%", width: "100%", height: "4px" }} />
+        {/* v0.6.10 Task E.4 (W31): the closing total bar — the cap renders as a labeled total
+            element carrying data-waterfall-total; the label list gains the closing entry with
+            the totalCost value. The closure identity and the 100.0 percent fill pins stand
+            verbatim; the geometry is unchanged. */}
+        <div data-testid="waterfall-cap" data-waterfall-total="true" className="waterfall-cap" style={{ bottom: "100%", width: "100%", height: "4px" }} />
       </div>
       <ul className="waterfall-label-list">
         {segments.map((s) => (
           <li key={s.id} data-testid="waterfall-label" data-waterfall-kind={s.kind} className="waterfall-label">{s.name} {valueFor(s.total)}</li>
         ))}
+        <li data-testid="waterfall-total-label" data-waterfall-kind="total" className="waterfall-label">Total program cost {valueFor(total)}</li>
       </ul>
     </div>
   );

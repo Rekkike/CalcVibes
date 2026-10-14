@@ -241,6 +241,24 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                   total={result.totalCost}
                   valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
                 />
+                {/* v0.6.10 Task G.1: the funding breakdown block — beneath the waterfall:
+                    gross capital program, grants, net private capital, the grant intensity,
+                    and the funding rows with their kinds and years. Every figure is composed
+                    by the deck model (deck.ts); the presentation renders, never recomputes. */}
+                {sl.funding !== undefined && (
+                  <div data-testid="deck-funding-block" className="deck-funding-block">
+                    <p data-testid="chart-kicker" className="chart-kicker">The funding breakdown</p>
+                    <p data-stat="funding-gross">{sl.funding.grossLabel}: {sl.funding.gross}</p>
+                    <p data-stat="funding-grants">Grants: {sl.funding.grants}</p>
+                    <p data-stat="funding-net">Net private capital: {sl.funding.net}</p>
+                    <p data-stat="funding-intensity">Grant intensity: {sl.funding.intensity}</p>
+                    <ul data-testid="deck-funding-rows">
+                      {sl.funding.rows.map((r) => (
+                        <li key={r.label} data-funding-kind={r.kind}>{r.label} ({r.kind === "grant" ? "grant" : "interest-free note"}, year {r.year}{r.term != null ? `, term ${r.term} years` : ""}): {r.value}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
             {sl.name === "recovery" && result !== null && (
