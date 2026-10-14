@@ -17,16 +17,16 @@ describe("Task A: CONTRAST", () => {
 });
 
 describe("Task B: CHART-LABEL / ONE-COMPOSITION / PEAK-LABEL", () => {
-  it("the Cost section renders the composition rows with names, shares, and values (re-anchored per v0.5.7; v0.6.7 re-anchor: the port cost base, EUR at entry thousands)", () => {
+  it("the Cost section renders the composition rows with names, shares, and values (v0.6.10 re-anchor: the program cost base, EUR at entry thousands)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
     const rows = document.querySelector('[data-testid="composition-rows-wrap"] [data-testid="composition-rows"]') as HTMLElement;
     const rowEls = rows.querySelectorAll("[data-composition-row]");
-    expect(rowEls.length).toBe(5);
-    expect(rowEls[0].querySelector('[data-row-label="name"]')?.textContent).toContain("Engineering, permits & studies");
-    expect(rowEls[0].querySelector('[data-row-label="share"]')?.textContent).toContain("7.5%");
-    expect(rowEls[0].querySelector('[data-row-label="value"]')?.textContent).toContain("12 000");
+    expect(rowEls.length).toBe(6);
+    expect(rowEls[0].querySelector('[data-row-label="name"]')?.textContent).toContain("Container shore power — engineering & studies (RSP JV)");
+    expect(rowEls[0].querySelector('[data-row-label="share"]')?.textContent).toContain("16.5%");
+    expect(rowEls[0].querySelector('[data-row-label="value"]')?.textContent).toContain("74 000");
   });
 
   it("the deck investment slide carries exactly one composition figure (re-anchored per v0.6.5 Task C/W13: the donut lives on the summary slide only)", () => {
@@ -145,10 +145,10 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
 
   it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.9");
+    expect(VERSION).toBe("v0.6.10");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.9");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.10");
   });
 });
 
@@ -163,7 +163,7 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     const labels = Array.from(tiles).map((t) => (t as HTMLElement).getAttribute("data-tile"));
     expect(labels).toEqual([
       "Total cost", "Total collected", "Net gain", "Achieved IRR", "NPV at WACC",
-      "Payback (nominal)",
+      "Payback (nominal)", "Equity outlay", "Equity IRR", "Minimum DSCR",
     ]);
   });
 
