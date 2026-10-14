@@ -1,35 +1,42 @@
-# Environment Discipline — Standing Rules for Builder Sessions
+# Environment discipline — the Work-sandbox era record
 
-Read this before anything else in a session. These rules are standing: they apply to every directive pass, without restatement.
+This file is the durable record of the environment failures, the workarounds, and the process disciplines proven during the Work-sandbox passes (v0.6.8 through v0.6.10). It exists so that any future session — on any surface — can rebuild a working environment from this repository alone, and so that the disciplines that held under adversity remain written down.
 
-## 1. Session ritual
+Per the migration ruling (the ledger, Round 45 Supplement 8): the sandbox-specific workarounds below retire with the Work sandbox. A persistent developer environment (Vibe Code or any native tooling) does not exhibit this failure class and should use plain `npm install` / `npx vitest`. The process disciplines (chunked commits, byte verification, pinned directives, the honest ledger) are environment-agnostic and stand on every surface.
 
-At session start, before any work: verify the working tree is clean and current with origin/main; report the HEAD SHA; report the ledger (current test counts); confirm the current spec version from docs/SPECIFICATION.md. Never assume state from memory.
+## The failure class of record
 
-## 2. The engine purity rule
+- Per-turn environment resets wiped the working directory repeatedly (eleven wipes across the v0.6.9 and v0.6.10 trajectories). The session transcript survives a wipe even though the filesystem does not, so an alive session replays its own prior edits from history — but the transcript dies with the session and is never a plan of record.
+- Full outages: the remote sandbox lease expired and the storage proxy rejected every access path with authorization failures (three times in the v0.6.10 trajectory, each roughly thirty-five minutes to the honest halt).
+- `npm install` and `npm ci` are forbidden in the sandbox. The hand-rolled lockfile installer below is the workaround.
+- GitHub — the sole durable store — never failed once across the entire trajectory. Every push, fetch, and CI run held. The consistent conclusion: push early, push often.
 
-The calculation engine (core/src) is a pure, deterministic module: no I/O, no network, no clock or randomness. Every metric derives from the monthly-resolution cash-flow vector. The prototype under prototype/standalone-prototype.html is the behavioral reference of record for the v0.1 engine; its engine functions may be ported directly and are then pinned by checkpoint tests.
+## The verified rebuild recipe (the one-command rebuild, from the branch tip)
 
-## 3. Checkpoint verification
+1. Extract the tree: `curl -sL -o tree.tar.gz https://codeload.github.com/Rekkike/CalcVibes/tar.gz/<tip-sha>` then `tar xzf`. Beware stale CDN tarballs — re-fetch fresh if a diff looks wrong.
+2. Rebuild node_modules with the sha512 lockfile installer (below) — resumable, roughly 280 seconds for both workspaces, every tarball integrity-verified.
+3. Verify the batteries: `node node_modules/vitest/dist/cli.js run` and `node node_modules/typescript/lib/tsc.js --noEmit -p tsconfig.json`, in each workspace.
+4. Re-verify the committed state against the ledger's expected counts before doing any work.
 
-Checkpoint arithmetic is always script-verified, never hand-derived. Every pinned figure gets a red proof at least once: mutate the constant, observe the test fail, revert. A figure contradiction stops at the report; never a silent correction.
+## The sha512 lockfile installer
 
-## 4. Chunked invocations
+Download each package tarball listed in `package-lock.json` directly from the registry, verify its sha512 against the lockfile's `integrity` field, and extract it into `node_modules` at the lockfile's declared path. The installer of record carries four fixes, each found the hard way:
 
-Test suites and builds run in per-suite or small-batch invocations, never one long silent full-suite run. Long silent invocations risk session loss. Chunked is the default; a full single run is the exception that must be justified.
+1. The detected tarball root segment — npm tarballs may carry any single root directory, not only `package/` (the `@types/node` tarball carries `node v22.20/`); detect the actual root instead of assuming.
+2. Non-destructive merge extraction — never remove the destination before copying: a parallel or nested install can share an ancestor directory, and destructive ancestor removal deletes siblings (a concurrency race). Copy over the destination in place.
+3. The package-unique cache key — `name.replace(/^@/, "").replace(/\//g, "__")` plus the version: `@types/react` and `react` both resolve to a tarball named `react-<version>.tgz`, and a name-derived cache key alone installs the wrong package (a jsx-runtime failure).
+4. The path-copy normalization — copy the root's contents (`src/.`), never the root itself; path normalization can silently rewrite a trailing `/.` and misplace the whole tree.
 
-## 5. Checkpoint protocol
+## The checkpoint discipline (the atomic checkpoint rule)
 
-Commit and push work-in-progress to a wip/<pass-name> branch after each completed unit of work and BEFORE every long-running step. On a session reset: re-clone, check out the WIP branch, continue — never restart from scratch. After final verified delivery (squash-merge to main), delete the branch.
+Never hold more than one unverified edit. Push to the working branch after every unit that would hurt to lose: each source-file batch at clean typecheck, each green re-anchored test suite, each verified harness. A red intermediate state on the working branch is acceptable mid-pass; the merge gate (full battery green plus byte verification) governs the deliverable. A running-state file (`CHECKPOINT.md`) rides the branch, updated at every push: the last verified step, the battery counts, the outstanding unverified edits, the next action. An involuntary halt then costs at most one checkpoint interval, and a resume reads its state from the branch tip instead of reconstructing from memory.
 
-## 6. One directive pass at a time
+The v0.6.10 pass closed at twenty-three checkpoints; every environment failure during the pass cost exactly one interval. The discipline is the proof.
 
-One directive pass at a time; verify each pass (commit SHA, spec version, test ledger) before the next. Exclusion verdicts are first-class deliverables: report what is out of scope rather than inventing a feature to justify a pass.
+## The read-only probe rule
 
-## 7. Tone
+Connectivity probes are read-only: `get_commit` and list calls answer the same question at zero risk. A probe that pushes can overwrite real files (the CHECKPOINT.md heartbeat incident of the v0.6.10 pass, restored at 176da09d). The running-state file is written only in checkpoint commits, never by probes.
 
-Formal tone, no contractions, no emojis, in directives and reports. Never invent figures, rates, or wording: surface gaps as notices or honest negatives.
+## The transcript-recovery observation
 
-## 8. Versioning contract
-
-0.x is a pre-1.0 development series. The roadmap gates: v0.3 = appraisal suite closed; v0.4 = financing layer landed; v1.0 = installable-and-standalone promise (desktop packaging, project files, installer). Every pass grades its spec bump in the changelog of docs/SPECIFICATION.md.
+A wipe erases the filesystem, not the session transcript: every edit made earlier in a pass survives verbatim in the session's own history, so a wiped-but-alive session replays its prior edits instead of re-deriving them. The loss accounting is therefore time (extract, reinstall, re-verify), not work product — provided the session lives. The transcript is a lucky secondary channel, never a plan of record; the pushes are the plan.
