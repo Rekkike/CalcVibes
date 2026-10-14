@@ -3,7 +3,7 @@ import { render, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { projectFileName } from "../src/projectFile.js";
 import { parseProject, serializeProject } from "../../core/src/fileio.js";
-import { demoProject, shorePowerProject } from "../src/state.js";
+import { demoProject, shorePowerProject, shorePowerProgram } from "../src/state.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
@@ -20,7 +20,7 @@ describe("v0.6.3 project file save/load", () => {
     // an invalid in-progress model (an emptied cost line name) must still be savable
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    fireEvent.change(document.querySelector('[data-line="c1"] [data-field="name"]') as HTMLInputElement, { target: { value: "" } });
+    fireEvent.change(document.querySelector('[data-line="p1"] [data-field="name"]') as HTMLInputElement, { target: { value: "" } });
     expect((byTest("save-project") as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -44,20 +44,20 @@ describe("v0.6.3 project file save/load", () => {
     expect(byTest("load-error")).toBeNull();
   });
 
-  it("LOAD-ERR / NO-DEFAULT-DEMO: a malformed file surfaces the banner with the exact message and leaves the current project untouched (v0.6.7 re-anchor: the current project is the port demo)", async () => {
+  it("LOAD-ERR / NO-DEFAULT-DEMO: a malformed file surfaces the banner with the exact message and leaves the current project untouched (v0.6.10 re-anchor: the current project is the program demo)", async () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.change(fileInput(), { target: { files: [new File(["{not json"], "broken.calcvibes.json")] } });
     await waitFor(() => {
       expect(byTest("load-error")?.textContent).toBe("FILE-MALFORMED: the file is not valid JSON and cannot be opened.");
     });
-    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore power example (Rotterdam)");
+    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore-power program (Rotterdam)");
     // the template demo asset is not a project file: the kind refusal surfaces too
     fireEvent.change(fileInput(), { target: { files: [new File([JSON.stringify({ schemaVersion: 8 })], "template-project.json")] } });
     await waitFor(() => {
       expect(byTest("load-error")?.textContent).toBe('FILE-KIND: the file declares kind "undefined"; a CalcVibes project file declares "calcvibes-project".');
     });
-    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore power example (Rotterdam)");
+    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore-power program (Rotterdam)");
   });
 
   it("SAVE-NAME: the project file name is the slugified project name with the .calcvibes.json extension", () => {
@@ -66,7 +66,7 @@ describe("v0.6.3 project file save/load", () => {
     expect(projectFileName("Malmö Port 4!")).toBe("malm-port-4.calcvibes.json");
   });
 
-  it("SAVE-STATE: clicking Save project serializes the live editor state through the file format (v0.6.7 re-anchor: the port demo; entry unit stays at the App default thousands, the loader does not sync it)", async () => {
+  it("SAVE-STATE: clicking Save project serializes the live editor state through the file format (v0.6.10 re-anchor: the program demo; entry unit stays at the App default thousands, the loader does not sync it)", async () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     const captured: Blob[] = [];
@@ -84,9 +84,9 @@ describe("v0.6.3 project file save/load", () => {
         reader.readAsText(captured[0]);
       });
       const back = parseProject(text);
-      expect(JSON.stringify(back.inputs)).toBe(JSON.stringify(shorePowerProject()));
+      expect(JSON.stringify(back.inputs)).toBe(JSON.stringify(shorePowerProgram()));
       expect(back.settings.entryUnit).toBe("thousands");
-      expect(back.settings.startYear).toBeNull();
+      expect(back.settings.startYear).toBe(2026); // the program loader presets the calendar start year
     } finally {
       window.URL.createObjectURL = origCreate;
       window.URL.revokeObjectURL = origRevoke;
