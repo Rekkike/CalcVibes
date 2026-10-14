@@ -1,13 +1,13 @@
 # CHECKPOINT — v0.6.10 funding-block pass (the branch is the working store; this history dies with the branch deletion)
 
-Updated: 2026-10-14, session 5, checkpoint 5 (operating-ui and financing-ui re-anchored green and pushed).
+Updated: 2026-10-14, session 5, checkpoint 6 (the sections suite re-anchored green and pushed).
 
 ## Last verified step
-Checkpoint 5: two suites re-anchored to the shorePowerProgram fixture and green — web/test/operating-ui.test.tsx 12/12 (maintenance derived total €12 000,00 k = 0.5% of the 120 M capex base over the 20-year window; the first-collection-year override enters calendar years under the preset start year 2026, entry 2027 → model year 2; Mode B at the gross-of-funding term-20 payment 4017471.445590696 → "Solved term: 20 years (240 payments; last payment month 275)") and web/test/financing-ui.test.tsx 8/8 (loadFinancing replaces enableFinancing — the fixture arrives enabled sharePct 0 / perLine 31.69 / 3.5% / term 20 / grace 3; the per-line override pin p1 "31.69"; the debt schedule 3206705.47 / 4099568.51 / 133349.53 with min DSCR 4.3189 in 2048; the zero-outlay note via share 100 + the three per-line shares raised + service start 6; the leveraged P_L 2698180.689756401 → "€2 698 k"; FIN-LEVERAGED-MODE without the enable toggle). All figures engine-verified by scratch harness before re-anchoring; the harnesses are deleted. tsc clean.
+Checkpoint 6: web/test/sections.test.tsx re-anchored and green 5/5 — the repayment stats at the program fixture (payment "€2 843 k", 240 payments, start year 3, total collected "€855 907,75 k" including the riding grants), the results section (23 yearly rows, the composition naming "Container shore power — engineering & studies (RSP JV)", payback "13.854", achieved IRR "6.05%", the goal check, and the honest 3-sign-change ambiguity warning), and the recompute pin (term 3 → "€9 733 k", engine 9732652.914261179). Preceding: operating-ui 12/12 (maintenance €12 000,00 k; calendar-year override entry 2027; Mode B gross payment 4017471.445590696 → term 20/240/275) and financing-ui 8/8 (loadFinancing; per-line 31.69; debt schedule 3206705.47 / 4099568.51 / 133349.53, min DSCR 4.3189 in 2048; zero-outlay via share 100 + service start 6; leveraged P_L "€2 698 k"; FIN-LEVERAGED-MODE). All figures engine-verified by scratch harness; the harnesses are deleted. tsc clean.
 
 ## Battery counts at this checkpoint
 - core: 26 files / 277 tests — all green.
-- web: demo-rotation 15/15, funding-ui 5/5, tariff-span-ui 4/4, operating-ui 12/12, financing-ui 8/8 green locally; the remaining pre-re-anchor suites still carry the backlog (was 66 failures; operating-ui carried 3 and financing-ui 5, so 58 remain).
+- web: demo-rotation 15/15, funding-ui 5/5, tariff-span-ui 4/4, operating-ui 12/12, financing-ui 8/8, sections 5/5 green locally; the remaining pre-re-anchor suites still carry the backlog (was 66 failures; operating-ui 3, financing-ui 5, sections 3 cleared, so 55 remain).
 
 ## Outstanding unverified edits
 None. Everything re-applied so far is in this push.
