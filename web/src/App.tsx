@@ -94,8 +94,15 @@ export function App() {
   }, [inputs, issues]);
   const modeResult = useMemo(() => {
     if (issues.length > 0 || engineIssues.length > 0) return null;
-    if (mode === "B") return { kind: "B" as const, ...solveTerm(inputs, modePayment) };
-    if (mode === "C") return { kind: "C" as const, result: computeModel(inputs, { fixedPayment: modePayment }) };
+    try {
+      if (mode === "B") return { kind: "B" as const, ...solveTerm(inputs, modePayment) };
+      if (mode === "C") return { kind: "C" as const, result: computeModel(inputs, { fixedPayment: modePayment }) };
+    } catch (e) {
+      // v0.6.10 (ratified deviation): the mode solves are gross of funding and respect the
+      // declared tariff span; a refusal renders the honest refusal panel, never a crash.
+      if (e instanceof EngineInputError) return { kind: "refusal" as const, message: e.issues.join(" ") };
+      throw e;
+    }
     return null;
   }, [inputs, issues, mode, modePayment]);
 
@@ -332,10 +339,16 @@ export function App() {
           <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} entryUnit={entryUnit} />
         )}
         {view === "results" && result !== null && mode === "A" && <ResultsSection result={result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />}
-        {view === "results" && modeResult !== null && mode === "B" && (
+        {view === "results" && modeResult !== null && modeResult.kind === "refusal" && (
+          <section data-testid="mode-results">
+            <h2>Mode {mode} — refused</h2>
+            <p data-stat="modeRefusal">The engine refused to compute the mode result for this project: {modeResult.message}</p>
+          </section>
+        )}
+        {view === "results" && modeResult !== null && modeResult.kind === "B" && (
           <section data-testid="mode-results">
             <h2>Mode B — solved term</h2>
-            {modeResult.kind === "B" && modeResult.paymentCount !== null ? (
+            {modeResult.paymentCount !== null ? (
               <>
                 <p data-stat="modeBTerm">Solved term: {modeResult.termYears} years ({modeResult.paymentCount} payments; last payment month {modeResult.lastPaymentMonth}).</p>
                 <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />
@@ -345,7 +358,7 @@ export function App() {
             )}
           </section>
         )}
-        {view === "results" && modeResult !== null && mode === "C" && (
+        {view === "results" && modeResult !== null && modeResult.kind === "C" && (
           <section data-testid="mode-results">
             <h2>Mode C — evaluation of the given payment</h2>
             <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />

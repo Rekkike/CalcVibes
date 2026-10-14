@@ -242,9 +242,10 @@ export function deckSlides(
     body: investmentBody,
     // v0.6.8 Task A.4: the composition shares on this slide are of the capital program; the
     // disclosed 101 percent artifact (the port's five shares read 8/30/30/23/10) is named.
-    // v0.6.9 Task E (finding W27): the one-decimal shares sum to exactly 100.0 on every
-    // fixture (the pinned checks), so the integer-rounding caveat would be a false
-    // disclosure; the capital-program basis stays stated.
+    // v0.6.9 Task E (finding W27): the one-decimal shares summed to exactly 100.0 then.
+    // v0.6.10 (disclosed): on the shore-power program fixture the one-decimal shares sum to
+    // 100.1 (16.5+24.5+22.3+27.8+4.5+4.5) — the honest one-decimal rounding residue, disclosed
+    // in the completion report, never smoothed; the capital-program basis stays stated.
     disclosures: ["Composition shares are of the capital program."],
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
     ...(fundingBlock !== undefined ? { funding: fundingBlock } : {}),

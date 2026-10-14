@@ -55,7 +55,9 @@ export function TariffSection(props: {
     setTariff({ ...t, rows: t.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
   // The overall span editors keep their raw text locally (controlled inputs); the committed
   // span is all-or-nothing — declared only when both fields parse, null otherwise.
-  const [spanText, setSpanText] = useState<{ start: string; term: string }>({ start: "", term: "" });
+  // The text initializes FROM the declared span (a preset span must render its values, or
+  // editing one field would silently drop the other per the all-or-nothing commit).
+  const [spanText, setSpanText] = useState<{ start: string; term: string }>(declaredSpan ? { start: String(declaredSpan.startYear), term: String(declaredSpan.termYears) } : { start: "", term: "" });
   const declaredKey = declaredSpan ? `${declaredSpan.startYear}:${declaredSpan.termYears}` : "";
   const [spanSyncedKey, setSpanSyncedKey] = useState(declaredKey);
   if (spanSyncedKey !== declaredKey) {
@@ -74,7 +76,11 @@ export function TariffSection(props: {
     }
   };
   // The per-row span editors: empty = inherit the common span (row.span null).
-  const [rowSpanText, setRowSpanText] = useState<Record<string, { start: string; term: string }>>({});
+  // The per-row text initializes FROM the preset row spans for the same reason as the overall
+  // editors above.
+  const [rowSpanText, setRowSpanText] = useState<Record<string, { start: string; term: string }>>(
+    Object.fromEntries(t.rows.map((r) => [r.id, r.span ? { start: String(r.span.startYear), term: String(r.span.termYears) } : { start: "", term: "" }]))
+  );
   const rowSpanKey = t.rows.map((r) => r.id + ":" + (r.span ? `${r.span.startYear}-${r.span.termYears}` : "none")).join("|");
   const [rowSpanSyncedKey, setRowSpanSyncedKey] = useState(rowSpanKey);
   if (rowSpanSyncedKey !== rowSpanKey) {

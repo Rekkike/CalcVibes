@@ -23,7 +23,9 @@ function fromFile(file: typeof templateFile): ModelInputs {
   };
 }
 
-const defaultSettings: ProjectFileSettings = { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null };
+// v0.6.10 Task F.6: the settings carry the additive scenarioGrantScales field; the round-trip
+// literals gain the explicit null so the byte-identity holds under the field-emitting serializer.
+const defaultSettings: ProjectFileSettings = { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null, scenarioGrantScales: null };
 
 // The multi-lease fixture of record (the web state.ts shape, replicated here so the core battery stands alone).
 function multiLeaseFixture(): ModelInputs {
@@ -90,7 +92,7 @@ describe("v0.6.3 project file format", () => {
   });
 
   it("RT-1: the template project round-trips with its settings, byte-identically", () => {
-    const settings: ProjectFileSettings = { startYear: 2026, entryUnit: "ones", scenarioTargets: [8, 10, 12], scenarioTerms: [10, 15], scenarioBalloons: [0, 1000000] };
+    const settings: ProjectFileSettings = { startYear: 2026, entryUnit: "ones", scenarioTargets: [8, 10, 12], scenarioTerms: [10, 15], scenarioBalloons: [0, 1000000], scenarioGrantScales: null };
     const model = fromFile(templateFile);
     const text = serializeProject(model, settings);
     const back = parseProject(text);

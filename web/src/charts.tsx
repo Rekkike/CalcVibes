@@ -88,8 +88,10 @@ export function CompositionRows(props: {
         <div key={r.id} data-composition-row={r.id} className="composition-row">
           <span data-row-label="name" className="row-name">{r.name}</span>
           {/* v0.6.9 Task E (finding W27): the share renders at one decimal — the integer form's
-              accumulation to 101 percent on the port was the finding; one decimal sums to 100.0
-              on every fixture (the pinned checks). */}
+              accumulation to 101 percent on the port was the finding. v0.6.10 (disclosed): on
+              the shore-power program fixture the one-decimal shares sum to 100.1 (16.5+24.5+
+              22.3+27.8+4.5+4.5); the one-decimal rounding residue is honest and disclosed,
+              never smoothed or re-weighted. */}
           <span data-row-label="share" className="row-share">{(Math.round(r.sharePct * 1000) / 10).toFixed(1)}%</span>
           <div className="row-bar-track">
             <svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" className="row-bar-svg">

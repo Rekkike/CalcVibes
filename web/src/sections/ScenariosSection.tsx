@@ -64,14 +64,23 @@ export function ScenariosSection(props: {
   // v0.6.9 Task F (finding W28): the scenario payment figures render through the
   // magnitude-aware feeForDisplay; the total-cost cells stay at the entry-unit money form.
   const fee = (v: number) => feeForDisplay(v, cur, entryUnit);
+  // v0.6.10 (ratified deviation): the named-set and tornado computations refuse independently
+  // (the program fixture's optimistic set needs a term the declared tariff span cannot cover);
+  // the refusal never removes the axis editors or the per-cell tables — those render their own
+  // honest null cells. Only the refused named-set/tornado tables are replaced by notices.
   let sc: ReturnType<typeof scenarioResults> | null = null;
   let t: ReturnType<typeof tornado> | null = null;
-  let refusalMessage: string | null = null;
+  let scRefusal: string | null = null;
+  let tRefusal: string | null = null;
   try {
     sc = scenarioResults(inputs);
+  } catch (e) {
+    scRefusal = (e as Error).message;
+  }
+  try {
     t = tornado(inputs);
   } catch (e) {
-    refusalMessage = (e as Error).message;
+    tRefusal = (e as Error).message;
   }
   const terms = scenarioTerms ?? [];
   const targets = scenarioTargets ?? [];
@@ -132,21 +141,19 @@ export function ScenariosSection(props: {
       gs.push(row);
     }
   }
-  if (refusalMessage !== null || sc === null || t === null) {
-    return (
-      <section data-testid="scenarios">
-        <h2>Scenarios and sensitivity</h2>
-        <div data-testid="scenarios-refusal" className="warning">
-          <p>The engine refused to compute the scenario set for this project.</p>
-          <p>{refusalMessage ?? "The scenario set could not be computed for this project."}</p>
-        </div>
-      </section>
-    );
-  }
   const anyAxisSet = targets.length > 0 || terms.length > 0 || balloons.length > 0 || grantScales.length > 0;
   return (
     <section data-testid="scenarios">
       <h2>Scenarios and sensitivity</h2>
+      {(scRefusal !== null || tRefusal !== null) && (
+        <div data-testid="scenarios-refusal" className="warning">
+          <p>The engine refused to compute the scenario set for this project.</p>
+          {[...new Set([scRefusal, tRefusal].filter((m): m is string => m !== null))].map((m) => (
+            <p key={m}>{m}</p>
+          ))}
+          <p>The axis editors and the per-cell tables below still render, with honest null cells where the engine refuses.</p>
+        </div>
+      )}
       <div className="scenario-lists">
         {onScenarioTargetsChange && <ScenarioListEditor label="target" values={scenarioTargets} onChange={onScenarioTargetsChange} />}
         {onScenarioTermsChange && <ScenarioListEditor label="term" values={scenarioTerms} onChange={onScenarioTermsChange} />}
@@ -157,6 +164,9 @@ export function ScenariosSection(props: {
         <p data-testid="scenarios-empty-state" className="warning">Enter values to compute the tables.</p>
       )}
       <h3>Named scenario sets</h3>
+      {sc === null ? (
+        <p data-testid="scenario-set-refusal" className="warning">The named scenario sets could not be computed for this project{scRefusal !== null ? `: ${scRefusal}` : "."}</p>
+      ) : (
       <table data-testid="scenario-table">
         <thead><tr><th>Scenario</th><th>Payment</th><th>Total cost</th><th>Payments</th></tr></thead>
         <tbody>
@@ -165,7 +175,11 @@ export function ScenariosSection(props: {
           <tr data-scenario="pessimistic"><td>Pessimistic</td><td data-stat="pesPayment">{sc.pessimistic.paymentAmount === null ? "—" : fee(sc.pessimistic.paymentAmount)}</td><td>{money(sc.pessimistic.totalCost)}</td><td>{sc.pessimistic.paymentCount}</td></tr>
         </tbody>
       </table>
+      )}
       <h3>Tornado (payment sensitivity)</h3>
+      {t === null ? (
+        <p data-testid="tornado-refusal" className="warning">The tornado could not be computed for this project{tRefusal !== null ? `: ${tRefusal}` : "."}</p>
+      ) : (
       <table data-testid="tornado-table">
         <thead><tr><th>Factor</th><th>Low</th><th>High</th></tr></thead>
         <tbody>
@@ -174,6 +188,7 @@ export function ScenariosSection(props: {
           ))}
         </tbody>
       </table>
+      )}
       {profileActive && <p data-testid="sce-profile-note" className="warning">The payment sensitivity tables require the solved payment stream; they do not apply while a collections profile is present (SCE-PROFILE).</p>}
       <h3>Payment vs term at each target IRR</h3>
       {!tablesComputable ? (
