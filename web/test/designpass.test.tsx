@@ -6,7 +6,7 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
 describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", () => {
-  it("NAV-PRESERVED: all ten views render inside their three groups and each navigates on one click", () => {
+  it("NAV-PRESERVED: all eleven views render inside their three groups and each navigates on one click (v0.6.10: the funding view joins the finance group)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     const groups = document.querySelectorAll(".nav-group");
@@ -17,11 +17,11 @@ describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", ()
     expect(Array.from(model.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
       .toEqual(["overview", "costs", "operating", "repayment", "tariff"]);
     expect(Array.from(finance.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
-      .toEqual(["financing", "appraisal"]);
+      .toEqual(["funding", "financing", "appraisal"]);
     expect(Array.from(read.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
       .toEqual(["results", "scenarios", "detail"]);
     expect(model.querySelector('[data-nav="costs"]')?.textContent).toBe("Cost model");
-    for (const v of ["overview", "costs", "operating", "repayment", "tariff", "financing", "appraisal", "results", "scenarios", "detail"]) {
+    for (const v of ["overview", "costs", "operating", "repayment", "tariff", "funding", "financing", "appraisal", "results", "scenarios", "detail"]) {
       fireEvent.click(byNav(v));
       expect(byNav(v).className).toContain("active");
     }
@@ -57,29 +57,28 @@ describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", ()
 
 describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => {
   it("ANSWER-BAND: the statement equals its computed branch for the met case, tone-coded", async () => {
-    // v0.6.7 re-anchor: the demo button loads the port fixture; the met-case branch is asserted
-    // against its engine fields (achieved IRR 6% against the target 6%).
-    const { shorePowerProject } = await import("../src/state.js");
+    // v0.6.10 re-anchor: the demo button loads the program fixture; the met-case branch is
+    // asserted against its engine fields (achieved IRR 6.05% against the target 6%; the net
+    // flow carries 3 sign changes, so the honest ambiguity warning rides the statement).
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, percentForDisplay, roundForDisplay } = await import("../src/engine.js");
-    const port = shorePowerProject();
-    const result = computeModel(port);
+    const program = shorePowerProgram();
+    const result = computeModel(program);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
     const band = document.querySelector('[data-testid="answer-band"]') as HTMLElement;
     expect(band.className).toContain("tone-ok");
     const statement = document.querySelector('[data-testid="goal-check"]')?.textContent ?? "";
-    expect(statement).toContain(`achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(port.targetIrr, 2)}%`);
+    expect(statement).toContain(`achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(program.targetIrr, 2)}%`);
     expect(statement).toContain("target achieved");
   });
 
-  it("KPI-ROW: each card value equals its engine field through the display formatters; the absent-financing branch is honest", async () => {
-    // v0.6.7 re-anchor: the demo button loads the port fixture (EUR); the KPI values flow through
-    // the display formatters at the results band's unit default.
-    const { shorePowerProject } = await import("../src/state.js");
-    const { computeModel, percentForDisplay, roundForDisplay, deckMoneyForDisplay, deckYearsForDisplay } = await import("../src/engine.js");
-    const port = shorePowerProject();
-    const result = computeModel(port);
+  it("KPI-ROW: each card value equals its engine field through the display formatters; the financing branch renders the minimum DSCR (v0.6.10 re-anchor: the program fixture arrives financed — min DSCR 4.31887090724161 in year 23 → 2048)", async () => {
+    const { shorePowerProgram, yearHeader } = await import("../src/state.js");
+    const { computeModel, percentForDisplay, roundForDisplay, deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } = await import("../src/engine.js");
+    const program = shorePowerProgram();
+    const result = computeModel(program);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
@@ -87,18 +86,23 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     expect(cards.length).toBe(4);
     const byLabel = (l: string) => cards.find((c) => c.querySelector(".kpi-label")?.textContent === l) as HTMLElement;
     expect(byLabel("Achieved IRR").querySelector(".kpi-value")?.textContent).toBe(percentForDisplay(result.achievedIrr, 2));
-    expect(byLabel("Achieved IRR").querySelector(".kpi-chip")?.textContent).toBe(`vs ${roundForDisplay(port.targetIrr, 2)}% target`);
+    expect(byLabel("Achieved IRR").querySelector(".kpi-chip")?.textContent).toBe(`vs ${roundForDisplay(program.targetIrr, 2)}% target`);
     expect(byLabel("Achieved IRR").className).toContain("tone-ok");
     expect(byLabel("NPV at WACC").querySelector(".kpi-value")?.textContent).toBe(deckMoneyForDisplay(result.npvAtWacc, "EUR", "ones"));
     expect(byLabel("Payback (nominal)").querySelector(".kpi-value")?.textContent).toBe(deckYearsForDisplay(result.paybackYears as number));
-    expect(byLabel("Min DSCR").querySelector(".kpi-value")?.textContent).toBe("not applicable");
+    // The financing branch: the minimum DSCR through the two-decimal DSCR formatter with
+    // its calendar chip at the preset start year 2026.
+    expect(byLabel("Min DSCR").querySelector(".kpi-value")?.textContent).toBe(dscrTwoForDisplay(result.financing!.minDscr!.value));
+    expect(byLabel("Min DSCR").querySelector(".kpi-value")?.textContent).toBe("4.32");
+    expect(byLabel("Min DSCR").querySelector(".kpi-chip")?.textContent).toBe(`in ${yearHeader(result.financing!.minDscr!.year, 2026)}`);
+    expect(byLabel("Min DSCR").querySelector(".kpi-chip")?.textContent).toBe("in 2048");
   });
 
   it("FIGURE-BAND: the three figures equal their engine fields through the deck money variant; the note renders verbatim", async () => {
-    // v0.6.7 re-anchor: the demo button loads the port fixture (EUR).
-    const { shorePowerProject } = await import("../src/state.js");
+    // v0.6.10 re-anchor: the demo button loads the program fixture (EUR).
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
@@ -179,21 +183,21 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(caption?.textContent).not.toMatch(/\d/);
   });
 
-  it("WATERFALL-BUILD: one segment per cost line plus the operating and reinvestment kinds; the labels flow through the deck money variant", async () => {
-    // v0.6.8 re-anchor: the waterfall is honest to the whole cost program. The demo button
-    // loads the port fixture — five capital lines plus the operating-lines segment, six
-    // segments in all, no reinvestments. The build is derived from the engine fields and
-    // closes exactly at the cap.
-    const { shorePowerProject } = await import("../src/state.js");
+  it("WATERFALL-BUILD: one segment per cost line plus the operating and reinvestment kinds; the labels flow through the deck money variant; the closing total bar carries the total (W31)", async () => {
+    // v0.6.10 re-anchor: the demo button loads the program fixture — six capital lines plus
+    // the operating-lines segment, seven segments in all, no reinvestments. The build is
+    // derived from the engine fields and closes exactly at the cap; the cap renders as the
+    // labeled closing total bar (data-waterfall-total) with the totalCost in the label list.
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     const reinvestments = (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0);
     const expectedSegments = [
       ...result.lineTotals.map((l) => ({ id: l.id, name: l.name, total: l.total, kind: "capital" as const })),
       ...(result.operatingTotal > 0 ? [{ id: "operating", name: "Operating lines", total: result.operatingTotal, kind: "operating" as const }] : []),
       ...(reinvestments > 0 ? [{ id: "reinvestments", name: "Reinvestments", total: reinvestments, kind: "reinvestments" as const }] : []),
     ];
-    expect(expectedSegments.length).toBe(6);
+    expect(expectedSegments.length).toBe(7);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -215,10 +219,17 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(accShare).toBeCloseTo(1, 6);
     const capEl = waterfall.querySelector('[data-testid="waterfall-cap"]') as HTMLElement;
     expect(parseFloat(capEl.style.bottom)).toBeCloseTo(100, 0);
+    // W31: the closing total bar carries data-waterfall-total and its label names the total
+    // program cost at the deck money variant (entry thousands on the loaded demo).
+    expect(capEl.getAttribute("data-waterfall-total")).toBe("true");
+    const totalLabel = waterfall.querySelector('[data-testid="waterfall-total-label"]') as HTMLElement;
+    expect(totalLabel.getAttribute("data-waterfall-kind")).toBe("total");
+    expect(totalLabel.textContent).toBe(`Total program cost ${deckMoneyForDisplay(result.totalCost, "EUR", "thousands")}`);
+    expect(totalLabel.textContent).toBe("Total program cost €628 250 k");
     // v0.6.9 Task A: the stepped geometry — each segment owns an equal slot, fills 60 percent
     // of it, and the cap spans the full width; adjacent steps never overlap.
     const stepEls = waterfall.querySelectorAll("[data-waterfall-step]");
-    expect(stepEls.length).toBe(6);
+    expect(stepEls.length).toBe(7);
     const slot = 100 / expectedSegments.length;
     for (let i = 0; i < stepEls.length; i++) {
       const seg = stepEls[i] as HTMLElement;
@@ -235,6 +246,7 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     for (const seg of Array.from(segments)) {
       expect((seg as HTMLElement).querySelector('[data-testid="waterfall-label"]')).toBe(null);
     }
+    // The label list: one label per segment plus the closing total entry (W31).
     const labels = waterfall.querySelectorAll('[data-testid="waterfall-label"]');
     expect(labels.length).toBe(expectedSegments.length);
     for (let i = 0; i < labels.length; i++) {
@@ -284,12 +296,13 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     const plot = document.querySelector('[data-testid="hurdle-plot"]') as HTMLElement;
     const targetDot = plot.querySelector('[data-testid="hurdle-target-dot"]') as HTMLElement;
     const achievedDot = plot.querySelector('[data-testid="hurdle-achieved-dot"]') as HTMLElement;
-    // v0.6.7 re-anchor: the demo button loads the port fixture; the two dots map its fields.
-    const { shorePowerProject } = await import("../src/state.js");
+    // v0.6.10 re-anchor: the demo button loads the program fixture; the two dots map its
+    // fields (target 6, achieved 6.05 on the same zero-based scale).
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
-    const port = shorePowerProject();
-    const res = computeModel(port);
-    const target = port.targetIrr;
+    const program = shorePowerProgram();
+    const res = computeModel(program);
+    const target = program.targetIrr;
     const achieved = (res.achievedIrr ?? 0) * 100;
     const scale = Math.max(target, achieved) * 1.15;
     expect(parseFloat(targetDot.style.left)).toBeCloseTo((target / scale) * 100, 0);
@@ -321,10 +334,11 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
   });
 
   it("TAKEAWAY-KICKERS: the investment kicker names the dominant line from the argmax over the engine lineTotals", async () => {
-    // v0.6.7 re-anchor: the port fixture's dominant line is "Substations & grid connections".
-    const { shorePowerProject } = await import("../src/state.js");
+    // v0.6.10 re-anchor: the program fixture's dominant line is the market pillar
+    // (p4, "Market pillar — bulk & liquid berths", total 125 000 000).
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     const dominant = result.lineTotals.reduce((b, l) => (l.total > b.total ? l : b), result.lineTotals[0]);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
