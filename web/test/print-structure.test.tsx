@@ -41,6 +41,6 @@ describe("Task E: composition, one figure (re-anchored to the composition rows p
     expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
     const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
     expect(rows).toBeTruthy();
-    expect((rows as HTMLElement).querySelectorAll("[data-composition-row]").length).toBe(5);
+    expect((rows as HTMLElement).querySelectorAll("[data-composition-row]").length).toBe(6);
   });
 });
