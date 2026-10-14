@@ -127,6 +127,20 @@ export function feeForDisplay(value: number, currency: CurrencyCode = "SEK", ent
   return deckMoneyForDisplay(value, currency, "ones");
 }
 
+// v0.6.10 Task E.3 (W20): the unit-price exemption extends the fee class — a unit price
+// renders at unit ones with the currency form (two decimals, grouped), never the entry-unit
+// collapse. Pinned: 7108.4140139564915 renders "€7 108,41"; 40141.63207881312 "€40 141,63";
+// 29162.724159821497 "€29 162,72".
+export function unitPriceForDisplay(value: number, currency: CurrencyCode = "SEK"): string {
+  return moneyForDisplay(value, currency, "ones");
+}
+
+// v0.6.10 Task G.1: the one-decimal comma percent (the grant intensity 38,6%); the standing
+// percent forms keep the dot convention (disclosed in the completion report).
+export function percentOneForDisplay(rate: number): string {
+  return roundForDisplay(rate * 100, 1).toFixed(1).replace(".", ",") + "%";
+}
+
 export function percentTwoForDisplay(rate: number): string {
   return roundForDisplay(rate * 100, 2).toFixed(2) + "%";
 }
@@ -139,4 +153,4 @@ export function dscrTwoForDisplay(value: number): string {
   return roundForDisplay(value, 2).toFixed(2);
 }
 
-export const VERSION = "v0.6.9";
+export const VERSION = "v0.6.10";

@@ -3,7 +3,7 @@ import { render, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { projectFileName } from "../src/projectFile.js";
 import { parseProject, serializeProject } from "../../core/src/fileio.js";
-import { demoProject, shorePowerProject } from "../src/state.js";
+import { demoProject, shorePowerProgram } from "../src/state.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
@@ -20,7 +20,7 @@ describe("v0.6.3 project file save/load", () => {
     // an invalid in-progress model (an emptied cost line name) must still be savable
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    fireEvent.change(document.querySelector('[data-line="c1"] [data-field="name"]') as HTMLInputElement, { target: { value: "" } });
+    fireEvent.change(document.querySelector('[data-line="p1"] [data-field="name"]') as HTMLInputElement, { target: { value: "" } });
     expect((byTest("save-project") as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -44,20 +44,20 @@ describe("v0.6.3 project file save/load", () => {
     expect(byTest("load-error")).toBeNull();
   });
 
-  it("LOAD-ERR / NO-DEFAULT-DEMO: a malformed file surfaces the banner with the exact message and leaves the current project untouched (v0.6.7 re-anchor: the current project is the port demo)", async () => {
+  it("LOAD-ERR / NO-DEFAULT-DEMO: a malformed file surfaces the banner with the exact message and leaves the current project untouched (v0.6.10 re-anchor: the current project is the program demo)", async () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.change(fileInput(), { target: { files: [new File(["{not json"], "broken.calcvibes.json")] } });
     await waitFor(() => {
       expect(byTest("load-error")?.textContent).toBe("FILE-MALFORMED: the file is not valid JSON and cannot be opened.");
     });
-    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore power example (Rotterdam)");
+    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore-power program (Rotterdam)");
     // the template demo asset is not a project file: the kind refusal surfaces too
     fireEvent.change(fileInput(), { target: { files: [new File([JSON.stringify({ schemaVersion: 8 })], "template-project.json")] } });
     await waitFor(() => {
       expect(byTest("load-error")?.textContent).toBe('FILE-KIND: the file declares kind "undefined"; a CalcVibes project file declares "calcvibes-project".');
     });
-    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore power example (Rotterdam)");
+    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore-power program (Rotterdam)");
   });
 
   it("SAVE-NAME: the project file name is the slugified project name with the .calcvibes.json extension", () => {
@@ -66,7 +66,7 @@ describe("v0.6.3 project file save/load", () => {
     expect(projectFileName("Malmö Port 4!")).toBe("malm-port-4.calcvibes.json");
   });
 
-  it("SAVE-STATE: clicking Save project serializes the live editor state through the file format (v0.6.7 re-anchor: the port demo; entry unit stays at the App default thousands, the loader does not sync it)", async () => {
+  it("SAVE-STATE: clicking Save project serializes the live editor state through the file format (v0.6.10 re-anchor: the program demo; entry unit stays at the App default thousands, the loader does not sync it)", async () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     const captured: Blob[] = [];
@@ -84,9 +84,9 @@ describe("v0.6.3 project file save/load", () => {
         reader.readAsText(captured[0]);
       });
       const back = parseProject(text);
-      expect(JSON.stringify(back.inputs)).toBe(JSON.stringify(shorePowerProject()));
+      expect(JSON.stringify(back.inputs)).toBe(JSON.stringify(shorePowerProgram()));
       expect(back.settings.entryUnit).toBe("thousands");
-      expect(back.settings.startYear).toBeNull();
+      expect(back.settings.startYear).toBe(2026); // the program loader presets the calendar start year
     } finally {
       window.URL.createObjectURL = origCreate;
       window.URL.revokeObjectURL = origRevoke;
@@ -119,5 +119,67 @@ describe("v0.6.3 project file save/load", () => {
       window.URL.createObjectURL = origCreate;
       window.URL.revokeObjectURL = origRevoke;
     }
+  });
+});
+
+describe("v0.6.10 Task G.6: the funding block rides the project file additively", () => {
+  it("FUNDING-ROUND-TRIP: serialize→parse→serialize on the program fixture is byte-identical and the parsed project computes the figures of record", async () => {
+    const { computeModel } = await import("../src/engine.js");
+    const settings = { startYear: 2026, entryUnit: "thousands" as const, scenarioTargets: [4, 6, 8], scenarioTerms: [15, 20, 25], scenarioBalloons: [0, 8, 16], scenarioGrantScales: [0, 0.5, 1] };
+    const first = serializeProject(shorePowerProgram(), settings);
+    const back = parseProject(first);
+    const second = serializeProject(back.inputs, back.settings);
+    expect(second).toBe(first); // the Task G.6 byte-identity pin
+    // the funding block, the tariff spans, and the display labels survive the round trip
+    expect(back.inputs.funding?.rows.length).toBe(4);
+    expect(back.inputs.tariff?.span).toEqual({ startYear: 3, termYears: 20 });
+    expect(back.inputs.tariff?.volumeUnitLabel).toBe("GWh");
+    expect(back.inputs.tariff?.priceUnitLabel).toBe("€ct/kWh");
+    expect(back.inputs.tariff?.priceDisplayDivisor).toBe(10000);
+    expect(back.settings.scenarioGrantScales).toEqual([0, 0.5, 1]);
+    // the parsed project computes identically to the fixture (equality, not tolerance)
+    const direct = computeModel(shorePowerProgram());
+    const r = computeModel(back.inputs);
+    expect(r.paymentAmount).toBe(direct.paymentAmount);
+    expect(r.totalCost).toBe(direct.totalCost);
+    expect(r.totalCollected).toBe(direct.totalCollected);
+    expect(r.achievedIrr).toBe(direct.achievedIrr);
+    expect(r.fundingView?.grantsTotal).toBe(direct.fundingView?.grantsTotal);
+    expect(r.fundingView?.fundingNpv).toBe(direct.fundingView?.fundingNpv);
+    // the verified pins of record
+    expect(r.paymentAmount).toBe(2843365.6055825967);
+    expect(r.fundingView?.grantsTotal).toBe(173500000);
+    expect(r.fundingView?.fundingNpv).toBe(140055345.14230645);
+  });
+
+  it("FILE-V1-ADDITIVE: a version-1 file without the new fields parses with the empty behavior and computes identically to today", async () => {
+    const { computeModel } = await import("../src/engine.js");
+    // a pre-v0.6.10 shape: the program project with the funding block, the tariff spans,
+    // and the display labels removed, and settings without the grant-scale list.
+    const stripped = JSON.parse(JSON.stringify(shorePowerProgram())) as typeof shorePowerProgram extends () => infer I ? I : never;
+    const s = stripped as unknown as { funding?: unknown; tariff?: Record<string, unknown> & { rows?: Array<Record<string, unknown>> } };
+    delete s.funding;
+    if (s.tariff) {
+      delete s.tariff.span;
+      delete s.tariff.volumeUnitLabel;
+      delete s.tariff.priceUnitLabel;
+      delete s.tariff.priceDisplayDivisor;
+      if (Array.isArray(s.tariff.rows)) {
+        for (const row of s.tariff.rows) delete row.span;
+      }
+    }
+    const file = serializeProject(stripped as never, { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+    expect(JSON.parse(file).fileVersion).toBe(1); // FILE_VERSION stays 1
+    const back = parseProject(file); // absence parses (additive optional fields)
+    expect(back.settings.scenarioGrantScales ?? null).toBeNull(); // absent = the empty behavior
+    expect(back.inputs.funding ?? null).toBeNull();
+    expect(back.inputs.tariff?.span ?? null).toBeNull();
+    // the parsed project computes identically to the same project computed directly today
+    const r = computeModel(back.inputs);
+    const direct = computeModel(JSON.parse(JSON.stringify(stripped)) as never);
+    expect(r.paymentAmount).toBe(direct.paymentAmount);
+    expect(r.totalCollected).toBe(direct.totalCollected);
+    expect(r.achievedIrr).toBe(direct.achievedIrr);
+    expect(r.fundingView ?? null).toBeNull(); // the empty behavior: no funding view
   });
 });

@@ -23,15 +23,15 @@ async function openAlpha() {
 }
 
 describe("chunk 6: appraisal section, residual, engine goalMet", () => {
-  it("renders the appraisal summary from the engine with basis labels (v0.6.7 re-anchor: the port fixture at entry unit thousands, EUR)", () => {
+  it("renders the appraisal summary from the engine with basis labels (v0.6.10 re-anchor: the program fixture at entry unit thousands, EUR)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("appraisal"));
     expect(byStat("npvAtTarget").textContent).toBe("-€0,00 k");
-    expect(byStat("npvAtWacc").textContent).toBe("€27 497,14 k");
+    expect(byStat("npvAtWacc").textContent).toBe("€52 409,25 k"); // npvAtWacc 52409252.63203347, scratch-verified
     expect(byStat("profitabilityIndex").textContent).toBe("€0,00 k");
-    expect(byStat("discountedPaybackYears").textContent).toBe("18.3685");
-    expect(byStat("mirr").textContent).toBe("4.49028%");
+    expect(byStat("discountedPaybackYears").textContent).toBe("18.23938"); // 18.23938311386264
+    expect(byStat("mirr").textContent).toBe("4.42677%"); // 0.044267690561307305
     expect(byStat("goalMet").textContent).toBe("Target achieved");
     const summary = document.querySelector('[data-testid="appraisal-summary"]') as HTMLElement;
     expect(summary.textContent).toContain("discounted at WACC");
@@ -91,34 +91,46 @@ describe("chunk 7: modes, scenarios, sensitivity in the UI", () => {
     expect(document.querySelector('[data-field="modePayment"]')).toBeTruthy();
   });
 
-  it("scenarios view renders the three named sets with engine figures (v0.6.7 re-anchor: the port fixture)", () => {
+  it("scenarios view refuses the program scenario set with the honest banner (v0.6.10 re-anchor: the program optimistic set needs a term the declared tariff span cannot cover)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    // v0.6.9 Task F: the scenario payment cells close at the fee formatter (thousands).
-    expect(byStat("basePayment").textContent).toBe("€1 626 k");
-    expect(byStat("optPayment").textContent).toBe("€1 299 k");
-    expect(byStat("pesPayment").textContent).toBe("€2 002 k");
+    // v0.6.10 (ratified deviation): the named-set computation refuses on the program fixture
+    // (scratch-verified); the banner names the engine refusal and the named-set stats do not render.
+    const refusal = document.querySelector('[data-testid="scenarios-refusal"]') as HTMLElement;
+    expect(refusal).toBeTruthy();
+    expect(refusal.textContent).toContain("The engine refused to compute the scenario set for this project.");
+    expect(refusal.textContent).toContain("Invalid model inputs: Tariff span does not cover the required collection stream: year 24 carries required collections outside the tariff grid.");
+    expect(refusal.textContent).toContain("The axis editors and the per-cell tables below still render, with honest null cells where the engine refuses.");
+    expect(document.querySelector('[data-stat="basePayment"]')).toBeNull();
+    expect(document.querySelector('[data-stat="optPayment"]')).toBeNull();
+    expect(document.querySelector('[data-stat="pesPayment"]')).toBeNull();
   });
 
-  it("sensitivity view renders the tornado and both two-way tables (v0.6.7 re-anchor: the port loader presets the axes, so the tables compute)", () => {
+  it("sensitivity view refuses the tornado and renders both two-way tables with honest cells (v0.6.10 re-anchor: the program loader presets the axes; the tornado needs terms the declared tariff span cannot cover)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
-    const tornado = screen.getByTestId("tornado-table");
-    expect(tornado.querySelectorAll("tbody tr").length).toBe(4);
-    const factors = Array.from(tornado.querySelectorAll("tbody tr")).map((tr) => tr.getAttribute("data-factor"));
-    expect(factors).toEqual(["burn", "targetIrr", "term", "escalation"]);
+    // v0.6.10 (ratified deviation): the tornado refuses on the program fixture (scratch-verified)
+    // and is replaced by the honest notice; the per-cell tables still render.
+    const tRefusal = document.querySelector('[data-testid="tornado-refusal"]') as HTMLElement;
+    expect(tRefusal).toBeTruthy();
+    expect(tRefusal.textContent).toBe("The tornado could not be computed for this project: Invalid model inputs: Tariff span does not cover the required collection stream: year 24 carries required collections outside the tariff grid.");
+    expect(screen.queryByTestId("tornado-table")).toBeNull();
     // The preset axes [4, 6, 8] x [15, 20, 25] and balloons [0, 8, 16] x terms [15, 20, 25]
-    // now compute: three rows each, no empty states.
+    // compute: three rows each, no empty states; the term-25 cells carry the honest refusal.
     const tt = screen.getByTestId("term-target-table");
     expect(tt.querySelectorAll("tbody tr").length).toBe(3);
     const ttBase = tt.querySelectorAll("tbody tr")[1].querySelectorAll("td")[2].textContent;
-    expect(ttBase).toBe("€1 626 k");
+    expect(ttBase).toBe("€2 843 k"); // the solved payment pin 2843365.6055825967 at the fee formatter
+    const ttRefused = tt.querySelectorAll("tbody tr")[1].querySelectorAll("td")[3].textContent;
+    expect(ttRefused).toBe("refused: Invalid model inputs: Tariff span does not cover the required collection stream: year 24 carries required collections outside the tariff grid.");
     const bt = screen.getByTestId("balloon-term-table");
     expect(bt.querySelectorAll("tbody tr").length).toBe(3);
     const btBase = bt.querySelectorAll("tbody tr")[1].querySelectorAll("td")[1].textContent;
-    expect(btBase).toBe("€1 626 k");
+    expect(btBase).toBe("€2 843 k");
+    const btRefused = bt.querySelectorAll("tbody tr")[2].querySelectorAll("td")[1].textContent;
+    expect(btRefused).toBe("refused: Invalid model inputs: Tariff span does not cover the required collection stream: year 24 carries required collections outside the tariff grid.");
     expect(screen.queryByTestId("term-target-empty")).toBeNull();
     expect(screen.queryByTestId("balloon-term-empty")).toBeNull();
   });

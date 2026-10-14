@@ -7,11 +7,11 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
 describe("Task A2: YEARLY-HONEST", () => {
-  it("the paired columns carry direct peak labels through the formatters and the year labels in HTML (v0.6.7 re-anchor: the port demo, EUR)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("the paired columns carry direct peak labels through the formatters and the year labels in HTML (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
-    const demo = shorePowerProject();
+    const demo = shorePowerProgram();
     const result = computeModel(demo);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -23,13 +23,14 @@ describe("Task A2: YEARLY-HONEST", () => {
     const inflowPeak = Array.from(chart.querySelectorAll('[data-testid="column-peak-inflow"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakInflow = Math.max(...result.yearly.map((y) => y.inflow));
     expect(inflowPeak.textContent).toBe(`Inflow peak ${deckMoneyForDisplay(peakInflow, "EUR", "ones")}`);
-    expect(chart.querySelector('[data-testid="column-year-label-first"]')?.textContent).toBe(yearHeader(1, null));
+    expect(chart.querySelector('[data-testid="column-year-label-first"]')?.textContent).toBe(yearHeader(1, 2026));
   });
 
-  it("the cumulative line carries its endpoints and zero crossing through the formatters, on its own chart (v0.6.7 re-anchor: the port demo, EUR)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("the cumulative line carries its endpoints and zero crossing through the formatters, on its own chart (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(shorePowerProject());
+    const { yearHeader } = await import("../src/state.js"); // v0.6.10: the loader presets the calendar start year 2026, so the rendered crossing label is a calendar year.
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
@@ -41,7 +42,7 @@ describe("Task A2: YEARLY-HONEST", () => {
     const values = result.yearly.map((y) => y.cumulative);
     const zeroIdx = values.findIndex((v, i) => i > 0 && values[i - 1] < 0 && v >= 0);
     if (zeroIdx > 0) {
-      expect(crossing?.textContent).toContain(`Year ${zeroIdx + 1}`);
+      expect(crossing?.textContent).toContain(yearHeader(zeroIdx + 1, 2026));
     } else {
       expect(crossing).toBeNull();
     }
@@ -121,10 +122,10 @@ describe("Task F1/F2: DECK-MONEY-CLASS / DECK-YEARS-CLASS", () => {
 });
 
 describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peaks", () => {
-  it("DECK-MONEY-CLASS (rendered scope): no decimal separator in any rendered presentation-scope chart money string (v0.6.7 re-anchor: the port demo, EUR)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("DECK-MONEY-CLASS (rendered scope): no decimal separator in any rendered presentation-scope chart money string (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -139,10 +140,10 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     expect(rows.querySelector('[data-composition-row]')?.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(firstTotal, "EUR", "thousands"));
   });
 
-  it("APP-CHART-READING-CLASS: every app chart label renders through the reading class; the tables keep the standing format (v0.6.7 re-anchor: the port demo, EUR)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("APP-CHART-READING-CLASS: every app chart label renders through the reading class; the tables keep the standing format (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
@@ -158,12 +159,12 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     expect(detailCell).toMatch(/,\d{2}/);
   });
 
-  it("PEAK-NAMED: every peak label names its series; the deck recovery peak carries its year range (v0.6.8 re-anchor: the port peak is a recovery bucket sum at width 2, EUR)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("PEAK-NAMED: every peak label names its series; the deck recovery peak carries its year range (v0.6.10 re-anchor: the program peak is a recovery bucket sum at width 2 and names its calendar range through the loader-preset 2026)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
     const { bucketSeries } = await import("../src/charts.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -177,7 +178,7 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     const { buckets, width } = bucketSeries(inflows, 15);
     const peakIdx = buckets.reduce((bi, v, i) => (v > buckets[bi] ? i : bi), 0);
     // v0.6.8 Task C: the peak label names the bucket range, not just its first year.
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), null)}`);
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx * width + 1, 2026)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), 2026)}`);
     fireEvent.click(byAction("exit-presentation"));
     fireEvent.click(byNav("results"));
     const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;

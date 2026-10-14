@@ -52,18 +52,21 @@ describe("chunk 5: operating, maintenance, override, settings surfaces", () => {
     const derived = document.querySelector('[data-testid="maintenance-derived"]');
     expect(derived && derived.textContent).toContain("0.5% of total CAPEX");
     expect(derived && derived.textContent).toContain("36–275");
-    expect(derived && derived.textContent).toContain("€8 400,00 k");
+    // v0.6.10 re-anchor: the program fixture's capex base is the two capex lines
+    // (100 M quay cabling + 20 M cruise terminal = 120 M); 0.5% per year over the
+    // 20-year window (months 36–275) totals 12 000 000 → €12 000,00 k at entry thousands.
+    expect(derived && derived.textContent).toContain("€12 000,00 k");
   });
 
-  it("override: setting the first collection year disables grace and surfaces the message when grace is nonzero", () => {
+  it("override: setting the first collection year disables grace and surfaces the message when grace is nonzero (v0.6.10 re-anchor: the program loader presets start year 2026, so the field is calendar-semantics — the entry 2027 converts to model year 2)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    fireEvent.change(byField("firstCollectionYear"), { target: { value: "2" } });
+    fireEvent.change(byField("firstCollectionYear"), { target: { value: "2027" } });
     expect((byField("graceYears") as HTMLInputElement).disabled).toBe(true);
     expect((byField("graceYears") as HTMLInputElement).value).toBe("0");
     fireEvent.change(byField("graceYears"), { target: { value: "1" } });
-    fireEvent.change(byField("firstCollectionYear"), { target: { value: "2" } });
+    fireEvent.change(byField("firstCollectionYear"), { target: { value: "2027" } });
     expect(screen.getByTestId("issues-summary").textContent).toContain("grace must be zero");
   });
 
@@ -102,13 +105,13 @@ describe("chunk 6: calendar headers, mode results, MIRR helper", () => {
     expect(screen.getByTestId("yearly-table").textContent).not.toContain("Year 1");
   });
 
-  it("Mode B results render in the results panel (v0.6.7 re-anchor: the port fixture's own solved payment at entry unit ones; the default 400000 is infeasible on the port base)", () => {
+  it("Mode B results render in the results panel (v0.6.10 re-anchor: the mode solves run gross of funding — the term-20 payment on the gross basis is 4017471.445590696, entry unit ones; the default 400000 is infeasible on the program base)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
     fireEvent.change(byField("mode"), { target: { value: "B" } });
     fireEvent.change(byField("entryUnit"), { target: { value: "ones" } });
-    fireEvent.change(byField("modePayment"), { target: { value: "1626222.633944825" } });
+    fireEvent.change(byField("modePayment"), { target: { value: "4017471.445590696" } });
     fireEvent.click(byNav("results"));
     expect(screen.getByTestId("mode-results").textContent).toContain("Solved term: 20 years (240 payments; last payment month 275)");
   });

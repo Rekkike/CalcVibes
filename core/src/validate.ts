@@ -97,6 +97,28 @@ export function validateInputs(inp: ModelInputs): string[] {
   if (!(inp.targetIrr > -100)) {
     issues.push("Target IRR must be greater than -100.");
   }
+  // v0.6.10 Task A.1: the funding block validation — the collect-all contract. The horizon
+  // checks (FND-HORIZON, FND-LOAN-HORIZON) live in the engine where the horizon is known.
+  if (inp.funding !== undefined && inp.funding !== null) {
+    for (const fr of inp.funding.rows ?? []) {
+      if (fr.kind !== "grant" && fr.kind !== "interest-free-loan") {
+        issues.push(`Funding row ${fr.id} has unsupported kind "${fr.kind}" (FND-KIND).`);
+      }
+      if (!Number.isInteger(fr.year) || fr.year < 1) {
+        issues.push(`Funding row ${fr.id} must land in a model year of at least 1 (FND-YEAR).`);
+      }
+      if (!(fr.amount > 0) || !Number.isFinite(fr.amount)) {
+        issues.push(`Funding row ${fr.id} must carry a positive amount (FND-AMOUNT).`);
+      }
+      if (fr.kind === "interest-free-loan") {
+        const t = fr.termYears ?? 1;
+        const rs = fr.repaymentStartYear ?? 1;
+        if (!Number.isInteger(t) || t < 1 || !Number.isInteger(rs) || rs < 1) {
+          issues.push(`Funding row ${fr.id} must carry a term and repayment start year of at least 1 (FND-LOAN-TERM).`);
+        }
+      }
+    }
+  }
   if (inp.repayment.firstCollectionYear !== null && inp.repayment.firstCollectionYear !== undefined) {
     if (!Number.isInteger(inp.repayment.firstCollectionYear) || (inp.repayment.firstCollectionYear as number) < 1) {
       issues.push("First collection year must be an integer of at least 1.");

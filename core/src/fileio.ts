@@ -15,6 +15,9 @@ export interface ProjectFileSettings {
   scenarioTargets: number[] | null;
   scenarioTerms: number[] | null;
   scenarioBalloons: number[] | null;
+  // v0.6.10 Task G.6: the settings' grant-scale list rides the file additively; FILE_VERSION
+  // stays 1 (absent parses as the empty behavior — null).
+  scenarioGrantScales?: number[] | null;
 }
 
 export class ProjectFileError extends Error {
@@ -67,6 +70,7 @@ function readSettings(v: unknown): ProjectFileSettings {
     scenarioTargets: readNumberList(v.scenarioTargets, "scenarioTargets"),
     scenarioTerms: readNumberList(v.scenarioTerms, "scenarioTerms"),
     scenarioBalloons: readNumberList(v.scenarioBalloons, "scenarioBalloons"),
+    scenarioGrantScales: readNumberList(v.scenarioGrantScales, "scenarioGrantScales"),
   };
 }
 

@@ -60,28 +60,28 @@ describe("v0.6.2 chunk 1: the editing boundary", () => {
     expect(byStat("totalCost").textContent).toBe("1 000 kr");
   });
 
-  it("UNIT-EDIT-3: the loaded template stores actuals while editors display valueToEntry (thousands) (v0.6.7 re-anchor: the port demo, EUR; the overview uses the deck display class)", () => {
+  it("UNIT-EDIT-3: the loaded template stores actuals while editors display valueToEntry (thousands) (v0.6.10 re-anchor: the program demo, EUR; the overview uses the deck display class)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
     const amount = allByField("amount")[0] as HTMLInputElement;
-    expect(Number(amount.value)).toBeCloseTo(6000000 / 1000, 6);
+    expect(Number(amount.value)).toBeCloseTo(37000000 / 1000, 6);
     fireEvent.click(byNav("overview"));
-    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
+    expect(byStat("paymentAmount").textContent).toBe("€2 843 k");
   });
 });
 
 describe("v0.6.2 chunk 1: the cost model line totals (W3)", () => {
-  it("LT-1: the template line totals render through the money formatter at unit ones (v0.6.7 re-anchor: the port line totals, EUR)", () => {
+  it("LT-1: the template line totals render through the money formatter at unit ones (v0.6.10 re-anchor: the program line totals, EUR)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.change(document.querySelector('[data-field="entryUnit"]') as HTMLElement, { target: { value: "ones" } });
     fireEvent.click(byNav("costs"));
     const cells = Array.from(document.querySelectorAll('[data-testid="line-total"]'));
     expect(cells.length).toBeGreaterThan(0);
-    expect(cells[0].textContent).toBe("€12 000 000,00");
-    expect(cells[1].textContent).toBe("€48 000 000,00");
-    expect(cells[2].textContent).toBe("€48 000 000,00");
+    expect(cells[0].textContent).toBe("€74 000 000,00");
+    expect(cells[1].textContent).toBe("€110 000 000,00");
+    expect(cells[2].textContent).toBe("€100 000 000,00");
   });
 
   it("LT-2: the profile-only fixture renders 420000 as 420,00 tkr, never empty", () => {
@@ -133,7 +133,7 @@ describe("v0.6.2 chunk 1: scenarios guards and the root error boundary (W4)", ()
     expect(refusedCells.some((td) => (td.textContent ?? "").includes("The balloon's discounted value at the target rate reaches the cost NPV; the solved payment would be non-positive."))).toBe(true);
   });
 
-  it("SCE-GUARD-2: the demo project computes all cells (unchanged behavior)", () => {
+  it("SCE-GUARD-2: the demo project renders the balloon table honestly; the short-term cells refuse on the span-covered program fixture (v0.6.10 re-anchor: 6 rows, 7 cols, 6 span-coverage refusals)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
@@ -148,7 +148,11 @@ describe("v0.6.2 chunk 1: scenarios guards and the root error boundary (W4)", ()
       fireEvent.change(inputs[inputs.length - 1], { target: { value: v } });
     }
     const table = document.querySelector('[data-testid="balloon-term-table"]') as HTMLElement;
-    expect(Array.from(table.querySelectorAll("td[data-cell-refusal]")).length).toBe(0);
+    expect(table.querySelectorAll("tbody tr").length).toBe(6);
+    expect(table.querySelectorAll("thead th").length).toBe(7);
+    const refused = Array.from(table.querySelectorAll("td[data-cell-refusal]"));
+    expect(refused.length).toBe(6);
+    expect(refused.every((td) => (td.textContent ?? "").includes("Tariff span does not cover the required collection stream"))).toBe(true);
   });
 
   it("BND-1: a deliberately throwing child renders the boundary card with the shell intact", () => {

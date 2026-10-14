@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { computeModel } from "../src/engine.js";
-import { demoProject, shorePowerProject } from "../src/state.js";
+import { demoProject, shorePowerProgram } from "../src/state.js";
 import { buildWorkbook, readWorkbook } from "../src/xlsx.js";
 import type { ModelInputs } from "../../core/src/types.js";
 
@@ -87,7 +87,7 @@ describe("v0.6 chunk 4 — the web surfaces", () => {
     expect(hint?.textContent).toContain("Derived horizon:");
     const derivation = document.querySelector('[data-testid="horizon-derivation"]') as HTMLElement;
     expect(derivation).toBeTruthy();
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     for (const hc of result.horizon!.constituents) {
       const el = derivation.querySelector('[data-constituent="' + hc.label + '"]');
       expect(el?.textContent).toContain("month " + hc.month);
@@ -180,7 +180,7 @@ describe("v0.6 chunk 4 — the web surfaces", () => {
 
   it("LEGACY-XLSX: the base demo workbook keeps the standing sheet inventory", async () => {
     const map = await sheetRows(demoProject());
-    expect(Array.from(map.keys())).toEqual(["Inputs", "Cost lines", "Repayment", "Metrics"]);
+    expect(Array.from(map.keys())).toEqual(["Inputs", "Cost lines", "Repayment", "Collections schedule", "Metrics"]);
   });
 });
 
@@ -192,7 +192,7 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.9");
+    expect(VERSION).toBe("v0.6.10");
   });
 
   it("WATERFALL-FORM: the build-up is vertical floats to a solid cap with the labels outside the geometry", () => {

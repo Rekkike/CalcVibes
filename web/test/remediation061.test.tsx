@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { computeModel, moneyForDisplay } from "../src/engine.js";
-import { demoProject, multiLeaseProject, shorePowerProject } from "../src/state.js";
+import { demoProject, multiLeaseProject, shorePowerProgram } from "../src/state.js";
 import { bucketSeries, bucketWidthFor } from "../src/charts.js";
 import type { ModelInputs } from "../../core/src/types.js";
 
@@ -26,9 +26,9 @@ describe("v0.6.1 chunk 1 — the worksuite surfaces", () => {
     expect(document.querySelector('[data-testid="scenarios"]')).toBeTruthy();
   });
 
-  it("ENTRY-UNIT: the Results stats and the yearly table render unit-scaled figures consistent with the deck (v0.6.7 re-anchor: the port demo, EUR)", async () => {
+  it("ENTRY-UNIT: the Results stats and the yearly table render unit-scaled figures consistent with the deck (v0.6.10 re-anchor: the program demo, EUR)", async () => {
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.change(document.querySelector('[data-field="entryUnit"]') as HTMLSelectElement, { target: { value: "millions" } });

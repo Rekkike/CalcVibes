@@ -59,7 +59,7 @@ describe("Task C: carried observations", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    const nameInput = document.querySelector('[data-line="c1"] [data-field="name"]') as HTMLInputElement;
+    const nameInput = document.querySelector('[data-line="p1"] [data-field="name"]') as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "" } });
     const reason = document.querySelector('[data-testid="export-disabled-reason"]');
     expect(reason && reason.textContent).toContain("XLSX and PDF export are disabled");
@@ -74,7 +74,7 @@ describe("Task C: carried observations", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    const nameInput = document.querySelector('[data-line="c1"] [data-field="name"]') as HTMLInputElement;
+    const nameInput = document.querySelector('[data-line="p1"] [data-field="name"]') as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "" } });
     fireEvent.click(byAction("present"));
     const pdfBtn = document.querySelector('[data-testid="presentation"] [data-action="download-pdf"]') as HTMLButtonElement;

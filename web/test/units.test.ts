@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moneyForDisplay, entryToValue, valueToEntry, deckMoneyForDisplay, feeForDisplay, type EntryUnit } from "../src/engine.js";
+import { moneyForDisplay, entryToValue, valueToEntry, deckMoneyForDisplay, feeForDisplay, unitPriceForDisplay, type EntryUnit } from "../src/engine.js";
 import { deckSlides } from "../src/deck.js";
 import { computeModel } from "../src/engine.js";
 import { demoProject } from "../src/state.js";
@@ -75,8 +75,8 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
     const stResult = computeModel(stInputs);
     const stDeck = deckSlides(stInputs, stResult, { startYear: null, entryUnit: "thousands" });
     expect(stDeck.slides[3].title).toBe("The recovery — a stable tariff");
-    // v0.6.9 Task F: the stable base price is a fee-class figure at the thousands formatter.
-    expect(stDeck.slides[3].body.find((f) => f.label === "Base price (first grid year terms)")!.value).toBe(feeForDisplay(stResult.tariffBaseUnitPrice as number, "SEK", "thousands"));
+    // v0.6.10 re-anchor: the stable base price renders through unitPriceForDisplay (the unit-price display class).
+    expect(stDeck.slides[3].body.find((f) => f.label === "Base price (first grid year terms)")!.value).toBe(unitPriceForDisplay(stResult.tariffBaseUnitPrice as number, "SEK"));
   });
 
   it("the profile branch title", () => {

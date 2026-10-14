@@ -3,7 +3,7 @@ import { render, fireEvent } from "@testing-library/react";
 import fs from "node:fs";
 import { App } from "../src/App.js";
 import { computeModel, deckMoneyForDisplay, percentForDisplay, deckYearsForDisplay } from "../src/engine.js";
-import { demoProject, shorePowerProject } from "../src/state.js";
+import { demoProject, shorePowerProject, shorePowerProgram } from "../src/state.js";
 import { deckSlides } from "../src/deck.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
@@ -49,8 +49,8 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     expect(document.querySelector('[data-testid="cost-inflow-columns"]')).toBeNull();
   });
 
-  it("OVERVIEW-SUMMARY: the Overview metric cards and summary chart bind to engine fields through the formatters (v0.6.7 re-anchor: the port demo, EUR)", () => {
-    const result = computeModel(shorePowerProject());
+  it("OVERVIEW-SUMMARY: the Overview metric cards and summary chart bind to engine fields through the formatters (v0.6.10 re-anchor: the program demo, EUR)", () => {
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("overview"));
@@ -153,10 +153,10 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6R", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.9");
+    expect(VERSION).toBe("v0.6.10");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.9");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.10");
   });
 
   it("CHART-TRACE and ACTION-TITLES stand: the signed chart values equal the engine yearly rows; the deck titles carry no figures on the coverage slide (v0.6.7 re-anchor: the port demo)", () => {

@@ -61,8 +61,8 @@ describe("Task G: the deck design system (structural pins)", () => {
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
     const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
-    // v0.6.7 re-anchor: the port fixture carries five cost lines.
-    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(5);
+    // v0.6.10 re-anchor: the program fixture carries six cost lines.
+    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(6);
     expect(rows.querySelectorAll('[data-testid="donut-segment-label"]').length).toBe(0);
   });
 

@@ -207,12 +207,12 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     }
   });
 
-  it("CHART-WHOLE: the recovery bars label the visible buckets and thin the rest (v0.6.8 re-anchor: the port recovery buckets at width 2 thin to six visible labels)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("CHART-WHOLE: the recovery bars label the visible buckets and thin the rest (v0.6.10 re-anchor: the program recovery buckets at width 2 thin to six visible labels; the loader-preset calendar start year 2026)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
     const { bucketSeries } = await import("../src/charts.js");
-    const result = computeModel(shorePowerProject());
+    const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -223,15 +223,16 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     const { width } = bucketSeries(new Array<number>(result.yearly.length).fill(0), 15);
     expect(yearLabels.length).toBe(Math.ceil(result.yearly.length / width));
     // v0.6.8 Task C: labels thin to every ceil(bucketCount/8)th column at width > 1;
-    // thinned columns carry a non-breaking space and data-thinned="true". Port at
-    // cap 15: 12 buckets, thinStep 2, six visible labels and six thinned.
+    // thinned columns carry a non-breaking space and data-thinned="true". The program
+    // at cap 15: 12 buckets, thinStep 2, six visible labels and six thinned; the
+    // labels read as calendar years through the loader-preset start year 2026.
     const thinStep = width > 1 ? Math.ceil(yearLabels.length / 8) : 1;
     expect(Array.from(yearLabels).filter((l) => (l as SVGTextElement).getAttribute("data-thinned") !== "true").length).toBe(6);
     for (let k = 0; k < yearLabels.length; k++) {
       const labelEl = yearLabels[k] as SVGTextElement;
       const expected = width === 1
-        ? yearHeader(k + 1, null)
-        : `${yearHeader(k * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (k + 1) * width), null)}`;
+        ? yearHeader(k + 1, 2026)
+        : `${yearHeader(k * width + 1, 2026)}–${yearHeader(Math.min(result.yearly.length, (k + 1) * width), 2026)}`;
       if (width > 1 && k % thinStep !== 0) {
         expect(labelEl.textContent).toBe("\u00a0");
         expect(labelEl.getAttribute("data-thinned")).toBe("true");
@@ -241,11 +242,11 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     }
   });
 
-  it("CHART-PURPOSE: every deck chart carries its kicker title, its labels, and its total (v0.6.7 re-anchor: the port cost base and per-lift recovery, EUR at entry thousands)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("CHART-PURPOSE: every deck chart carries its kicker title, its labels, and its total (v0.6.10 re-anchor: the program cost base and per-lift recovery, EUR at entry thousands)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { bucketSeries } = await import("../src/charts.js");
-    const demo = shorePowerProject();
+    const demo = shorePowerProgram();
     const result = computeModel(demo);
     const unit = "thousands";
     render(<App />);
@@ -253,8 +254,8 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const investmentRows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
-    expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Substations & grid connections dominates the cost base");
-    expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(5);
+    expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Market pillar — bulk & liquid berths dominates the cost base");
+    expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(6);
     const firstRow = investmentRows?.querySelector("[data-composition-row]");
     expect(firstRow?.querySelector('[data-row-label="name"]')?.textContent).toBe(result.lineTotals[0].name);
     expect(firstRow?.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(result.lineTotals[0].total, "EUR", unit));
@@ -274,12 +275,12 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     expect(summaryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Per-lift prices set the yearly recovery");
   });
 
-  it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force (v0.6.8 re-anchor: the port peak is a recovery bucket sum at width 2 and names its range)", async () => {
-    const { shorePowerProject } = await import("../src/state.js");
+  it("PEAK-FORMAT: the peak label equals the display formatter output of the engine peak at the unit in force (v0.6.10 re-anchor: the program peak is a recovery bucket sum at width 2 and names its calendar range through the loader-preset 2026)", async () => {
+    const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
     const { bucketSeries } = await import("../src/charts.js");
-    const demo = shorePowerProject();
+    const demo = shorePowerProgram();
     const result = computeModel(demo);
     const unit = "thousands";
     render(<App />);
@@ -293,7 +294,7 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     const { buckets, width } = bucketSeries(rawInflows, 15);
     const peakIdx = buckets.indexOf(Math.max(...buckets));
     // v0.6.8 Task C: the peak label names the bucket range, not just its first year.
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", unit)} in ${yearHeader(peakIdx * width + 1, null)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), null)}`);
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", unit)} in ${yearHeader(peakIdx * width + 1, 2026)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), 2026)}`);
   });
 
   it("PEAK-PRINT: the print stylesheet carries the peak-label ink variant", () => {

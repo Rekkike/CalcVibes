@@ -24,9 +24,9 @@ describe("chunk 2: shell, blank start, demo load, validation panel", () => {
   it("loads the demo project labeled as a demo and renders the baseline headline statistics", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
-    expect(screen.getByText("Shore power example (Rotterdam)")).toBeTruthy();
-    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
-    expect(byStat("totalCost").textContent).toBe("€269 592 k");
+    expect(screen.getByText("Shore-power program (Rotterdam)")).toBeTruthy();
+    expect(byStat("paymentAmount").textContent).toBe("€2 843 k");
+    expect(byStat("totalCost").textContent).toBe("€628 250 k");
     expect(screen.queryByTestId("issues-summary")).toBeNull();
   });
 
@@ -39,7 +39,7 @@ describe("chunk 2: shell, blank start, demo load, validation panel", () => {
     const amountInput = allByField("amount")[0] as HTMLInputElement;
     fireEvent.change(amountInput, { target: { value: "0" } });
     expect(screen.getByTestId("issues-summary")).toBeTruthy();
-    expect(screen.getByTestId("issues-summary").textContent).toContain("Cost line c1 has an empty name.");
+    expect(screen.getByTestId("issues-summary").textContent).toContain("Cost line p1 has an empty name.");
     expect(screen.getByTestId("issues-summary").textContent).toContain("has a non-positive amount.");
     expect((allByField("amount")[0] as HTMLInputElement).value).toBe("0");
     expect(screen.getByTestId("line-issues").textContent).toContain("empty name");

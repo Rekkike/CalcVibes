@@ -61,7 +61,7 @@ describe("Collections editor (Task B web)", () => {
 });
 
 describe("Yearly detail section (Task D web)", () => {
-  it("renders both grids with totals rows and the two tariff rows visible (v0.6.7 re-anchor: the port fixture presets a multi-row decompose tariff)", () => {
+  it("renders both grids with totals rows and the two tariff rows visible (v0.6.10 re-anchor: the program fixture presets a multi-row decompose tariff with riding grants and a funding loan)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("detail"));
@@ -69,15 +69,23 @@ describe("Yearly detail section (Task D web)", () => {
     const colGrid = document.querySelector('[data-testid="collections-grid"]') as HTMLElement;
     expect(costGrid).toBeTruthy();
     expect(colGrid).toBeTruthy();
-    expect(costGrid.querySelector('[data-grid-row="cost:c1"]')).toBeTruthy();
+    expect(costGrid.querySelector('[data-grid-row="cost:p1"]')).toBeTruthy();
     expect(colGrid.querySelector('[data-grid-row="tariff:r1"]')).toBeTruthy();
     expect(colGrid.querySelector('[data-grid-row="tariff:r2"]')).toBeTruthy();
     expect(costGrid.querySelector('[data-grid-totals="true"]')).toBeTruthy();
     expect(colGrid.querySelector('[data-grid-totals="true"]')).toBeTruthy();
     const r1Row = colGrid.querySelector('[data-grid-row="tariff:r1"]') as HTMLElement;
-    expect(r1Row.textContent).toContain("\u20ac303 574,46 k");
+    expect(r1Row.textContent).toContain("\u20ac490 354,39 k");
     const r2Row = colGrid.querySelector('[data-grid-row="tariff:r2"]') as HTMLElement;
-    expect(r2Row.textContent).toContain("\u20ac86 718,97 k");
+    expect(r2Row.textContent).toContain("\u20ac96 808,39 k");
+    // v0.6.10 re-anchor: the collections grid carries the four tariff rows plus the riding grants and the funding loan (8 rows)
+    expect(colGrid.querySelectorAll("[data-grid-row]").length).toBe(8);
+    expect(colGrid.querySelector('[data-grid-row="tariff:r3"]')).toBeTruthy();
+    expect(colGrid.querySelector('[data-grid-row="tariff:r4"]')).toBeTruthy();
+    expect(colGrid.querySelector('[data-grid-row="grant:g1"]')).toBeTruthy();
+    expect(colGrid.querySelector('[data-grid-row="grant:g2"]')).toBeTruthy();
+    expect(colGrid.querySelector('[data-grid-row="grant:g3"]')).toBeTruthy();
+    expect(colGrid.querySelector('[data-grid-row="funding-loan:l1"]')).toBeTruthy();
   });
 
   it("profile mode shows the profile row in the collections grid (re-pointed to the Alpha template via the project-file route)", async () => {

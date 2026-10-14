@@ -70,20 +70,56 @@ export function tornado(inp: ModelInputs): TornadoRow[] {
   ];
 }
 
+// v0.6.10 Task D.2: every two-way table catches EngineInputError per cell and yields null —
+// a span that cannot cover a term renders an honest null cell, never a broken table.
 export function paymentVsTermTargetTable(inp: ModelInputs, terms: number[], targets: number[]): (number | null)[][] {
   assertNoCollectionsProfile(inp);
   return targets.map((t) =>
-    terms.map((term) =>
-      computeModel({ ...inp, targetIrr: t, repayment: { ...inp.repayment, termYears: term } }).paymentAmount
-    )
+    terms.map((term) => {
+      try {
+        return computeModel({ ...inp, targetIrr: t, repayment: { ...inp.repayment, termYears: term } }).paymentAmount;
+      } catch (e) {
+        if (e instanceof EngineInputError) return null;
+        throw e;
+      }
+    })
   );
 }
 
 export function paymentVsBalloonTermTable(inp: ModelInputs, balloons: number[], terms: number[]): (number | null)[][] {
   assertNoCollectionsProfile(inp);
   return terms.map((term) =>
-    balloons.map((balloon) =>
-      computeModel({ ...inp, repayment: { ...inp.repayment, termYears: term, balloon } }).paymentAmount
-    )
+    balloons.map((balloon) => {
+      try {
+        return computeModel({ ...inp, repayment: { ...inp.repayment, termYears: term, balloon } }).paymentAmount;
+      } catch (e) {
+        if (e instanceof EngineInputError) return null;
+        throw e;
+      }
+    })
+  );
+}
+
+// v0.6.10 Task D.1: the grant-scale axis — each cell scales the grant rows' amounts by the
+// factor and solves at the term. A factor of 0 removes the grant rows (a zero-amount grant is
+// invalid per FND-AMOUNT); the loan rows never scale.
+export function paymentVsGrantScaleTable(inp: ModelInputs, grantScales: number[], terms: number[]): (number | null)[][] {
+  assertNoCollectionsProfile(inp);
+  const scaledFunding = (scale: number): ModelInputs["funding"] => {
+    if (!inp.funding || !inp.funding.rows || inp.funding.rows.length === 0) return inp.funding;
+    const rows = inp.funding.rows
+      .filter((fr) => fr.kind !== "grant" || scale > 0)
+      .map((fr) => (fr.kind === "grant" ? { ...fr, amount: fr.amount * scale } : fr));
+    return { rows };
+  };
+  return grantScales.map((scale) =>
+    terms.map((term) => {
+      try {
+        return computeModel({ ...inp, repayment: { ...inp.repayment, termYears: term }, funding: scaledFunding(scale) }).paymentAmount;
+      } catch (e) {
+        if (e instanceof EngineInputError) return null;
+        throw e;
+      }
+    })
   );
 }

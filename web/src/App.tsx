@@ -4,7 +4,7 @@ import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
 import { EngineInputError } from "../../core/src/validate.js";
-import { blankCostLine, blankProject, landNewbuildProject, nextCostId, shorePowerProject, solarParkProject } from "./state.js";
+import { blankCostLine, blankProject, landNewbuildProject, nextCostId, shorePowerProgram, solarParkProject } from "./state.js";
 import type { CostLine } from "../../core/src/types.js";
 import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
@@ -14,6 +14,7 @@ import { AppraisalSection } from "./sections/AppraisalSection.js";
 import { ScenariosSection } from "./sections/ScenariosSection.js";
 import { OperatingSection } from "./sections/OperatingSection.js";
 import { TariffSection } from "./sections/TariffSection.js";
+import { FundingSection } from "./sections/FundingSection.js";
 import { FinancingSection } from "./sections/FinancingSection.js";
 import { YearlyDetailSection } from "./sections/YearlyDetailSection.js";
 import { Presentation } from "./presentation/Presentation.js";
@@ -21,7 +22,7 @@ import { RootErrorBoundary } from "./ErrorBoundary.js";
 import { parseProject, ProjectFileError } from "../../core/src/fileio.js";
 import { downloadProjectFile } from "./projectFile.js";
 
-type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "financing" | "appraisal" | "results" | "scenarios" | "detail";
+type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "results" | "scenarios" | "detail";
 
 export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
@@ -45,6 +46,7 @@ export function App() {
   const [scenarioTargets, setScenarioTargets] = useState<number[] | null>(null);
   const [scenarioTerms, setScenarioTerms] = useState<number[] | null>(null);
   const [scenarioBalloons, setScenarioBalloons] = useState<number[] | null>(null);
+  const [scenarioGrantScales, setScenarioGrantScales] = useState<number[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -76,8 +78,11 @@ export function App() {
     checkList("target", scenarioTargets, (v) => v >= 0, (v) => `Scenario target ${v} must not be negative.`);
     checkList("term", scenarioTerms, (v) => v > 0, (v) => `Scenario term ${v} must be positive.`);
     checkList("balloon", scenarioBalloons, (v) => v >= 0, (v) => `Scenario balloon ${v} must not be negative.`);
+    // v0.6.10 Task E.5 (Task D.1): the grant-scale axis — a factor multiplies every grant row's
+    // amount; 0 removes the grants (a zero-amount grant is invalid); negative factors are refused.
+    checkList("grant-scale", scenarioGrantScales, (v) => v >= 0, (v) => `Scenario grant-scale ${v} must not be negative.`);
     return list;
-  }, [inputs, scenarioTargets, scenarioTerms, scenarioBalloons]);
+  }, [inputs, scenarioTargets, scenarioTerms, scenarioBalloons, scenarioGrantScales]);
   const { result, engineIssues } = useMemo(() => {
     if (issues.length > 0) return { result: null, engineIssues: [] as string[] };
     try {
@@ -89,8 +94,15 @@ export function App() {
   }, [inputs, issues]);
   const modeResult = useMemo(() => {
     if (issues.length > 0 || engineIssues.length > 0) return null;
-    if (mode === "B") return { kind: "B" as const, ...solveTerm(inputs, modePayment) };
-    if (mode === "C") return { kind: "C" as const, result: computeModel(inputs, { fixedPayment: modePayment }) };
+    try {
+      if (mode === "B") return { kind: "B" as const, ...solveTerm(inputs, modePayment) };
+      if (mode === "C") return { kind: "C" as const, result: computeModel(inputs, { fixedPayment: modePayment }) };
+    } catch (e) {
+      // v0.6.10 (ratified deviation): the mode solves are gross of funding and respect the
+      // declared tariff span; a refusal renders the honest refusal panel, never a crash.
+      if (e instanceof EngineInputError) return { kind: "refusal" as const, message: e.issues.join(" ") };
+      throw e;
+    }
     return null;
   }, [inputs, issues, mode, modePayment]);
 
@@ -114,6 +126,8 @@ export function App() {
     setInputs((p) => ({ ...p, tariff: t }));
   const setFinancing = (fc: import("../../core/src/types.js").FinancingConfig) =>
     setInputs((p) => ({ ...p, financing: fc }));
+  const setFunding = (fc: import("../../core/src/types.js").FundingConfig | null) =>
+    setInputs((p) => ({ ...p, funding: fc }));
   const openProjectFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -125,6 +139,7 @@ export function App() {
         setScenarioTargets(loaded.settings.scenarioTargets);
         setScenarioTerms(loaded.settings.scenarioTerms);
         setScenarioBalloons(loaded.settings.scenarioBalloons);
+        setScenarioGrantScales(loaded.settings.scenarioGrantScales ?? null);
         setMode("A");
         setLoadError(null);
       } catch (e) {
@@ -134,7 +149,7 @@ export function App() {
     reader.readAsText(file);
   };
   const saveProjectFile = () => {
-    downloadProjectFile(inputs, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons });
+    downloadProjectFile(inputs, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, scenarioGrantScales });
   };
   const exportXlsx = async () => {
     if (result === null) return;
@@ -200,13 +215,16 @@ export function App() {
               e.target.value = "";
             }}
           />
-          {/* v0.6.7 Task B: the realistic demo rotation. The port loader presets the three scenario axes
-              (the balloon entries are entry-unit values; at unit millions, 8 and 16 scale to raw
-              balloons of 8 000 000 and 16 000 000 at compute). The land loader presets the target
-              axis only; the term and balloon axes are inert in contracts mode (finding F1), so
-              presetting them would be dishonest. The entry-unit select is untouched: only
-              project-file open syncs the unit. */}
-          <button data-action="load-demo" onClick={() => { setInputs(shorePowerProject()); setScenarioTargets([4, 6, 8]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 8, 16]); }}>Load shore power demo (Rotterdam)</button>
+          {/* v0.6.7 Task B / v0.6.10 Task F: the realistic demo rotation. The program loader
+              (the whole-program port fixture of record) presets the start year 2026 (a
+              presentation-only label; the first collection year 3 reads calendar 2028) and the
+              three scenario axes (the balloon entries are entry-unit values; at unit millions,
+              8 and 16 scale to raw balloons of 8 000 000 and 16 000 000 at compute). The grant-
+              scale axis stays empty (the Round 23 empty-boxes principle). The land loader
+              presets the target axis only; the term and balloon axes are inert in contracts
+              mode (finding F1), so presetting them would be dishonest. The entry-unit select is
+              untouched: only project-file open syncs the unit. */}
+          <button data-action="load-demo" onClick={() => { setInputs(shorePowerProgram()); setStartYear(2026); setScenarioTargets([4, 6, 8]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 8, 16]); }}>Load shore-power program demo (Rotterdam)</button>
           <button data-action="load-multi-lease-demo" onClick={() => { setInputs(landNewbuildProject()); setScenarioTargets([6, 8, 10]); }}>Load land newbuild demo (Mjøstårnet)</button>
           {/* v0.6.6 Task B: the third loader presets the scenario axes (the amendment of record: the balloon
               entries are entry-unit values; at unit thousands, 1000 and 2000 scale to raw balloons of
@@ -246,7 +264,7 @@ export function App() {
           <div data-nav-group="finance" className="nav-group">
             <span className="nav-group-label">Finance</span>
             <div className="nav-group-views">
-              {(["financing", "appraisal"] as View[]).map((v) => (
+              {(["funding", "financing", "appraisal"] as View[]).map((v) => (
                 <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
                   {v[0].toUpperCase() + v.slice(1)}
                 </button>
@@ -311,6 +329,9 @@ export function App() {
         {view === "tariff" && (
           <TariffSection inputs={inputs} result={result} setTariff={setTariff} startYear={startYear} entryUnit={entryUnit} />
         )}
+        {view === "funding" && (
+          <FundingSection inputs={inputs} result={result} setFunding={setFunding} startYear={startYear} entryUnit={entryUnit} />
+        )}
         {view === "financing" && (
           <FinancingSection inputs={inputs} setFinancing={setFinancing} />
         )}
@@ -318,10 +339,16 @@ export function App() {
           <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} entryUnit={entryUnit} />
         )}
         {view === "results" && result !== null && mode === "A" && <ResultsSection result={result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />}
-        {view === "results" && modeResult !== null && mode === "B" && (
+        {view === "results" && modeResult !== null && modeResult.kind === "refusal" && (
+          <section data-testid="mode-results">
+            <h2>Mode {mode} — refused</h2>
+            <p data-stat="modeRefusal">The engine refused to compute the mode result for this project: {modeResult.message}</p>
+          </section>
+        )}
+        {view === "results" && modeResult !== null && modeResult.kind === "B" && (
           <section data-testid="mode-results">
             <h2>Mode B — solved term</h2>
-            {modeResult.kind === "B" && modeResult.paymentCount !== null ? (
+            {modeResult.paymentCount !== null ? (
               <>
                 <p data-stat="modeBTerm">Solved term: {modeResult.termYears} years ({modeResult.paymentCount} payments; last payment month {modeResult.lastPaymentMonth}).</p>
                 <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />
@@ -331,7 +358,7 @@ export function App() {
             )}
           </section>
         )}
-        {view === "results" && modeResult !== null && mode === "C" && (
+        {view === "results" && modeResult !== null && modeResult.kind === "C" && (
           <section data-testid="mode-results">
             <h2>Mode C — evaluation of the given payment</h2>
             <ResultsSection result={modeResult.result} targetIrr={inputs.targetIrr} currency={inputs.currency} startYear={startYear} entryUnit={entryUnit} />
@@ -340,7 +367,7 @@ export function App() {
         {view === "detail" && result !== null && (
           <YearlyDetailSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} />
         )}
-        {view === "scenarios" && <ScenariosSection inputs={inputs} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} onScenarioTargetsChange={setScenarioTargets} onScenarioTermsChange={setScenarioTerms} onScenarioBalloonsChange={setScenarioBalloons} entryUnit={entryUnit} currency={inputs.currency} />}
+        {view === "scenarios" && <ScenariosSection inputs={inputs} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} scenarioGrantScales={scenarioGrantScales} onScenarioTargetsChange={setScenarioTargets} onScenarioTermsChange={setScenarioTerms} onScenarioBalloonsChange={setScenarioBalloons} onScenarioGrantScalesChange={setScenarioGrantScales} entryUnit={entryUnit} currency={inputs.currency} />}
         {view === "results" && result === null && <p>Resolve the input issues to see results.</p>}
         </RootErrorBoundary>
       </main>

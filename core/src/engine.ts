@@ -148,11 +148,22 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     : Math.max(Math.ceil(lastCostYear * 12), repaymentStartYear * 12 + termMonths);
   if (residualAmount > 0) totalMonths = Math.max(totalMonths, residualYear * 12);
   const tariffCfg0 = inp.tariff ?? { mode: "off" as const, escalationPerYear: 2, rows: [], fixedAnnualAmount: null, manualPrices: null };
-  const gridFirstYear = repaymentStartYear;
+  // v0.6.10 Task C (W35): the tariff owns its span — with a declared span the year columns run
+  // span.startYear through span.startYear + span.termYears (termYears + 1 columns, the repayment
+  // convention). Without a span the derivation is unchanged (repaymentStartYear, term + 1) —
+  // the no-drift pin.
+  const tariffSpanCfg = tariffCfg0.span ?? null;
+  const gridFirstYear = tariffSpanCfg ? tariffSpanCfg.startYear : repaymentStartYear;
+  const gridTermYears = tariffSpanCfg ? tariffSpanCfg.termYears : inp.repayment.termYears;
   const gridYears: number[] = [];
-  for (let k = 0; k < inp.repayment.termYears + 1; k++) gridYears.push(gridFirstYear + k);
-  const weightedVolumes: number[] = gridYears.map((_, k) =>
-    tariffCfg0.rows.reduce((acc, row) => acc + row.weight * (row.lifts[k] ?? 0), 0)
+  for (let k = 0; k < gridTermYears + 1; k++) gridYears.push(gridFirstYear + k);
+  // v0.6.10 Task C.2: a row is active in the years its span covers (startYear through
+  // startYear + termYears - 1); a row with no span inherits the full grid. Volumes typed at a
+  // grid column outside the row's span gate to zero in that year's weighted volume.
+  const rowActiveInYear = (row: import("./types.js").TariffRow, year: number): boolean =>
+    !row.span || (year >= row.span.startYear && year <= row.span.startYear + row.span.termYears - 1);
+  const weightedVolumes: number[] = gridYears.map((year, k) =>
+    tariffCfg0.rows.reduce((acc, row) => acc + (rowActiveInYear(row, year) ? row.weight * (row.lifts[k] ?? 0) : 0), 0)
   );
   const tariffCollectionMode0 = tariffCfg0.mode === "stable" || tariffCfg0.mode === "manual" || tariffCfg0.mode === "fixed";
   const lastTariffMonth = tariffCfg0.mode !== "off" ? gridYears[gridYears.length - 1] * 12 : -1;
@@ -211,6 +222,45 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     }
     lineTotalsMap.set(c.id, total);
   }
+  // v0.6.10 Task A/B: the funding block. Absent rows leave every downstream figure
+  // byte-identical (the golden no-drift pin). The allocation runs before the book schedule so
+  // both computeBookSchedule call sites receive the netting map.
+  const fundingRows = inp.funding?.rows ?? [];
+  const fundingPresent = fundingRows.length > 0;
+  const fundingAllocation: import("./types.js").FundingAllocation[] = [];
+  const nettingByLine: Map<string, Map<number, number>> | undefined = fundingPresent ? new Map() : undefined;
+  let grantsTotal = 0;
+  for (const fr of fundingRows) {
+    if (fr.kind !== "grant") continue;
+    grantsTotal += fr.amount;
+    // Task B: each grant allocates proportionally to the capitalized-to-date cost of the
+    // depreciating lines at its receipt year — lines whose effective depreciation config is
+    // not "retained"; operating lines and reinvestments never share (they are not cost lines);
+    // a line with zero capitalized-to-date at the receipt year gets no share.
+    const eligible: { lineId: string; lineName: string; capitalizedToDate: number }[] = [];
+    let baseTotal = 0;
+    for (const c of inp.costs) {
+      const cfg = c.depreciation ?? inp.depreciationDefault ?? null;
+      if (!cfg || cfg.mode === "retained") continue;
+      let cap = 0;
+      for (const [y, amt] of lineIncurred(c)) {
+        if (y <= fr.year) cap += amt;
+      }
+      if (cap <= 0) continue;
+      eligible.push({ lineId: c.id, lineName: c.name, capitalizedToDate: cap });
+      baseTotal += cap;
+    }
+    const shares: import("./types.js").FundingShare[] = eligible.map((e) => {
+      const shareOfGrant = baseTotal > 0 ? e.capitalizedToDate / baseTotal : 0;
+      // The pinned spelling: amount * capitalized-to-date / base, multiplication first.
+      const nettedAmount = baseTotal > 0 ? (fr.amount * e.capitalizedToDate) / baseTotal : 0;
+      const perLine = nettingByLine?.get(e.lineId) ?? new Map<number, number>();
+      perLine.set(fr.year, nettedAmount);
+      nettingByLine?.set(e.lineId, perLine);
+      return { lineId: e.lineId, lineName: e.lineName, capitalizedToDate: e.capitalizedToDate, shareOfGrant, nettedAmount };
+    });
+    fundingAllocation.push({ grantId: fr.id, label: fr.label, year: fr.year, amount: fr.amount, shares });
+  }
   if (residualMode === "calculated" && residualYear * 12 > totalMonths) {
     const provisional = computeBookSchedule(
       inp.costs,
@@ -218,6 +268,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       inp.depreciationDefault ?? null,
       residualYear,
       lineTotalsMap,
+      nettingByLine,
     );
     if (provisional.remainingBookValueAt(residualYear) > 0) {
       horizonConstituents.push({ label: "book-value residual horizon extension", month: residualYear * 12 });
@@ -226,6 +277,21 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   for (const hc of horizonConstituents) {
     if (hc.month > totalMonths) totalMonths = hc.month;
   }
+  // v0.6.10 Task A.1: the funding horizon refusals — they live here where the horizon is final.
+  if (fundingPresent) {
+    for (const fr of fundingRows) {
+      if (fr.year * 12 > totalMonths) {
+        throw new EngineInputError([`Funding row ${fr.id} lands in year ${fr.year}, beyond the model horizon of ${totalMonths} months (FND-HORIZON).`]);
+      }
+      if (fr.kind === "interest-free-loan") {
+        const loanTerm = fr.termYears ?? 1;
+        const loanStart = fr.repaymentStartYear ?? 1;
+        if ((loanStart + loanTerm - 1) * 12 > totalMonths) {
+          throw new EngineInputError([`Funding row ${fr.id} repays beyond the model horizon of ${totalMonths} months (FND-LOAN-HORIZON).`]);
+        }
+      }
+    }
+  }
   const horizonYears = Math.ceil(totalMonths / 12);
   const bookSchedule = computeBookSchedule(
     inp.costs,
@@ -233,6 +299,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     inp.depreciationDefault ?? null,
     horizonYears,
     lineTotalsMap,
+    nettingByLine,
   );
   let residualAmountUsed = residualSetAmount;
   if (residualMode === "calculated") {
@@ -280,6 +347,25 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   const balloonMonth = repaymentStartYear * 12 + termMonths;
   const df = (m: number) => 1 / Math.pow(1 + rM, m);
+  // v0.6.10 Task A.2: the grant-netted basis. fundingNpv is the present value at the target
+  // monthly rate of the funding rows — each receipt discounted at its year-end month; an
+  // interest-free loan additionally contributes its repayments (equal annual installments)
+  // as negative present value (its subsidy element). It is subtracted from every solve
+  // numerator; the identity npvAtTarget = 0 at the target rate holds on the full stream.
+  let fundingNpv = 0;
+  if (fundingPresent) {
+    for (const fr of fundingRows) {
+      fundingNpv += fr.amount * df(fr.year * 12);
+      if (fr.kind === "interest-free-loan") {
+        const loanTerm = fr.termYears ?? 1;
+        const loanStart = fr.repaymentStartYear ?? 1;
+        const installment = fr.amount / loanTerm;
+        for (let k = 0; k < loanTerm; k++) {
+          fundingNpv -= installment * df((loanStart + k) * 12);
+        }
+      }
+    }
+  }
   const balloonMonthProfile = profileEndMonth;
   const balloonDf = (profileMode ? balloonMonthProfile : balloonMonth) <= totalMonths ? df(profileMode ? balloonMonthProfile : balloonMonth) : 0;
   if (!profileMode && inp.repayment.balloon > 0 && inp.repayment.balloon * balloonDf >= costNpv) {
@@ -431,15 +517,15 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       pvService += pay / Math.pow(1 + rM, m);
       running -= prin;
     }
-    leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf) / dfSumEsc;
+    leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf - fundingNpv) / dfSumEsc;
   }
   const rawSolvedPayment = leveraged && leveragedPayment !== null
     ? leveragedPayment
     : (opts && opts.fixedPayment !== undefined
       ? opts.fixedPayment
       : (contractsMode
-        ? (solvedContractsDfSum > 0 ? (costNpvWithOperating - solvedBalloonsPv - residualAmountUsed * residualDf - evaluatedInflowsPv) / solvedContractsDfSum : 0)
-        : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf) / dfSumEsc : 0)));
+        ? (solvedContractsDfSum > 0 ? (costNpvWithOperating - solvedBalloonsPv - residualAmountUsed * residualDf - evaluatedInflowsPv - fundingNpv) / solvedContractsDfSum : 0)
+        : (dfSumEsc > 0 ? (costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf - fundingNpv) / dfSumEsc : 0)));
   const clampActive = !(tariffCollectionMode || profileMode) && rawSolvedPayment < 0;
   const solvedPayment = clampActive ? 0 : rawSolvedPayment;
   const payment = tariffCollectionMode || profileMode ? 0 : solvedPayment;
@@ -448,6 +534,15 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   let tariffBaseUnitPrice: number | null = null;
   if (tariffCfg.mode !== "off") {
     if (tariffCfg.mode === "decompose") {
+      // v0.6.10 Task C.3: the coverage refusal — every year carrying required collections must
+      // be a grid year; the tariff owns its span, it never borrows the repayment shape.
+      const gridYearSet = new Set(gridYears);
+      for (const sl of slots) {
+        const slotYear = Math.floor((sl.monthIndex - 1) / 12) + 1;
+        if (payment * sl.escFactor > 0 && !gridYearSet.has(slotYear)) {
+          throw new EngineInputError([`Tariff span does not cover the required collection stream: year ${slotYear} carries required collections outside the tariff grid.`]);
+        }
+      }
       for (let k = 0; k < gridYears.length; k++) {
         const year = gridYears[k];
         let required = 0;
@@ -461,7 +556,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         const unitPrice = weightedVolumes[k] > 0 ? required / weightedVolumes[k] : null;
         const perRowCharges: Record<string, number> | null = {};
         for (const row of tariffCfg.rows) {
-          (perRowCharges as Record<string, number>)[row.id] = row.weight * (unitPrice as number);
+          // v0.6.10 Task C.2: a row outside its span in this year carries no volume and no charge.
+          (perRowCharges as Record<string, number>)[row.id] = rowActiveInYear(row, year) ? row.weight * (unitPrice as number) : 0;
         }
         tariffInfos.push({ year, required, weightedVolume: weightedVolumes[k], unitPrice, revenue: required, perRowCharges });
       }
@@ -482,7 +578,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         if (volumeNpvWeight <= 0) {
           throw new EngineInputError(["Stable tariff infeasible: all weighted volumes are zero, so no base unit price can recover the cost NPV."]);
         }
-        let netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf;
+        let netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf - fundingNpv;
         if (leveraged) {
           let pvDraws = 0;
           const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
@@ -541,7 +637,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         const unitPrice = tariffCfg.mode === "manual" ? (tariffCfg.manualPrices?.[k] ?? null) : (tariffCfg.mode === "stable" ? (tariffBaseUnitPrice as number) * Math.pow(1 + tariffEsc, k) : null);
         const perRowCharges: Record<string, number> | null = {};
         for (const row of tariffCfg.rows) {
-          (perRowCharges as Record<string, number>)[row.id] = row.weight * (unitPrice as number);
+          // v0.6.10 Task C.2: a row outside its span in this year carries no volume and no charge.
+          (perRowCharges as Record<string, number>)[row.id] = rowActiveInYear(row, year) ? row.weight * (unitPrice as number) : 0;
         }
         tariffInfos.push({ year, required: null, weightedVolume: weightedVolumes[k], unitPrice, revenue: revenues[k], perRowCharges });
       }
@@ -603,6 +700,24 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   if (residualAmountUsed > 0 && residualMonth <= totalMonths) {
     inflowByMonth[residualMonth] = (inflowByMonth[residualMonth] || 0) + residualAmountUsed;
+  }
+  // v0.6.10 Task A.3: the funding cash rides in every mode — each receipt enters at its
+  // year-end month; each interest-free loan's installments enter as negative inflows at
+  // their months (the loan nets to zero over the horizon by construction).
+  if (fundingPresent) {
+    for (const fr of fundingRows) {
+      const receiptMonth = fr.year * 12;
+      inflowByMonth[receiptMonth] = (inflowByMonth[receiptMonth] || 0) + fr.amount;
+      if (fr.kind === "interest-free-loan") {
+        const loanTerm = fr.termYears ?? 1;
+        const loanStart = fr.repaymentStartYear ?? 1;
+        const installment = fr.amount / loanTerm;
+        for (let k = 0; k < loanTerm; k++) {
+          const im = (loanStart + k) * 12;
+          inflowByMonth[im] = (inflowByMonth[im] || 0) - installment;
+        }
+      }
+    }
   }
   const monthly: import("./types.js").MonthlyRow[] = [];
   let cumulative = 0;
@@ -703,6 +818,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   }
   if (!contractsMode && inp.repayment.balloon > 0) totalCollected += inp.repayment.balloon;
   if (residualAmountUsed > 0) totalCollected += residualAmountUsed;
+  // v0.6.10 Task A.4: totalCollected gains the grants total (the loans net zero and never join it).
+  if (fundingPresent) totalCollected += grantsTotal;
   const signChanges = monthlySignChanges;
   const netFlows = monthlyFlows;
   const npvAtTarget = npvMonthly(rM, netFlows);
@@ -862,6 +979,25 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     if (residualYear >= 1 && residualYear <= totalYearsForGrid) amounts[residualYear - 1] += residualAmountUsed;
     collectionsGrid.push({ id: "residual", name: "Residual", kind: "residual", amounts });
   }
+  // v0.6.10 Task A.5: the funding rows ride as visible collections-side rows — a grant as
+  // kind "grant" (the receipt), an interest-free loan as kind "funding-loan" (the receipt
+  // plus the negative repayment entries, summing to zero). The full circle stays reconciled.
+  if (fundingPresent) {
+    for (const fr of fundingRows) {
+      const amounts = zeroRow();
+      if (fr.year >= 1 && fr.year <= totalYearsForGrid) amounts[fr.year - 1] += fr.amount;
+      if (fr.kind === "interest-free-loan") {
+        const loanTerm = fr.termYears ?? 1;
+        const loanStart = fr.repaymentStartYear ?? 1;
+        const installment = fr.amount / loanTerm;
+        for (let k = 0; k < loanTerm; k++) {
+          const y = loanStart + k;
+          if (y >= 1 && y <= totalYearsForGrid) amounts[y - 1] -= installment;
+        }
+      }
+      collectionsGrid.push({ id: fr.id, name: fr.label, kind: fr.kind === "grant" ? "grant" : "funding-loan", amounts });
+    }
+  }
   const bookView: import("./types.js").BookView = {
     lines: bookSchedule.lines.map((l) => ({ id: l.id, name: l.name, isRetained: l.isRetained, years: l.years })),
     combined: bookSchedule.combined.map((row, idx) => {
@@ -958,6 +1094,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     horizon: { totalMonths: totalMonths, totalYears: Math.ceil(totalMonths / 12), constituents: horizonConstituents },
     bookView: bookView,
     termPositions: termPositions,
+    // v0.6.10 Task A: the funding view — null when no funding rows are present.
+    fundingView: fundingPresent ? { rows: fundingRows, grantsTotal, fundingNpv, allocation: fundingAllocation } : null,
     residualAmountUsed: residualAmountUsed,
     contractsInfo: contracts.map((c) => ({
       id: c.id,
@@ -976,7 +1114,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
 
 import { EngineInputError, validateInputs } from "./validate.js";
 import { normalizeContracts, allReinvestments, contractLastCollectionMonth } from "./contracts.js";
-import { computeBookSchedule } from "./depreciation.js";
+import { computeBookSchedule, lineIncurred } from "./depreciation.js";
 import type { PaymentSlot } from "./slots.js";
 import { computeFinancingOverlay, validateFinancing } from "./financing.js";
 

@@ -23,26 +23,29 @@ describe("chunk 7: section parity and presentation", () => {
     expect(table()).toBe(1);
   });
 
-  it("repayment section renders the solved structure from the live model", () => {
+  it("repayment section renders the solved structure from the live model (v0.6.10 re-anchor: the program fixture — the solved payment 2843365.6055825967 at entry thousands, the collections total including the riding grants)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
+    expect(byStat("paymentAmount").textContent).toBe("€2 843 k");
     expect(byStat("paymentCount").textContent).toBe("240");
     expect(byStat("repaymentStartYear").textContent).toBe("3");
-    expect(byStat("totalCollected").textContent).toBe("€390 293,43 k");
+    expect(byStat("totalCollected").textContent).toBe("€855 907,75 k");
   });
 
-  it("results section renders the yearly table, composition, metrics, and goal check", () => {
+  it("results section renders the yearly table, composition, metrics, and goal check (v0.6.10 re-anchor: the program fixture — payback 13.854, achieved IRR 6.05%, and the honest 3-sign-change ambiguity warning)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
     expect(screen.getByTestId("yearly-table").querySelectorAll("tbody tr").length).toBe(23);
-    expect(screen.getByTestId("cost-composition").textContent).toContain("Substations & grid connections");
-    expect(byStat("paybackYears").textContent).toBe("14.11097");
-    expect(byStat("achievedIrr").textContent).toBe("6%");
+    expect(screen.getByTestId("cost-composition").textContent).toContain("Container shore power — engineering & studies (RSP JV)");
+    expect(byStat("paybackYears").textContent).toBe("13.854");
+    expect(byStat("achievedIrr").textContent).toBe("6.05%");
     expect(screen.getByTestId("goal-check").textContent).toContain("target achieved");
-    expect(screen.queryByTestId("irr-ambiguity-warning")).toBeNull();
+    // The program fixture's net flow carries 3 sign changes (the funding receipts ride the
+    // collections side), so the honest ambiguity warning renders.
+    const warning = screen.getByTestId("irr-ambiguity-warning");
+    expect(warning.textContent).toContain("3 sign changes");
   });
 
   it("presentation mode navigates eight slides by keyboard and exits on Escape", () => {
@@ -70,12 +73,12 @@ describe("chunk 7: section parity and presentation", () => {
     expect(byStat("paymentAmount")).toBeTruthy();
   });
 
-  it("changing an input re-renders the live model (engine-driven recompute)", () => {
+  it("changing an input re-renders the live model (engine-driven recompute) (v0.6.10 re-anchor: the term-3 solve on the program base is 9732652.914261179 → €9 733 k)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
-    expect(byStat("paymentAmount").textContent).toBe("€1 626 k");
+    expect(byStat("paymentAmount").textContent).toBe("€2 843 k");
     fireEvent.change(byField("termYears"), { target: { value: "3" } });
-    expect(byStat("paymentAmount").textContent).toBe("€5 469 k");
+    expect(byStat("paymentAmount").textContent).toBe("€9 733 k");
   });
 });

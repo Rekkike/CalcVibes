@@ -1,4 +1,6 @@
-// Directive v0.6.7 — the realistic demo rotation: pins of record (Task D).
+// Directive v0.6.7 — the realistic demo rotation: pins of record (Task D); re-anchored to the
+// v0.6.10 whole-program shore-power fixture for the loader and deck pins (Tasks E/F/G); the
+// internal port and land fixtures keep their engine pins unchanged.
 // Every figure below was script-verified against the delivered engine before this file was
 // written. Exact double equality (toBe) is used wherever the engine returns the pinned double
 // verbatim; toBeCloseTo is used only where the directive prints a rounded spelling of the
@@ -9,8 +11,11 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
-import { shorePowerProject, landNewbuildProject } from "../src/state.js";
-import { computeModel, entryToValue } from "../src/engine.js";
+import { shorePowerProgram, shorePowerProject, landNewbuildProject } from "../src/state.js";
+import {
+  computeModel,
+  entryToValue,
+} from "../src/engine.js";
 import { deckSlides } from "../src/deck.js";
 import type { ModelInputs, ModelResult } from "../../core/src/types.js";
 
@@ -183,50 +188,76 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     expect(atBalloonEntry(16)).toBe(1591107.6364556993);
   });
 
-  it("PORT-LOADER: the button relabeled, the data-action unchanged, and the three preset axes surface in the Scenarios tab", async () => {
+  it("PROGRAM-LOADER: the button relabeled, the data-action unchanged, the start year preset, and the axes surface in the Scenarios tab beside the honest refusal (v0.6.10 Task E)", async () => {
     render(<App />);
     const button = byAction("load-demo");
     expect(button).toBeTruthy();
-    expect(button.textContent).toBe("Load shore power demo (Rotterdam)");
+    expect(button.textContent).toBe("Load shore-power program demo (Rotterdam)");
     fireEvent.click(button);
     await waitFor(() => {
-      expect(screen.getByText("Shore power example (Rotterdam)")).toBeTruthy();
+      expect(screen.getByText("Shore-power program (Rotterdam)")).toBeTruthy();
     });
+    expect((document.querySelector('[data-field="startYear"]') as HTMLInputElement).value).toBe("2026");
     fireEvent.click(byNav("scenarios"));
+    // The three preset axes surface; the grant-scale axis ships empty (Task E.5).
     expect(scenarioAxisValues("target")).toEqual(["4", "6", "8"]);
     expect(scenarioAxisValues("term")).toEqual(["15", "20", "25"]);
     expect(scenarioAxisValues("balloon")).toEqual(["0", "8", "16"]);
+    expect(scenarioAxisValues("grant-scale")).toEqual([]);
+    // The named scenario sets are honestly refused on this fixture (the term-25 shift leaves
+    // the declared tariff span), but the axis editors and the per-cell tables still render.
+    expect(document.querySelector('[data-testid="scenarios-refusal"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="scenario-set-refusal"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="term-target-table"]')).toBeTruthy();
   });
 
-  it("PORT-DECK: the rendered deck at entry unit ones carries the pinned figures and donuts", async () => {
-    const inputs = shorePowerProject();
+  it("PROGRAM-DECK: the rendered deck at entry unit ones carries the pinned figures, the funding block, and the fees-and-grants donut (v0.6.10 Tasks E/G)", async () => {
+    const inputs = shorePowerProgram();
     const result = computeModel(inputs);
     const deck = deckSlides(inputs, result, {
-      startYear: null,
+      startYear: 2026,
       entryUnit: "ones",
       scenarioTargets: [4, 6, 8],
       scenarioTerms: [15, 20, 25],
       scenarioBalloons: [0, 8, 16],
     });
-    // Deck-model pins (exact doubles): the outflow donut segments, the post-fix inflow donut
-    // segments (the honest full circle), and the targetChart points.
+    // Deck-model pins (exact doubles): the outflow donut segments (the six capital lines),
+    // the inflow donut's two segments (fees and grants), the funding block raws, the
+    // provenance funding grounding, and the targetChart points.
     const summary = deck.slides.find((s) => s.name === "summary");
     expect(summary).toBeDefined();
     const outflows = summary?.donuts?.find((d) => d.id === "outflows");
     const inflows = summary?.donuts?.find((d) => d.id === "inflows");
-    expect(outflows?.segments.map((s) => s.value)).toEqual([12000000, 48000000, 48000000, 36000000, 16000000]);
-    // v0.6.8 Task A.4 re-anchor: the repaired disclosure (the arithmetic-honest wording).
+    expect(outflows?.segments.map((s) => s.value)).toEqual([74000000, 110000000, 100000000, 125000000, 20000000, 20000000]);
     expect(outflows?.disclosure).toBe("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
-    expect(inflows?.segments.map((s) => s.value)).toEqual([303574464.86520803, 86718967.28154981]);
+    // The inflow donut: fees and grants of the totalCollected circle; the interest-free loan
+    // nets to zero and never joins the donut (the loan-nets-zero disclosure).
+    expect(inflows?.segments.map((s) => s.value)).toEqual([682407745.3398229, 173500000]);
     expect(sum(inflows?.segments.map((s) => s.value) ?? [])).toBeCloseTo(result.totalCollected, 6);
+    expect(inflows?.disclosure).toBe("Fees are the collections-side tariff rows; the interest-free loan nets to zero over the horizon and never joins the donut.");
+    // The investment slide's funding breakdown block: the raws and the rendered forms.
+    const investment = deck.slides.find((s) => s.name === "investment");
+    expect(investment?.funding).toBeDefined();
+    expect(investment?.funding?.grossRaw).toBe(449000000);
+    expect(investment?.funding?.grantsRaw).toBe(173500000);
+    expect(investment?.funding?.netRaw).toBe(275500000);
+    expect(investment?.funding?.intensity).toBe("38,6%");
+    expect(investment?.funding?.rows.map((r) => r.value)).toEqual(["€70 000 000", "€100 000 000", "€3 500 000", "€10 000 000"]);
+    expect(investment?.funding?.rows.map((r) => r.term ?? null)).toEqual([null, null, null, 10]);
+    // The scenarios slide: the named sets refuse honestly; the term chart keeps its kicker;
+    // the target chart carries the pinned solved payments.
     const scenariosSlide = deck.slides.find((s) => s.name === "scenarios");
-    expect(scenariosSlide?.targetChart?.mode).toBe("solved");
-    // v0.6.8 Task G.3 re-anchor: the target chart kicker names the rate basis.
-    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target IRR rises");
-    expect(scenariosSlide?.targetChart?.points.map((p) => p.value)).toEqual([1440560.902541411, 1626222.633944825, 1828351.5172141492]);
-    scenariosSlide?.targetChart?.points.forEach((p) => expect(p.met).toBe(true));
-    // v0.6.8 Task G.2 re-anchor: the scenarios comparison chart kicker names the varied parameter.
+    expect(scenariosSlide?.disclosures).toContain("The named scenario sets could not be computed for this project; see the Scenarios tab.");
+    expect(scenariosSlide?.disclosures).toContain("Some term values were refused by the engine; the refused cells render inline on the Scenarios tab.");
     expect(scenariosSlide?.chart?.kicker).toBe("Longer terms lower the payment");
+    expect(scenariosSlide?.targetChart?.mode).toBe("solved");
+    expect(scenariosSlide?.targetChart?.kicker).toBe("The payment rises as the target IRR rises");
+    expect(scenariosSlide?.targetChart?.points.map((p) => p.value)).toEqual([2489496.3612990044, 2843365.6055825967, 3233058.949475011]);
+    scenariosSlide?.targetChart?.points.forEach((p) => expect(p.met).toBe(true));
+    // The provenance disclosure carries the funding grounding verbatim.
+    expect((deck.provenance ?? []).join(" ")).toContain(
+      "Funding grounding: the grants (AFIF grant (EU); National shore-power grant; Province & municipality grant) ground in the national and municipal shore-power schemes and AFIF; the debt facility is grounded by the financing overlay; the interest-free note (Municipality interest-free note) nets to zero over the horizon.",
+    );
     // Rendered deck at entry unit "ones", set through the existing unit select.
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -235,52 +266,75 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     await waitFor(() => {
       expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(8);
     });
-    expect(titleMetricValue("Project cost")).toBe("€269 591 641");
+    expect(titleMetricValue("Project cost")).toBe("€628 250 000");
     expect(titleMetricValue("Target IRR")).toBe("6.00%");
     expect(titleMetricValue("Investment term")).toBe("23 years");
-    expect(tileValue("Cost NPV")).toBe("€193 986 917");
-    expect(tileValue("Achieved IRR")).toBe("6.00%");
-    expect(tileValue("Payback")).toBe("14.1 years");
-    // v0.6.8 Task B re-anchor: the fee-class figures render at the ones unit (the fee closure).
-    expect(tileValue("Solved payment")).toBe("€1 626 223");
-    expect(tileValue("Collected vs cost")).toBe("€390 293 432 vs €269 591 641");
+    expect(tileValue("Cost NPV")).toBe("€479 231 370");
+    expect(tileValue("Achieved IRR")).toBe("6.05%");
+    expect(tileValue("Payback")).toBe("13.9 years");
+    expect(tileValue("Solved payment")).toBe("€2 843 366");
+    expect(tileValue("Collected vs cost")).toBe("€855 907 745 vs €628 250 000");
     expect(tileValue("Verdict")).toBe("Target met");
-    expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("€269 591 641");
-    expect(bodyFigureValue("investment", "Cost NPV at target (discounted)")).toBe("€193 986 917");
-    expect(bodyFigureValue("investment", "Operating lines total")).toBe("€109 591 641");
+    expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("€628 250 000");
+    expect(bodyFigureValue("investment", "Cost NPV at target (discounted)")).toBe("€479 231 370");
+    expect(bodyFigureValue("investment", "Operating lines total")).toBe("€179 250 000");
+    // The funding breakdown block renders beneath the waterfall.
+    const fundingBlock = document.querySelector('[data-testid="deck-funding-block"]');
+    expect(fundingBlock).toBeTruthy();
+    expect(fundingBlock?.querySelector('[data-stat="funding-gross"]')?.textContent).toBe("Gross capital program: €449 000 000");
+    expect(fundingBlock?.querySelector('[data-stat="funding-grants"]')?.textContent).toBe("Grants: -€173 500 000");
+    expect(fundingBlock?.querySelector('[data-stat="funding-net"]')?.textContent).toBe("Net private capital: €275 500 000");
+    expect(fundingBlock?.querySelector('[data-stat="funding-intensity"]')?.textContent).toBe("Grant intensity: 38,6%");
+    const fundingRows = Array.from(fundingBlock?.querySelectorAll('[data-testid="deck-funding-rows"] li') ?? []);
+    expect(fundingRows.map((li) => li.textContent)).toEqual([
+      "AFIF grant (EU) (grant, year 3): €70 000 000",
+      "National shore-power grant (grant, year 5): €100 000 000",
+      "Province & municipality grant (grant, year 1): €3 500 000",
+      "Municipality interest-free note (interest-free note, year 1, term 10 years): €10 000 000",
+    ]);
+    // The recovery slide: per-lift prices with the unit-price exemption and the segment rates.
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — per-lift prices");
     expect(bodyFigureValue("recovery", "Payments")).toBe("240");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€1 626 223");
-    expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€390 293 432");
-    expect(bodyFigureValue("recovery", "Unit price Year 3")).toBe("€5,81");
-    // v0.6.8 Task E.4: the port fixture carries both basis notes, disclosed verbatim on the
+    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€2 843 366");
+    expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€855 907 745");
+    expect(bodyFigureValue("recovery", "Unit price 2028")).toBe("€7 108,41");
+    expect(bodyFigureValue("recovery", "Segment rate — Deep-sea container berths (full ramp)")).toBe("5,83 €ct/kWh");
+    expect(bodyFigureValue("recovery", "Segment rate — Cruise terminal berths (full ramp)")).toBe("4,37 €ct/kWh");
+    expect(bodyFigureValue("recovery", "Segment rate — Bulk & liquid market berths (full ramp)")).toBe("2,92 €ct/kWh");
+    expect(bodyFigureValue("recovery", "Segment rate — Inland & public berths (full ramp)")).toBe("1,46 €ct/kWh");
+    // v0.6.10 Task F: the program fixture carries both basis notes, disclosed verbatim on the
     // recovery slide (the land fixture is the null-tolerance demo and gains none).
     const recoverySlideEl = document.querySelector('[data-slide-name="recovery"]') as HTMLElement;
-    expect(recoverySlideEl.textContent).toContain("Tariff basis: Per-lift infrastructure surcharge recovering the full modeled program cost, including 20 years of operations and maintenance.");
-    expect(recoverySlideEl.textContent).toContain("Repayment basis: Monthly payments solved so the project earns the 6 percent target over 20 years; volumes are yearly vessel calls times lifts.");
-    expect(bodyFigureValue("coverage", "Break-even year")).toBe("Year 15");
-    expect(bodyFigureValue("coverage", "Nominal payback")).toBe("14.1 years");
-    expect(bodyFigureValue("coverage", "Discounted payback (at WACC)")).toBe("18.4 years");
+    expect(recoverySlideEl.textContent).toContain("Tariff basis: Per-kWh infrastructure surcharge recovering the net private program cost after grants; each segment carries its own operating span.");
+    expect(recoverySlideEl.textContent).toContain("Repayment basis: Monthly collections solved so the program earns the 6 percent target on the grant-netted private basis; sums vary by funding avenue.");
+    // The coverage slide: the calendar break-even under the 2026 start year.
+    expect(bodyFigureValue("coverage", "Break-even year")).toBe("2039");
+    expect(bodyFigureValue("coverage", "Nominal payback")).toBe("13.9 years");
+    expect(bodyFigureValue("coverage", "Discounted payback (at WACC)")).toBe("18.2 years");
+    // The deal slide: the equity verdict on the financing overlay (the equity IRR derived).
     expect(document.querySelector('[data-slide-name="deal"] [data-testid="deck-verdict"]')?.textContent).toBe(
-      "Target met — net gain €120 701 791."
+      "Target met — equity IRR 7.14% on €359 000 400 outlaid."
     );
+    // The donuts: six outflow labels, the fees-and-grants inflow pair with the loan disclosure.
     const outflowDonut = document.querySelector('[data-donut="outflows"]');
     expect(outflowDonut).toBeTruthy();
-    expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(5);
+    expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(6);
     expect(outflowDonut?.textContent).toContain("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
     const inflowDonut = document.querySelector('[data-donut="inflows"]');
     expect(inflowDonut).toBeTruthy();
     expect(inflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(2);
-    expect(inflowDonut?.textContent).toContain("Deep-sea container vessel (8-24k TEU)");
-    expect(inflowDonut?.textContent).toContain("Feeder & medium vessel (3-8k TEU)");
+    expect(inflowDonut?.textContent).toContain("Fees");
+    expect(inflowDonut?.textContent).toContain("Grants");
+    expect(inflowDonut?.textContent).toContain("the interest-free loan nets to zero over the horizon and never joins the donut.");
+    // The target chart rows render the pinned solved payments at the ones unit.
     const targetChart = document.querySelector('[data-slide-name="scenarios"] [data-testid="scenario-target-chart"]');
     expect(targetChart).toBeTruthy();
     expect(targetChart?.getAttribute("data-mode")).toBe("solved");
     expect(targetChart?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("The payment rises as the target IRR rises");
-    expect(targetChart?.querySelector('[data-target-label="4%"] .row-value')?.textContent).toBe("€1 440 561");
-    expect(targetChart?.querySelector('[data-target-label="6%"] .row-value')?.textContent).toBe("€1 626 223");
-    expect(targetChart?.querySelector('[data-target-label="8%"] .row-value')?.textContent).toBe("€1 828 352");
+    expect(targetChart?.querySelector('[data-target-label="4%"] .row-value')?.textContent).toBe("€2 489 496");
+    expect(targetChart?.querySelector('[data-target-label="6%"] .row-value')?.textContent).toBe("€2 843 366");
+    expect(targetChart?.querySelector('[data-target-label="8%"] .row-value')?.textContent).toBe("€3 233 059");
   });
 });
 
