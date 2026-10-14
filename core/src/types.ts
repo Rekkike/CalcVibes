@@ -78,11 +78,19 @@ export interface FinancingConfig {
   perLineSharePct: Record<string, number>;
 }
 
+export interface TariffSpan {
+  startYear: number;
+  termYears: number;
+}
+
 export interface TariffRow {
   id: string;
   label: string;
   weight: number;
   lifts: number[];
+  // v0.6.10 Task C (W35): the optional per-row span; absent = inherit the common span
+  // (or the repayment-derived grid when no common span is declared).
+  span?: TariffSpan | null;
 }
 
 export interface TariffConfig {
@@ -91,6 +99,15 @@ export interface TariffConfig {
   rows: TariffRow[];
   fixedAnnualAmount: number | null;
   manualPrices: number[] | null;
+  // v0.6.10 Task C (W35): the tariff owns its span — an overall start and term; absent
+  // derives the grid from the repayment shape exactly as before (the no-drift pin).
+  span?: TariffSpan | null;
+  // v0.6.10 Task E.3 (W20): the machine-labeled unit vocabulary — presentation-only,
+  // engine-blind beyond carrying the fields (the volume grid header unit and the
+  // per-segment surcharge unit with its divisor).
+  volumeUnitLabel?: string | null;
+  priceUnitLabel?: string | null;
+  priceDisplayDivisor?: number | null;
   // v0.6.8 Task E (finding W21): the optional, user-authored basis note. Engine-blind by the
   // pinned check; it surfaces in the app, the deck, and the PDF only.
   basisNote?: string | null;
@@ -126,6 +143,43 @@ export interface AppraisalParams {
   residual: ResidualParams;
 }
 
+export interface FundingRow {
+  id: string;
+  label: string;
+  kind: "grant" | "interest-free-loan";
+  amount: number;                    // currency units, positive
+  year: number;                      // model year the row lands (grant receipt; loan advance)
+  termYears?: number | null;         // loan-kind: the repayment term, default 1
+  repaymentStartYear?: number | null; // loan-kind: the first repayment year, default 1
+}
+
+export interface FundingConfig {
+  rows: FundingRow[];
+}
+
+export interface FundingShare {
+  lineId: string;
+  lineName: string;
+  capitalizedToDate: number;
+  shareOfGrant: number;
+  nettedAmount: number;
+}
+
+export interface FundingAllocation {
+  grantId: string;
+  label: string;
+  year: number;
+  amount: number;
+  shares: FundingShare[];
+}
+
+export interface FundingView {
+  rows: FundingRow[];
+  grantsTotal: number;
+  fundingNpv: number;
+  allocation: FundingAllocation[];
+}
+
 export interface ModelInputs {
   projectName: string;
   currency: string;
@@ -140,6 +194,10 @@ export interface ModelInputs {
   maintenance?: MaintenanceConfig;
   tariff?: TariffConfig;
   financing?: FinancingConfig;
+  // v0.6.10 Task A: the funding block — grants and the interest-free public note.
+  // Absent or null = the engine is byte-identical to the pre-funding behavior (the golden
+  // no-drift pin).
+  funding?: FundingConfig | null;
   projectLengthYears?: number | null;
 }
 
@@ -306,6 +364,8 @@ export interface ModelResult {
   bookView?: BookView;
   termPositions?: TermPosition[];
   contractsInfo?: ContractInfo[];
+  // v0.6.10 Task A: the funding view — null when no funding rows are present.
+  fundingView?: FundingView | null;
   residualAmountUsed?: number;
   solvedClamped?: boolean;
   headlineSource?: "monthly" | "yearly" | "ambiguous";

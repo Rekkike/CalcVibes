@@ -23,7 +23,7 @@ interface BookEntry {
   config: DepreciationConfig | null;
 }
 
-function lineIncurred(c: CostLine): Map<number, number> {
+export function lineIncurred(c: CostLine): Map<number, number> {
   const map = new Map<number, number>();
   const overrides = c.yearOverrides && Object.keys(c.yearOverrides).length > 0 ? c.yearOverrides : null;
   if (c.category === "capex") {
@@ -43,12 +43,16 @@ function lineIncurred(c: CostLine): Map<number, number> {
   return map;
 }
 
+// v0.6.10 Task B: the optional grant netting — lineId -> (receipt year -> netted amount).
+// With no map (or no entry for a line) the arithmetic is byte-identical to the
+// pre-funding schedule (the golden no-drift pin).
 export function computeBookSchedule(
   costs: CostLine[],
   reinvestments: { contractId: string; ri: Reinvestment }[],
   defaultConfig: DepreciationConfig | null,
   horizonYears: number,
   costLineTotals: Map<string, number>,
+  nettingByLine?: Map<string, Map<number, number>>,
 ): BookSchedule {
   const entries: BookEntry[] = [];
   for (const c of costs) {
@@ -73,27 +77,45 @@ export function computeBookSchedule(
     let basis = 0;
     let charges = 0;
     let charging = false;
+    // v0.6.10 Task B: the standing straight-line charge; a net arrival while charging
+    // re-bases it over the remaining straight-line years.
+    let currentCharge = 0;
+    const nets = nettingByLine?.get(e.id) ?? null;
     for (let y = firstYear; y <= horizonYears; y++) {
       const incurred = e.incurred.get(y) ?? 0;
+      const net = nets?.get(y) ?? 0;
+      // v0.6.10 Task B: the net arrival reduces the book first (byte-identical when absent);
+      // the ending carries the netted book forward, and before commissioning the nets simply
+      // reduce the commissioning basis.
+      const netted = book - net;
       let charge = 0;
       if (incurred > 0) {
         charge = 0;
       } else if (!charging && y >= commissioning) {
         charging = true;
-        basis = book;
+        basis = netted;
+        currentCharge = basis / straightYears;
+      }
+      if (charging && net > 0) {
+        // v0.6.10 Task B: the net arrival re-bases the remaining straight-line charge
+        // (nettedBook / remaining years); the rate mode charges on the netted book.
+        if (cfg && cfg.mode === "straight-line") {
+          const remaining = straightYears - charges;
+          currentCharge = remaining > 0 ? Math.max(0, netted) / remaining : 0;
+        }
       }
       if (charging && incurred === 0) {
         if (cfg && cfg.mode === "straight-line") {
-          charge = charges < straightYears ? basis / straightYears : 0;
+          charge = charges < straightYears ? currentCharge : 0;
         } else if (cfg && cfg.mode === "rate") {
-          charge = book * ((cfg.yearlyRatePct ?? 0) / 100);
+          charge = Math.max(0, netted) * ((cfg.yearlyRatePct ?? 0) / 100);
         } else {
           charge = 0;
         }
         charges += charge > 0 ? 1 : 0;
       }
-      if (book - charge < 0) charge = Math.max(0, book);
-      const ending = book + incurred - charge;
+      if (netted - charge < 0) charge = Math.max(0, netted);
+      const ending = netted + incurred - charge;
       rows.push({ year: y, beginning: book, charge: charge, ending: ending });
       book = ending;
     }
