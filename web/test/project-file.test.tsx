@@ -121,3 +121,65 @@ describe("v0.6.3 project file save/load", () => {
     }
   });
 });
+
+describe("v0.6.10 Task G.6: the funding block rides the project file additively", () => {
+  it("FUNDING-ROUND-TRIP: serialize→parse→serialize on the program fixture is byte-identical and the parsed project computes the figures of record", async () => {
+    const { computeModel } = await import("../src/engine.js");
+    const settings = { startYear: 2026, entryUnit: "thousands" as const, scenarioTargets: [4, 6, 8], scenarioTerms: [15, 20, 25], scenarioBalloons: [0, 8, 16], scenarioGrantScales: [0, 0.5, 1] };
+    const first = serializeProject(shorePowerProgram(), settings);
+    const back = parseProject(first);
+    const second = serializeProject(back.inputs, back.settings);
+    expect(second).toBe(first); // the Task G.6 byte-identity pin
+    // the funding block, the tariff spans, and the display labels survive the round trip
+    expect(back.inputs.funding?.rows.length).toBe(4);
+    expect(back.inputs.tariff?.span).toEqual({ startYear: 3, termYears: 20 });
+    expect(back.inputs.tariff?.volumeUnitLabel).toBe("GWh");
+    expect(back.inputs.tariff?.priceUnitLabel).toBe("€ct/kWh");
+    expect(back.inputs.tariff?.priceDisplayDivisor).toBe(10000);
+    expect(back.settings.scenarioGrantScales).toEqual([0, 0.5, 1]);
+    // the parsed project computes identically to the fixture (equality, not tolerance)
+    const direct = computeModel(shorePowerProgram());
+    const r = computeModel(back.inputs);
+    expect(r.paymentAmount).toBe(direct.paymentAmount);
+    expect(r.totalCost).toBe(direct.totalCost);
+    expect(r.totalCollected).toBe(direct.totalCollected);
+    expect(r.achievedIrr).toBe(direct.achievedIrr);
+    expect(r.fundingView?.grantsTotal).toBe(direct.fundingView?.grantsTotal);
+    expect(r.fundingView?.fundingNpv).toBe(direct.fundingView?.fundingNpv);
+    // the verified pins of record
+    expect(r.paymentAmount).toBe(2843365.6055825967);
+    expect(r.fundingView?.grantsTotal).toBe(173500000);
+    expect(r.fundingView?.fundingNpv).toBe(140055345.14230645);
+  });
+
+  it("FILE-V1-ADDITIVE: a version-1 file without the new fields parses with the empty behavior and computes identically to today", async () => {
+    const { computeModel } = await import("../src/engine.js");
+    // a pre-v0.6.10 shape: the program project with the funding block, the tariff spans,
+    // and the display labels removed, and settings without the grant-scale list.
+    const stripped = JSON.parse(JSON.stringify(shorePowerProgram())) as typeof shorePowerProgram extends () => infer I ? I : never;
+    const s = stripped as unknown as { funding?: unknown; tariff?: Record<string, unknown> & { rows?: Array<Record<string, unknown>> } };
+    delete s.funding;
+    if (s.tariff) {
+      delete s.tariff.span;
+      delete s.tariff.volumeUnitLabel;
+      delete s.tariff.priceUnitLabel;
+      delete s.tariff.priceDisplayDivisor;
+      if (Array.isArray(s.tariff.rows)) {
+        for (const row of s.tariff.rows) delete row.span;
+      }
+    }
+    const file = serializeProject(stripped as never, { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+    expect(JSON.parse(file).fileVersion).toBe(1); // FILE_VERSION stays 1
+    const back = parseProject(file); // absence parses (additive optional fields)
+    expect(back.settings.scenarioGrantScales ?? null).toBeNull(); // absent = the empty behavior
+    expect(back.inputs.funding ?? null).toBeNull();
+    expect(back.inputs.tariff?.span ?? null).toBeNull();
+    // the parsed project computes identically to the same project computed directly today
+    const r = computeModel(back.inputs);
+    const direct = computeModel(JSON.parse(JSON.stringify(stripped)) as never);
+    expect(r.paymentAmount).toBe(direct.paymentAmount);
+    expect(r.totalCollected).toBe(direct.totalCollected);
+    expect(r.achievedIrr).toBe(direct.achievedIrr);
+    expect(r.fundingView ?? null).toBeNull(); // the empty behavior: no funding view
+  });
+});
