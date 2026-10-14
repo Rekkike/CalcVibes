@@ -112,6 +112,40 @@ export async function buildWorkbook(
   repayWs.getColumn(4).numFmt = "#,##0.00";
   width(repayWs, 20);
 
+  // v0.6.10 Task G.4: the funding rows join the export as a Funding sheet — the kinds, years,
+  // and loan terms (raw, the audit route). Placed after the Repayment sheet (disclosed).
+  if (inputs.funding && inputs.funding.rows.length > 0) {
+    const fWs = wb.addWorksheet("Funding");
+    fWs.addRow(["Label", "Kind", "Amount", "Year", "Term years", "Repayment start"]);
+    fWs.getRow(1).eachCell(bold);
+    for (const r of inputs.funding.rows) {
+      fWs.addRow([r.label, r.kind, r.amount, r.year, r.termYears ?? null, r.repaymentStartYear ?? null]);
+    }
+    fWs.getColumn(3).numFmt = "#,##0.00";
+    width(fWs, 26);
+  }
+
+  // v0.6.10 Task G.4: the collections schedule sheet — the collections grid rows with their
+  // kinds (the tariff rows, the grant rows, the funding-loan row), raw per-year amounts. The
+  // sheet did not exist before this pass; it is added here (disclosed) as the raw audit route
+  // for the new grid kinds.
+  if (result.collectionsGrid.length > 0) {
+    const cgWs = wb.addWorksheet("Collections schedule");
+    const yearsCount = result.yearly.length;
+    const cgHeader: (string | number)[] = ["Row", "Name", "Kind", "Total"];
+    for (let y = 1; y <= yearsCount; y++) cgHeader.push(yearHeader(y, opts.startYear));
+    cgWs.addRow(cgHeader);
+    cgWs.getRow(1).eachCell(bold);
+    for (const row of result.collectionsGrid) {
+      const total = row.amounts.reduce((a, v) => a + v, 0);
+      const cells: (string | number | null)[] = [row.id, row.name, row.kind, total];
+      for (let k = 0; k < yearsCount; k++) cells.push(row.amounts[k] ?? null);
+      cgWs.addRow(cells);
+      for (let c = 4; c <= 4 + yearsCount; c++) cgWs.getRow(cgWs.rowCount).getCell(c).numFmt = "#,##0.00";
+    }
+    width(cgWs, 20);
+  }
+
   const metricsWs = wb.addWorksheet("Metrics");
   metricsWs.addRow(["Metric", "Value", "Unit"]);
   metricsWs.getRow(1).eachCell(bold);
@@ -146,6 +180,14 @@ export async function buildWorkbook(
     ["headlineSource", result.headlineSource ?? null, "flag"],
     ["residualDisclosure", result.residualDisclosure ?? null, "flag"],
   ];
+  // v0.6.10 Task G.4: the Metrics sheet gains grantsTotal and fundingNpv when the funding
+  // view is present (raw, the audit route).
+  if (result.fundingView != null) {
+    metrics.push(
+      ["funding.grantsTotal", result.fundingView.grantsTotal, "money"],
+      ["funding.fundingNpv", result.fundingView.fundingNpv, "money"],
+    );
+  }
   if (result.financing !== null) {
     const f = result.financing;
     metrics.push(

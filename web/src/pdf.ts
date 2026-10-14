@@ -519,6 +519,31 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       });
       y += 50;
     }
+    // v0.6.10 Task G.5: the funding breakdown renders through the deck's PDF pipeline — after
+    // the rows chart on the investment slide; the headline figures plus the rows list,
+    // text-only (the slide carries the structured block from deck.ts; the PDF draws it).
+    if (slide.funding !== undefined) {
+      const f = slide.funding;
+      doc.setFontSize(9);
+      const fundingLines: string[] = [
+        `${f.grossLabel}: ${f.gross}`,
+        `Grants: ${f.grants}`,
+        `Net private capital: ${f.net}`,
+        `Grant intensity: ${f.intensity}`,
+      ];
+      for (const r of f.rows) {
+        fundingLines.push(`${r.label} (${r.kind === "grant" ? "grant" : "interest-free note"}, year ${r.year}${r.term != null ? `, term ${r.term} years` : ""}): ${r.value}`);
+      }
+      for (const line of fundingLines) {
+        const wrapped = doc.splitTextToSize(line, 220) as string[];
+        const needed = DISCLOSURE_LINE_HEIGHT * wrapped.length;
+        if (allowBreak && y + needed > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+        doc.text(wrapped, 20, y);
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(line);
+        y += needed;
+      }
+      doc.setFontSize(10);
+    }
     // v0.6.5 Task B/W11: the scenarios target chart joins the print route.
     // v0.6.9 Task G: the scenarios slide never breaks here — the reserved, scaled height
     // is guaranteed within the content band by the up-front measurement above.

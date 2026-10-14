@@ -1,5 +1,5 @@
 import type { ModelInputs, ModelResult, TariffRow } from "../../core/src/types.js";
-import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay } from "./engine.js";
+import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
 import { yearHeader } from "./state.js";
@@ -59,6 +59,30 @@ export interface DeckTile {
   rawValue?: number | null;
 }
 
+// v0.6.10 Task G.1: the funding breakdown block — composed on the investment slide beneath
+// the waterfall when the funding view carries grants. The figures render through the deck
+// display formatters (feeForDisplay at the entry unit, one decimal — the honest halves; the
+// intensity takes the pinned comma one-decimal form); the raws ride for the audit route.
+export interface DeckFundingRow {
+  label: string;
+  kind: "grant" | "interest-free-loan";
+  year: number;
+  value: string;
+  term?: number | null;
+}
+
+export interface DeckFundingBlock {
+  grossLabel: string;
+  gross: string;
+  grants: string;
+  net: string;
+  intensity: string;
+  grossRaw: number;
+  grantsRaw: number;
+  netRaw: number;
+  rows: DeckFundingRow[];
+}
+
 export interface DeckSlide {
   name: string;
   title: string;
@@ -74,6 +98,7 @@ export interface DeckSlide {
   titleMetrics?: { label: string; value: string }[];
   kickerNumber?: string;
   solverScenario?: { label: string; requiredPayment: string | null } | null;
+  funding?: DeckFundingBlock;
 }
 
 export const TERM_GLOSSES: { term: string; gloss: string }[] = [
@@ -113,6 +138,10 @@ export function deckSlides(
   const leveraged = result.leveragedSolve;
   const tariffCollectionMode = inputs.tariff !== undefined && inputs.tariff.mode !== "off" && inputs.tariff.mode !== "decompose";
   const slides: DeckSlide[] = [];
+  // v0.6.10 Tasks G.1/G.2: the funding view drives the investment slide's funding breakdown
+  // block and the inflow donut's grant segment; the loan row nets to zero and never joins.
+  const fundingView = result.fundingView ?? null;
+  const grantsTotal = fundingView?.grantsTotal ?? 0;
 
   // Slide 0 — title
   slides.push({
@@ -133,9 +162,19 @@ export function deckSlides(
   const reinvestmentsTotal = (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0);
   if (reinvestmentsTotal > 0) outflowSegments.push({ id: "reinvestments", label: "Reinvestments", value: reinvestmentsTotal });
   const inflowSegments: DeckDonutSegment[] = [];
-  for (const row of result.collectionsGrid) {
-    const rowTotal = row.amounts.reduce((a, v) => a + v, 0);
-    if (rowTotal > 0) inflowSegments.push({ id: row.id, label: row.name, value: rowTotal });
+  let inflowDisclosure: string | undefined;
+  if (grantsTotal > 0) {
+    // v0.6.10 Task G.2: the inflow donut gains the grant segment — fees (the collections-side
+    // tariff rows) and grants of the totalCollected circle, at the one-decimal share
+    // convention; the interest-free loan nets to zero and never joins the donut.
+    inflowSegments.push({ id: "fees", label: "Fees", value: result.totalCollected - grantsTotal });
+    inflowSegments.push({ id: "grants", label: "Grants", value: grantsTotal });
+    inflowDisclosure = "Fees are the collections-side tariff rows; the interest-free loan nets to zero over the horizon and never joins the donut.";
+  } else {
+    for (const row of result.collectionsGrid) {
+      const rowTotal = row.amounts.reduce((a, v) => a + v, 0);
+      if (rowTotal > 0) inflowSegments.push({ id: row.id, label: row.name, value: rowTotal });
+    }
   }
   const summaryDonuts: DeckDonut[] = [
     {
@@ -146,7 +185,7 @@ export function deckSlides(
       // the waterfall arithmetic (operating lines and reinvestments are part of the total cost).
       ...(result.operatingTotal > 0 ? { disclosure: "The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately." } : {}),
     },
-    { id: "inflows", title: "Inflows — the collections", segments: inflowSegments },
+    { id: "inflows", title: "Inflows — the collections", segments: inflowSegments, ...(inflowDisclosure !== undefined ? { disclosure: inflowDisclosure } : {}) },
   ];
   slides.push({
     name: "summary",
@@ -172,6 +211,31 @@ export function deckSlides(
   if (result.operatingTotal > 0) {
     investmentBody.push({ label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "expensed as incurred; part of the total cost, not depreciated" });
   }
+  // v0.6.10 Task G.1: the funding breakdown block — gross capital program, grants, net private
+  // capital (each at one decimal in the entry unit, the honest halves), the grant intensity,
+  // and the funding rows listed with their kinds and years. The grants figure renders through
+  // feeForDisplay (an ASCII hyphen); the directive's U+2212 is typographic (disclosed).
+  let fundingBlock: DeckFundingBlock | undefined;
+  if (fundingView !== null && grantsTotal > 0) {
+    const grossCapital = result.lineTotals.reduce((a, l) => a + l.total, 0);
+    fundingBlock = {
+      grossLabel: "Gross capital program",
+      gross: fee(grossCapital),
+      grants: fee(-grantsTotal),
+      net: fee(grossCapital - grantsTotal),
+      intensity: percentOneForDisplay(grantsTotal / grossCapital),
+      grossRaw: grossCapital,
+      grantsRaw: grantsTotal,
+      netRaw: grossCapital - grantsTotal,
+      rows: fundingView.rows.map((r) => ({
+        label: r.label,
+        kind: r.kind,
+        year: r.year,
+        value: fee(r.amount),
+        term: r.kind === "interest-free-loan" ? (r.termYears ?? 1) : null,
+      })),
+    };
+  }
   slides.push({
     name: "investment",
     title: "The investment",
@@ -183,6 +247,7 @@ export function deckSlides(
     // disclosure; the capital-program basis stays stated.
     disclosures: ["Composition shares are of the capital program."],
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
+    ...(fundingBlock !== undefined ? { funding: fundingBlock } : {}),
   });
 
   // Slide 3 — recovery
@@ -196,12 +261,27 @@ export function deckSlides(
     if (inputs.tariff?.mode === "decompose") {
       recoveryTitle = "The recovery — per-lift prices";
       const firstPrice = result.tariffYears[0]?.unitPrice;
-      recoveryBody.push({ label: `Unit price ${yearHeader(result.tariffYears[0]?.year ?? 1, startYear)}`, value: firstPrice === null || firstPrice === undefined ? "not applicable" : fee(firstPrice), kind: "money", rawValue: firstPrice ?? null });
+      // v0.6.10 Task E.3/G.3 (W20): the unit-price exemption extends the fee class — a unit
+      // price renders at unit ones with the currency form, never the entry-unit collapse
+      // (the pinned "€7 108,41" class on the program fixture).
+      recoveryBody.push({ label: `Unit price ${yearHeader(result.tariffYears[0]?.year ?? 1, startYear)}`, value: firstPrice === null || firstPrice === undefined ? "not applicable" : unitPriceForDisplay(firstPrice, currency), kind: "money", rawValue: firstPrice ?? null });
+      // With the machine-labeled unit vocabulary declared, the per-row segment rates render
+      // as body figures at the full-ramp year — the first grid year at the maximum weighted
+      // volume (segment rate = charge / divisor, the pinned "5,83 €ct/kWh" class).
+      if (inputs.tariff.priceUnitLabel && inputs.tariff.priceDisplayDivisor && result.tariffYears.length > 0) {
+        const fullRamp = result.tariffYears.reduce((best, y) => (y.weightedVolume > best.weightedVolume ? y : best), result.tariffYears[0]);
+        for (const row of inputs.tariff.rows) {
+          if (fullRamp.perRowCharges === null) continue;
+          const rate = fullRamp.perRowCharges[row.id] / inputs.tariff.priceDisplayDivisor;
+          recoveryBody.push({ label: `Segment rate — ${row.label} (full ramp)`, value: `${roundForDisplay(rate, 2).toFixed(2).replace(".", ",")} ${inputs.tariff.priceUnitLabel}`, kind: "text", rawValue: rate });
+        }
+      }
     }
   } else if (inputs.tariff?.mode === "stable") {
     const base = result.tariffBaseUnitPrice as number;
     recoveryTitle = "The recovery — a stable tariff";
-    recoveryBody.push({ label: "Base price (first grid year terms)", value: fee(base), kind: "money", rawValue: base });
+    // v0.6.10 Task E.3 (W20): the stable base price joins the unit-price exemption.
+    recoveryBody.push({ label: "Base price (first grid year terms)", value: unitPriceForDisplay(base, currency), kind: "money", rawValue: base });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   } else if (inputs.tariff?.mode === "manual") {
     recoveryTitle = "The recovery — evaluated, not solved";
@@ -487,6 +567,17 @@ export function deckSlides(
   const provenance: string[] = anyScenarioSet
     ? ["Scenarios summary: present, fed by the user-set Scenarios tab values."]
     : ["Scenarios summary: no scenarios set."];
+  // v0.6.10 Task G.1: the provenance disclosure carries the funding grounding — composed from
+  // the funding row labels (the national and municipal schemes, AFIF) with the financing
+  // clause (the EIB facility grounds the debt). The composition choice is disclosed in the
+  // completion report.
+  if (fundingView !== null && grantsTotal > 0) {
+    const grantLabels = fundingView.rows.filter((r) => r.kind === "grant").map((r) => r.label).join("; ");
+    const loanLabels = fundingView.rows.filter((r) => r.kind === "interest-free-loan").map((r) => r.label).join("; ");
+    provenance.push(
+      `Funding grounding: the grants (${grantLabels}) ground in the national and municipal shore-power schemes and AFIF; the debt facility is grounded by the financing overlay${loanLabels !== "" ? `; the interest-free note (${loanLabels}) nets to zero over the horizon` : ""}.`,
+    );
+  }
   return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
 }
 
