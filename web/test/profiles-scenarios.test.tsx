@@ -39,9 +39,9 @@ describe("Profile editor (Task B UI)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    const capexRow = document.querySelector('[data-kind="cost"][data-line="c3"]') as HTMLElement;
+    const capexRow = document.querySelector('[data-kind="cost"][data-line="p3"]') as HTMLElement;
     expect(capexRow).toBeTruthy();
-    const editorRow = document.querySelector('[data-kind="year-editor"][data-line="c3"]') as HTMLElement;
+    const editorRow = document.querySelector('[data-kind="year-editor"][data-line="p3"]') as HTMLElement;
     const toggle = editorRow.querySelector('[data-testid="year-editor-toggle"]') as HTMLElement;
     expect(toggle).toBeTruthy();
     const editorDetails = editorRow.querySelector("details") as HTMLDetailsElement;
@@ -53,7 +53,7 @@ describe("Profile editor (Task B UI)", () => {
     fireEvent.change(first, { target: { value: "1" } });
     fireEvent.change(count, { target: { value: "4" } });
     fireEvent.click(editorRow.querySelector('[data-action="spread-fill"]') as HTMLElement);
-    const editor = document.querySelector('[data-kind="year-editor"][data-line="c3"] [data-testid="year-editor"]') as HTMLElement;
+    const editor = document.querySelector('[data-kind="year-editor"][data-line="p3"] [data-testid="year-editor"]') as HTMLElement;
     expect(editor.querySelectorAll("[data-override-year]").length).toBe(4);
     const amounts = Array.from(editor.querySelectorAll('[data-field="override-amount"]') as NodeListOf<HTMLInputElement>).map((i) => parseFloat(i.value));
     expect(amounts).toEqual([84500000, 84500000, 84500000, 84500000]);
@@ -63,7 +63,7 @@ describe("Profile editor (Task B UI)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    const amount = document.querySelector('[data-line="c3"] [data-field="amount"]') as HTMLInputElement;
+    const amount = document.querySelector('[data-line="p3"] [data-field="amount"]') as HTMLInputElement;
     expect(amount.disabled).toBe(false);
     expect(document.body.textContent).toContain("CAPEX duration is set by the year profile");
   });
@@ -82,7 +82,7 @@ describe("SCE battery (Task D)", () => {
     expect(document.querySelector('[data-testid="term-target-table"]')).toBeNull();
     expect(document.querySelector('[data-testid="balloon-term-table"]')).toBeNull();
   });
-  it("SCE-LIST: entering targets [3, 5, 7] and terms [5, 7, 9] renders the pinned rows (v0.6.7 re-anchor: the port base, term-5 column, entry unit thousands, EUR)", () => {
+  it("SCE-LIST: entering targets [3, 5, 7] and terms [5, 7, 9] renders the pinned rows (v0.6.10 re-anchor: the program base, term-7 column cells, entry unit thousands, EUR)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
@@ -102,11 +102,11 @@ describe("SCE battery (Task D)", () => {
     const rowText = (r: HTMLElement) => Array.from(r.querySelectorAll("td")).map((td) => td.textContent).join("|");
     expect(rows.length).toBe(3);
     expect(rowText(rows[0] as HTMLElement)).toContain("3%");
-    expect(rowText(rows[0] as HTMLElement)).toContain("€3 350 k");
-    expect(rowText(rows[1] as HTMLElement)).toContain("€3 534 k");
-    expect(rowText(rows[2] as HTMLElement)).toContain("€3 723 k");
+    expect(rowText(rows[0] as HTMLElement)).toContain("€4 515 k");
+    expect(rowText(rows[1] as HTMLElement)).toContain("€4 868 k");
+    expect(rowText(rows[2] as HTMLElement)).toContain("€5 239 k");
   });
-  it("SCE-ZERO: the 0 percent row renders the nominal identity (v0.6.7 re-anchor: the port base)", () => {
+  it("SCE-ZERO: the 0 percent row renders the nominal identity (v0.6.10 re-anchor: the program base)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("scenarios"));
@@ -124,7 +124,7 @@ describe("SCE battery (Task D)", () => {
     const tt = document.querySelector('[data-testid="term-target-table"]') as HTMLElement;
     const firstRow = tt.querySelector("tbody tr") as HTMLElement;
     expect(firstRow.textContent).toContain("0%");
-    expect(firstRow.textContent).toContain("€3 085 k");
+    expect(firstRow.textContent).toContain("€4 021 k");
   });
   it("SCE-VALID: each invalid construct surfaces the named error (v0.6.7 re-anchor: the port presets are cleared first)", () => {
     render(<App />);
