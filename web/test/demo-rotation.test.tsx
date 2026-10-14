@@ -15,11 +15,6 @@ import { shorePowerProgram, shorePowerProject, landNewbuildProject } from "../sr
 import {
   computeModel,
   entryToValue,
-  deckMoneyForDisplay,
-  deckYearsForDisplay,
-  unitPriceForDisplay,
-  percentForDisplay,
-  percentTwoForDisplay,
 } from "../src/engine.js";
 import { deckSlides } from "../src/deck.js";
 import type { ModelInputs, ModelResult } from "../../core/src/types.js";
@@ -260,7 +255,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     expect(scenariosSlide?.targetChart?.points.map((p) => p.value)).toEqual([2489496.3612990044, 2843365.6055825967, 3233058.949475011]);
     scenariosSlide?.targetChart?.points.forEach((p) => expect(p.met).toBe(true));
     // The provenance disclosure carries the funding grounding verbatim.
-    expect(deck.provenance.join(" ")).toContain(
+    expect((deck.provenance ?? []).join(" ")).toContain(
       "Funding grounding: the grants (AFIF grant (EU); National shore-power grant; Province & municipality grant) ground in the national and municipal shore-power schemes and AFIF; the debt facility is grounded by the financing overlay; the interest-free note (Municipality interest-free note) nets to zero over the horizon.",
     );
     // Rendered deck at entry unit "ones", set through the existing unit select.
