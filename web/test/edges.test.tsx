@@ -15,7 +15,7 @@ describe("EX-5 edges", () => {
     // make the result invalid: a cost line with an empty name
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("costs"));
-    const nameInput = document.querySelector('[data-line="c1"] [data-field="name"]') as HTMLInputElement;
+    const nameInput = document.querySelector('[data-line="p1"] [data-field="name"]') as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "" } });
     const xlsx = byAction("export-xlsx") as HTMLButtonElement;
     const pdfBtn = byAction("download-pdf") as HTMLButtonElement;
