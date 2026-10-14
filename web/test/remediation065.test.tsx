@@ -163,7 +163,7 @@ describe("v0.6.5 Task C: the paired composition donuts (W13)", () => {
     expect(infl.segments.reduce((a, s) => a + s.value, 0)).toBeCloseTo(mlr.totalCollected, 6);
   });
 
-  it("C-RENDER: the rendered summary carries the two donuts with labels outside the geometry, no viewbox text (v0.6.7 re-anchor: the port inflow carries the two post-fix tariff rows, so the single-segment full-circle case no longer arises from the demo button)", () => {
+  it("C-RENDER: the rendered summary carries the two donuts with labels outside the geometry, no viewbox text (v0.6.10 re-anchor: the program inflow carries the fees and grants segments — 2 segments in, 6 out — so the single-segment full-circle case no longer arises from the demo button)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -177,10 +177,11 @@ describe("v0.6.5 Task C: the paired composition donuts (W13)", () => {
     for (const label of Array.from(inflow.querySelectorAll('[data-testid="donut-label"]'))) {
       expect((inflow.querySelector("svg") as SVGSVGElement).contains(label)).toBe(false);
     }
-    expect(inflow.querySelector('[data-testid="donut-center-total"]')?.textContent).toBe("€390 293 k");
-    expect(inflow.querySelector('[data-donut-label="r1"]')?.textContent).toContain("Deep-sea container vessel (8-24k TEU)");
+    expect(inflow.querySelector('[data-testid="donut-center-total"]')?.textContent).toBe("€855 908 k");
+    expect(inflow.querySelector('[data-donut-label="fees"]')?.textContent).toContain("Fees €682 408 k");
+    expect(inflow.querySelector('[data-donut-label="grants"]')?.textContent).toContain("Grants €173 500 k");
     const outflow = wrap.querySelector('[data-donut="outflows"]') as HTMLElement;
-    expect(outflow.querySelectorAll("[data-donut-segment]").length).toBe(5);
+    expect(outflow.querySelectorAll("[data-donut-segment]").length).toBe(6);
     expect(outflow.querySelector("svg text")).toBeNull();
   });
 });
@@ -203,12 +204,12 @@ describe("v0.6.5 Task E: the scale-adaptive chart labels (W12)", () => {
     // the clamp is bounded [15, 85] in the model
     const deckSrc = fs.readFileSync("src/deck.ts", "utf8");
     expect(deckSrc).toContain("Math.min(85, Math.max(15");
-    // rendered: the coverage slot carries the crossing x and the label rule reads it (v0.6.7 re-anchor: the port crossing)
+    // rendered: the coverage slot carries the crossing x and the label rule reads it (v0.6.10 re-anchor: the program crossing)
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slot = document.querySelector('[data-slide-name="coverage"] [data-slide-chart="coverage"]') as HTMLElement;
-    expect(slot.style.getPropertyValue("--deck-crossing-x")).toBe("63.6%");
+    expect(slot.style.getPropertyValue("--deck-crossing-x")).toBe("59.1%");
     expect(document.querySelector('[data-testid="stage-returns-crossing"]')).toBeTruthy();
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\[data-testid="presentation"\] \.line-years\s*\{/);
