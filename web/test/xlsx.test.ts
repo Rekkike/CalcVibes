@@ -19,7 +19,7 @@ describe("EX-3 XLSX round-trip (base demo)", () => {
   it("sheet inventory and Repayment row count", async () => {
     const buffer = await buildWorkbook(demoProject(), result);
     const wb = await readWorkbook(buffer);
-    expect(wb.worksheets.map((ws) => ws.name)).toEqual(["Inputs", "Cost lines", "Repayment", "Metrics"]);
+    expect(wb.worksheets.map((ws) => ws.name)).toEqual(["Inputs", "Cost lines", "Repayment", "Collections schedule", "Metrics"]);
     const repay = wb.getWorksheet("Repayment") as { rowCount: number };
     expect(repay.rowCount).toBe(11);
   });

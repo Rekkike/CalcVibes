@@ -99,6 +99,8 @@ describe("chunk 7: carried fixes", () => {
   it("the results table uses the shared helper (covered in v0.3.1) and the deck does too; unset start gives Year-k", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
+    // v0.6.10 re-anchor: the program loader presets startYear 2026; clear it so the shared helper gives Year-k.
+    fireEvent.change(document.querySelector('[data-field="startYear"]') as HTMLElement, { target: { value: "" } });
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
