@@ -333,7 +333,7 @@ describe("v0.6.10 Task C — the tariff owns its span (W35)", () => {
       computeModel({ ...inp, repayment: { ...inp.repayment, termYears: 25 } });
       expect.unreachable();
     } catch (e) {
-      expect((e as EngineInputError).issues[0]).toBe("Tariff span does not cover the required collection stream: year 24 carries required collections outside the tariff grid.");
+      expect((e as EngineInputError).issues[0]).toBe("The required collections extend to year 24, beyond the declared tariff span (years 3-23): widen the tariff span or shorten the term.");
     }
   });
 

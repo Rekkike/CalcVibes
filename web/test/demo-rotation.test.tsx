@@ -204,10 +204,14 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     expect(scenarioAxisValues("term")).toEqual(["15", "20", "25"]);
     expect(scenarioAxisValues("balloon")).toEqual(["0", "8", "16"]);
     expect(scenarioAxisValues("grant-scale")).toEqual([]);
-    // The named scenario sets are honestly refused on this fixture (the term-25 shift leaves
-    // the declared tariff span), but the axis editors and the per-cell tables still render.
-    expect(document.querySelector('[data-testid="scenarios-refusal"]')).toBeTruthy();
-    expect(document.querySelector('[data-testid="scenario-set-refusal"]')).toBeTruthy();
+    // v0.6.11 re-anchor (Task E): the per-variant contract — the optimistic variant refuses
+    // under its own terms (the term-25 shift leaves the declared tariff span) and carries its
+    // engine reason beside its row; the axis editors and the per-cell tables still render.
+    expect(document.querySelector('[data-testid="scenarios-framing"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="scenario-refusal-optimistic"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="scenario-refusal-optimistic"]')?.textContent).toContain(
+      "The required collections extend to year 24, beyond the declared tariff span (years 3-23)"
+    );
     expect(document.querySelector('[data-testid="term-target-table"]')).toBeTruthy();
   });
 
@@ -244,10 +248,15 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     expect(investment?.funding?.intensity).toBe("38,6%");
     expect(investment?.funding?.rows.map((r) => r.value)).toEqual(["€70 000 000", "€100 000 000", "€3 500 000", "€10 000 000"]);
     expect(investment?.funding?.rows.map((r) => r.term ?? null)).toEqual([null, null, null, 10]);
-    // The scenarios slide: the named sets refuse honestly; the term chart keeps its kicker;
-    // the target chart carries the pinned solved payments.
+    // The scenarios slide (v0.6.11 re-anchor, Task F): the optimistic variant refuses under
+    // its own terms and carries its one-line disclosure; the pessimistic delta renders against
+    // the base (the rawValue pin); the optimistic delta item is absent; the term chart keeps
+    // its kicker; the target chart carries the pinned solved payments.
     const scenariosSlide = deck.slides.find((s) => s.name === "scenarios");
-    expect(scenariosSlide?.disclosures).toContain("The named scenario sets could not be computed for this project; see the Scenarios tab.");
+    expect(scenariosSlide?.disclosures).toContain("The optimistic scenario could not be computed for this project; see the Scenarios tab.");
+    const pesDelta = scenariosSlide?.body.find((f) => f.label === "Named-set delta, pessimistic vs base");
+    expect(pesDelta?.rawValue).toBe(865489.9467288586); // 3708855.5523114554 - 2843365.6055825967
+    expect(scenariosSlide?.body.find((f) => f.label === "Named-set delta, optimistic vs base")).toBeUndefined();
     expect(scenariosSlide?.disclosures).toContain("Some term values were refused by the engine; the refused cells render inline on the Scenarios tab.");
     expect(scenariosSlide?.chart?.kicker).toBe("Longer terms lower the payment");
     expect(scenariosSlide?.targetChart?.mode).toBe("solved");

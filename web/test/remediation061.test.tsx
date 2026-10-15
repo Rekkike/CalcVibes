@@ -10,7 +10,7 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
 describe("v0.6.1 chunk 1 — the worksuite surfaces", () => {
-  it("SCENARIOS-REFUSAL: an engine refusal inside the scenario set renders the readable card and the page stays mounted", () => {
+  it("SCENARIOS-REFUSAL: an engine refusal inside the scenario set renders the per-variant reasons and the page stays mounted (v0.6.11 re-anchor, Task E: the per-item contract)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
@@ -19,10 +19,14 @@ describe("v0.6.1 chunk 1 — the worksuite surfaces", () => {
     const addBtn = editor.querySelector('[data-action="add-col-override"]') as HTMLElement;
     fireEvent.click(addBtn);
     fireEvent.click(byNav("scenarios"));
-    const refusal = document.querySelector('[data-testid="scenarios-refusal"]') as HTMLElement;
-    expect(refusal).toBeTruthy();
-    expect(refusal.textContent).toContain("The engine refused to compute the scenario set");
-    expect(refusal.textContent).toContain("COL-PROFILE-AMOUNT");
+    // v0.6.11 (Task E): the invalid collections override refuses every variant under its own
+    // terms; each variant carries its engine reason beside its row, and the section stays mounted.
+    expect(document.querySelector('[data-testid="scenarios-framing"]')).toBeTruthy();
+    for (const variant of ["base", "optimistic", "pessimistic"]) {
+      const refusal = document.querySelector('[data-testid="scenario-refusal-' + variant + '"]') as HTMLElement;
+      expect(refusal).toBeTruthy();
+      expect(refusal.textContent).toContain("COL-PROFILE-AMOUNT");
+    }
     expect(document.querySelector('[data-testid="scenarios"]')).toBeTruthy();
   });
 

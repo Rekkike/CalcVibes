@@ -318,8 +318,11 @@ export function deckSlides(
 
   // Slide 3 — returns
   const returnsDisclosures: string[] = [];
-  if (result.irrAmbiguous) {
-    returnsDisclosures.push(`The net flow has ${result.signChanges} sign changes; the IRR may not be unique.`);
+  // v0.6.11 Task D: the engine-composed ambiguity note, rendered verbatim (single source;
+  // the retyped sentence of v0.6.8 is retired).
+  const mainAmbiguityNote = result.irrAmbiguityNote ?? null;
+  if (mainAmbiguityNote !== null) {
+    returnsDisclosures.push(mainAmbiguityNote);
   }
   // Slide 3 — coverage
   const coverageBody: DeckFigure[] = [
@@ -365,8 +368,9 @@ export function deckSlides(
     dealTitle = "The deal";
   } else {
     const eq = result.financing.equity;
-    if (eq.irrAmbiguous) {
-      dealDisclosures.push(`The equity net flow has ${eq.signChanges} sign changes; the equity IRR may not be unique.`);
+    // v0.6.11 Task D: the engine-composed equity ambiguity note, rendered verbatim.
+    if (eq.ambiguityNote !== null) {
+      dealDisclosures.push(eq.ambiguityNote);
     }
     dealTitle = "The deal — equity view";
   }
@@ -439,22 +443,25 @@ export function deckSlides(
         return null;
       }
     };
-    let sc: ReturnType<typeof scenarioResults> | null = null;
-    try {
-      sc = scenarioResults(inputs);
-    } catch {
-      sc = null;
-    }
-    if (sc !== null && sc.base.paymentAmount !== null) {
-      const basePayment = sc.base.paymentAmount;
-      if (sc.optimistic.paymentAmount !== null) {
-        sceBody.push({ label: "Named-set delta, optimistic vs base", value: money(sc.optimistic.paymentAmount - basePayment), kind: "money", rawValue: sc.optimistic.paymentAmount - basePayment });
+    // v0.6.11 Task F: the deck consumes the per-variant outcomes individually — a variant
+    // that computes renders its delta item; a variant that refuses under its own terms
+    // renders its one-line per-variant disclosure, naming the variant. The wholesale
+    // disclosure is retired.
+    const sc = scenarioResults(inputs);
+    const basePayment = sc.base.result !== null ? sc.base.result.paymentAmount : null;
+    if (basePayment !== null) {
+      if (sc.optimistic.result !== null && sc.optimistic.result.paymentAmount !== null) {
+        sceBody.push({ label: "Named-set delta, optimistic vs base", value: money(sc.optimistic.result.paymentAmount - basePayment), kind: "money", rawValue: sc.optimistic.result.paymentAmount - basePayment });
+      } else if (sc.optimistic.refusal !== null) {
+        sceDisclosures.push("The optimistic scenario could not be computed for this project; see the Scenarios tab.");
       }
-      if (sc.pessimistic.paymentAmount !== null) {
-        sceBody.push({ label: "Named-set delta, pessimistic vs base", value: money(sc.pessimistic.paymentAmount - basePayment), kind: "money", rawValue: sc.pessimistic.paymentAmount - basePayment });
+      if (sc.pessimistic.result !== null && sc.pessimistic.result.paymentAmount !== null) {
+        sceBody.push({ label: "Named-set delta, pessimistic vs base", value: money(sc.pessimistic.result.paymentAmount - basePayment), kind: "money", rawValue: sc.pessimistic.result.paymentAmount - basePayment });
+      } else if (sc.pessimistic.refusal !== null) {
+        sceDisclosures.push("The pessimistic scenario could not be computed for this project; see the Scenarios tab.");
       }
-    } else {
-      sceDisclosures.push("The named scenario sets could not be computed for this project; see the Scenarios tab.");
+    } else if (sc.base.refusal !== null) {
+      sceDisclosures.push("The base scenario could not be computed for this project; see the Scenarios tab.");
     }
     let chartData: { label: string; value: number }[] = [];
     let chartKicker: string | undefined;
@@ -515,11 +522,11 @@ export function deckSlides(
         }
       }
     }
-    if (chartData.length === 0 && sc !== null && sc.base.paymentAmount !== null) {
+    if (chartData.length === 0 && sc.base.result !== null && sc.base.result.paymentAmount !== null) {
       chartData = [
-        { label: "Base", value: sc.base.paymentAmount },
-        ...(sc.optimistic.paymentAmount !== null ? [{ label: "Optimistic", value: sc.optimistic.paymentAmount }] : []),
-        ...(sc.pessimistic.paymentAmount !== null ? [{ label: "Pessimistic", value: sc.pessimistic.paymentAmount }] : []),
+        { label: "Base", value: sc.base.result.paymentAmount },
+        ...(sc.optimistic.result !== null && sc.optimistic.result.paymentAmount !== null ? [{ label: "Optimistic", value: sc.optimistic.result.paymentAmount }] : []),
+        ...(sc.pessimistic.result !== null && sc.pessimistic.result.paymentAmount !== null ? [{ label: "Pessimistic", value: sc.pessimistic.result.paymentAmount }] : []),
       ];
       chartKicker = "The named scenarios set the payment range";
     }

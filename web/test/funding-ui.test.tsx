@@ -130,11 +130,12 @@ describe("v0.6.10 Task E.1: the funding worksuite surface", () => {
   it("GRANT-SCALE-AXIS: the axis ships empty beside the honest scenario refusal, and its explanation renders", async () => {
     await loadProgramDemo();
     fireEvent.click(byNav("scenarios"));
-    // The named-set computation is honestly refused on this fixture (the term-25 shift leaves
-    // the declared tariff span), but the axis editors and the per-cell tables still render.
-    expect(byTestid("scenarios-refusal")).toBeTruthy();
-    expect(byTestid("scenarios-refusal").textContent).toContain(
-      "The engine refused to compute the scenario set for this project."
+    // v0.6.11 re-anchor (Task E): the per-variant contract — the optimistic variant refuses
+    // under its own terms (the term-25 shift leaves the declared tariff span) and carries its
+    // engine reason; the axis editors and the per-cell tables still render.
+    expect(byTestid("scenarios-framing")).toBeTruthy();
+    expect(byTestid("scenario-refusal-optimistic").textContent).toContain(
+      "Invalid model inputs: The required collections extend to year 24, beyond the declared tariff span (years 3-23): widen the tariff span or shorten the term."
     );
     // The grant-scale axis explanation (the axis editor always renders).
     expect(byTestid("scenario-axis-explanation-grant-scale").textContent).toBe(
@@ -187,7 +188,7 @@ describe("v0.6.10 Task E.1: the funding worksuite surface", () => {
         if (core[i][j] === null) {
           expect(cells[j + 1].getAttribute("data-cell-refusal")).toBe("true");
           expect(cells[j + 1].textContent).toBe(
-            "refused: Invalid model inputs: Tariff span does not cover the required collection stream: year 24 carries required collections outside the tariff grid."
+            "refused: Invalid model inputs: The required collections extend to year 24, beyond the declared tariff span (years 3-23): widen the tariff span or shorten the term."
           );
         } else {
           expect(cells[j + 1].getAttribute("data-cell-refusal")).toBeNull();
