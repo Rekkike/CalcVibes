@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-// v0.6.11: the program fixture moved to _shared.ts (single-sourced across the funding and
-// scenario suites; importing a test file into another test file double-runs its tests).
-import { programFixture0610 } from "./_shared.js";
 import { computeModel } from "../src/engine.js";
 import { paymentVsTermTargetTable, paymentVsBalloonTermTable, paymentVsGrantScaleTable } from "../src/scenarios.js";
 import { EngineInputError } from "../src/validate.js";
 import type { ModelInputs } from "../src/types.js";
 
+// v0.6.11: the whole-program port fixture of record now lives in the shared module
+// ./_program0610.ts (byte-identical values; extracted for cross-suite import).
+import { programFixture0610 } from "./_program0610.js";
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -282,7 +282,8 @@ describe("v0.6.10 Task C — the tariff owns its span (W35)", () => {
       computeModel({ ...inp, repayment: { ...inp.repayment, termYears: 25 } });
       expect.unreachable();
     } catch (e) {
-      // v0.6.11 Task C: the sentence re-anchored to the reworded refusal (the failing year and the declared bounds).
+      // v0.6.11 Task C re-anchor: the refusal sentence now names the declared bounds and
+      // prescribes the check; the fixture, the term, and the failing year are unchanged.
       expect((e as EngineInputError).issues[0]).toBe("The required collections extend to year 24, beyond the declared tariff span (years 3-23): widen the tariff span or shorten the term.");
     }
   });
