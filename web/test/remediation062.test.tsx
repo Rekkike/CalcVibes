@@ -152,7 +152,7 @@ describe("v0.6.2 chunk 1: scenarios guards and the root error boundary (W4)", ()
     expect(table.querySelectorAll("thead th").length).toBe(7);
     const refused = Array.from(table.querySelectorAll("td[data-cell-refusal]"));
     expect(refused.length).toBe(6);
-    expect(refused.every((td) => (td.textContent ?? "").includes("Tariff span does not cover the required collection stream"))).toBe(true);
+    expect(refused.every((td) => (td.textContent ?? "").includes("The required collections extend to"))).toBe(true);
   });
 
   it("BND-1: a deliberately throwing child renders the boundary card with the shell intact", () => {

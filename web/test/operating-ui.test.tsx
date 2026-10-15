@@ -138,8 +138,11 @@ describe("chunk 6: calendar headers, mode results, MIRR helper", () => {
     fireEvent.change(byField("maintenanceMode"), { target: { value: "percent" } });
     fireEvent.click(byNav("results"));
     const warning = screen.getByTestId("irr-ambiguity-warning");
-    expect(warning.textContent).toContain("55 sign changes");
-    expect(warning.textContent).toContain("may not be unique");
+    // v0.6.11 re-anchor (Task D surface): the engine-composed operational note verbatim
+    // (scratch-verified on this fixture — signChanges 55, headlineSource yearly).
+    expect(warning.textContent).toContain(
+      "The net flow alternates 55 times beyond the funding pattern - collections below operating costs or one-off cost spikes can do this - so the IRR may not be unique; the yearly-aggregate rate is shown. The NPV at WACC and the MIRR remain the reliable criteria, and the operating years at the alternations merit a look."
+    );
   });
 
   it("display round pin retained", () => {

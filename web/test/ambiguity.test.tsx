@@ -11,12 +11,13 @@ function resultWith(overrides: Partial<ModelResult>): ModelResult {
 }
 
 describe("ambiguity warning display (component contract)", () => {
-  it("renders the warning when irrAmbiguous is true", () => {
-    const result = resultWith({ signChanges: 3, irrAmbiguous: true });
+  it("renders the warning when irrAmbiguous is true (v0.6.11 re-anchor, Task D surface: the engine-composed note is the contract)", () => {
+    const note =
+      "Funding receipts alternate the net flow (3 sign changes), so the IRR may not be unique - the yearly-aggregate rate is shown; the NPV at WACC and the MIRR are unaffected and remain the reliable criteria.";
+    const result = resultWith({ signChanges: 3, irrAmbiguous: true, irrAmbiguityCause: "financing", irrAmbiguityNote: note });
     render(<ResultsSection result={result} targetIrr={12} currency="EUR" />);
     const warning = screen.getByTestId("irr-ambiguity-warning");
-    expect(warning.textContent).toContain("3 sign changes");
-    expect(warning.textContent).toContain("may not be unique");
+    expect(warning.textContent).toContain(note);
   });
 
   it("does not render the warning when irrAmbiguous is false", () => {

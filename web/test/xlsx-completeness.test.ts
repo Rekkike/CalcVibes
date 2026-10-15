@@ -124,7 +124,11 @@ describe("D-2: Metrics identity — one row per top-level scalar of ModelResult;
     })) {
       leaves.set(`financing.${key}`, value as number | string);
     }
+    // v0.6.11 (Task D): EquityMetrics gained ambiguityCause and ambiguityNote — classification
+    // and prose, not metrics. The xlsx Metrics sheet is byte-identity locked (Task G) and does
+    // not enumerate them, so the leaf-for-leaf identity excludes the two new leaves.
     for (const [key, value] of scalarLeaves(f.equity, "equity")) {
+      if (key === "equity.ambiguityCause" || key === "equity.ambiguityNote") continue;
       leaves.set(key, typeof value === "boolean" ? (value ? "true" : "false") : (value as number | string));
     }
     for (const [key, value] of leaves) {
