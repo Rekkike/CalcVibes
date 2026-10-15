@@ -6,8 +6,9 @@ Per the migration ruling (the ledger, Round 45 Supplement 8): the sandbox-specif
 
 ## The failure class of record
 
-- Per-turn environment resets wiped the working directory repeatedly (eleven wipes across the v0.6.9 and v0.6.10 trajectories). The session transcript survives a wipe even though the filesystem does not, so an alive session replays its own prior edits from history — but the transcript dies with the session and is never a plan of record.
+- Per-turn environment resets wiped the working directory repeatedly (eleven wipes across the v0.6.9 and v0.6.10 trajectories; the v0.6.11 pass added further wipes and a new boundary - the native execution upgrade expires at every turn boundary, and one expiry wiped /tmp with the working tree inside it). The session transcript survives a wipe even though the filesystem does not, so an alive session replays its own prior edits from history — but the transcript dies with the session and is never a plan of record.
 - Full outages: the remote sandbox lease expired and the storage proxy rejected every access path with authorization failures (three times in the v0.6.10 trajectory, each roughly thirty-five minutes to the honest halt).
+- Context-window exhaustion: a turn that runs the full web battery repeatedly (roughly two minutes per run with large failure output) fills the context window and compacts, ending the turn mid-chunk. The cost accounting is the same - at most one checkpoint interval - and the resumed turn reads its state from the branch tip.
 - `npm install` and `npm ci` are forbidden in the sandbox. The hand-rolled lockfile installer below is the workaround.
 - GitHub — the sole durable store — never failed once across the entire trajectory. Every push, fetch, and CI run held. The consistent conclusion: push early, push often.
 
@@ -20,18 +21,19 @@ Per the migration ruling (the ledger, Round 45 Supplement 8): the sandbox-specif
 
 ## The sha512 lockfile installer
 
-Download each package tarball listed in `package-lock.json` directly from the registry, verify its sha512 against the lockfile's `integrity` field, and extract it into `node_modules` at the lockfile's declared path. The installer of record carries four fixes, each found the hard way:
+Download each package tarball listed in `package-lock.json` directly from the registry, verify its sha512 against the lockfile's `integrity` field, and extract it into `node_modules` at the lockfile's declared path. The installer of record carries five fixes, each found the hard way:
 
 1. The detected tarball root segment — npm tarballs may carry any single root directory, not only `package/` (the `@types/node` tarball carries `node v22.20/`); detect the actual root instead of assuming.
 2. Non-destructive merge extraction — never remove the destination before copying: a parallel or nested install can share an ancestor directory, and destructive ancestor removal deletes siblings (a concurrency race). Copy over the destination in place.
 3. The package-unique cache key — `name.replace(/^@/, "").replace(/\//g, "__")` plus the version: `@types/react` and `react` both resolve to a tarball named `react-<version>.tgz`, and a name-derived cache key alone installs the wrong package (a jsx-runtime failure).
 4. The path-copy normalization — copy the root's contents (`src/.`), never the root itself; path normalization can silently rewrite a trailing `/.` and misplace the whole tree.
+5. The tar-strip extraction — this sandbox's `cp` handles `src/.` by nesting the root directory inside the destination rather than copying its contents; the fix-4 copy step therefore extracts with `tar --strip-components=1` into the destination after the single-root check (found in the v0.6.11 rebuild).
 
 ## The checkpoint discipline (the atomic checkpoint rule)
 
 Never hold more than one unverified edit. Push to the working branch after every unit that would hurt to lose: each source-file batch at clean typecheck, each green re-anchored test suite, each verified harness. A red intermediate state on the working branch is acceptable mid-pass; the merge gate (full battery green plus byte verification) governs the deliverable. A running-state file (`CHECKPOINT.md`) rides the branch, updated at every push: the last verified step, the battery counts, the outstanding unverified edits, the next action. An involuntary halt then costs at most one checkpoint interval, and a resume reads its state from the branch tip instead of reconstructing from memory.
 
-The v0.6.10 pass closed at twenty-three checkpoints; every environment failure during the pass cost exactly one interval. The discipline is the proof.
+The v0.6.10 pass closed at twenty-three checkpoints; every environment failure during the pass cost exactly one interval. The discipline is the proof. The v0.6.11 pass closed at six pushes across three interrupted session lineages; the regenerate lesson of record: a regenerated session receives the original kickoff and must be told the branch state - a resume reads the branch tip, and a mid-pass state relay from the controller is the bridge between the two.
 
 ## The read-only probe rule
 
