@@ -3,17 +3,23 @@ import { paymentVsBalloonTermTable, paymentVsTermTargetTable, scenarioResults, t
 import { templateLike } from "./_shared.js";
 
 describe("Chunk 4: scenarios and sensitivity", () => {
-  it("scenario payments and headline figures; strict ordering", () => {
+  it("scenario payments and headline figures; strict ordering (the v0.6.11 Task A outcome shape; all three variants compute on this fixture)", () => {
     const sc = scenarioResults(templateLike());
-    expect(Math.abs((sc.base.paymentAmount as number) - 475309.13407)).toBeLessThan(0.01);
-    expect(Math.abs((sc.optimistic.paymentAmount as number) - 356830.01861)).toBeLessThan(0.01);
-    expect(Math.abs((sc.pessimistic.paymentAmount as number) - 629065.46336)).toBeLessThan(0.01);
-    expect(sc.optimistic.totalCost).toBe(6999102);
-    expect(sc.optimistic.paymentCount).toBe(32);
-    expect(Math.abs(sc.pessimistic.totalCost - 8715762)).toBeLessThan(0.01);
-    expect(sc.pessimistic.paymentCount).toBe(24);
-    expect((sc.optimistic.paymentAmount as number)).toBeLessThan(sc.base.paymentAmount as number);
-    expect((sc.base.paymentAmount as number)).toBeLessThan(sc.pessimistic.paymentAmount as number);
+    expect(sc.base.refusal).toBeNull();
+    expect(sc.optimistic.refusal).toBeNull();
+    expect(sc.pessimistic.refusal).toBeNull();
+    const base = sc.base.result!;
+    const optimistic = sc.optimistic.result!;
+    const pessimistic = sc.pessimistic.result!;
+    expect(Math.abs((base.paymentAmount as number) - 475309.13407)).toBeLessThan(0.01);
+    expect(Math.abs((optimistic.paymentAmount as number) - 356830.01861)).toBeLessThan(0.01);
+    expect(Math.abs((pessimistic.paymentAmount as number) - 629065.46336)).toBeLessThan(0.01);
+    expect(optimistic.totalCost).toBe(6999102);
+    expect(optimistic.paymentCount).toBe(32);
+    expect(Math.abs(pessimistic.totalCost - 8715762)).toBeLessThan(0.01);
+    expect(pessimistic.paymentCount).toBe(24);
+    expect((optimistic.paymentAmount as number)).toBeLessThan(base.paymentAmount as number);
+    expect((base.paymentAmount as number)).toBeLessThan(pessimistic.paymentAmount as number);
   });
 
   it("tornado pins", () => {

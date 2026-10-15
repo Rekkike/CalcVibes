@@ -247,6 +247,9 @@ export interface EquityMetrics {
   signChanges: number;
   irr: number | null;
   irrAmbiguous: boolean;
+  // v0.6.11 Task D: the equity-view ambiguity classification (null when signChanges <= 1).
+  ambiguityCause: "financing" | "operational" | null;
+  ambiguityNote: string | null;
   zeroOutlay: boolean;
 }
 
@@ -369,6 +372,10 @@ export interface ModelResult {
   residualAmountUsed?: number;
   solvedClamped?: boolean;
   headlineSource?: "monthly" | "yearly" | "ambiguous";
+  // v0.6.11 Task D: the mechanically classified ambiguity cause and the engine-composed
+  // note (both null when signChanges <= 1). Surfaces render the note verbatim.
+  irrAmbiguityCause?: "financing" | "operational" | null;
+  irrAmbiguityNote?: string | null;
   residualDisclosure?: string | null;
 }
 

@@ -1,5 +1,5 @@
-import { countSignChanges, npvMonthly } from "./engine.js";
-import type { DscrRow, EquityMetrics, FinancingConfig, FinancingResult, FinancingYearlyRow } from "./types.js";
+import { composeAmbiguityNote, countSignChanges, npvMonthly } from "./engine.js";
+import type { DscrRow, EquityMetrics, FinancingConfig, FinancingResult, FinancingYearlyRow, FundingRow } from "./types.js";
 
 export interface FinancingContext {
   costM: number[];
@@ -13,6 +13,8 @@ export interface FinancingContext {
   projectIrr: number | null;
   costLineTotals: { id: string; total: number }[];
   costs: { id: string; category: string; amount: number; startYear: number; durationYears: number; escalation: number; name: string }[];
+  // v0.6.11 Task D: the funding rows ride the context for the equity-view classifier.
+  fundingRows: FundingRow[];
 }
 
 export function validateFinancing(inp: { financing?: FinancingConfig; horizon: number; lastCostMonth: number; mode?: string; leveraged?: boolean }, issues: string[]): void {
@@ -160,6 +162,31 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
     }
   }
   const signChanges = countSignChanges(equityVec);
+  // v0.6.11 Task D: the equity-view ambiguity classifier — the same mechanical rule as
+  // the main view: re-count on the equity flow with the financing cash removed (the
+  // funding receipts and interest-free installments as on the main view, and the draws
+  // and debt service with them — they are themselves financing).
+  let ambiguityCause: "financing" | "operational" | null = null;
+  let ambiguityNote: string | null = null;
+  if (signChanges > 1) {
+    const fundingCash = new Array<number>(horizon).fill(0);
+    for (const fr of ctx.fundingRows) {
+      const rm = fr.year * 12;
+      if (rm >= 1 && rm <= horizon) fundingCash[rm - 1] += fr.amount;
+      if (fr.kind === "interest-free-loan") {
+        const loanTerm = fr.termYears ?? 1;
+        const loanStart = fr.repaymentStartYear ?? 1;
+        const installment = fr.amount / loanTerm;
+        for (let k = 0; k < loanTerm; k++) {
+          const im = (loanStart + k) * 12;
+          if (im >= 1 && im <= horizon) fundingCash[im - 1] -= installment;
+        }
+      }
+    }
+    const withoutFinancing = equityVec.map((v, i) => v - fundingCash[i] - draws[i] + service[i]);
+    ambiguityCause = countSignChanges(withoutFinancing) <= 1 ? "financing" : "operational";
+    ambiguityNote = composeAmbiguityNote(ambiguityCause, "equity", signChanges, null);
+  }
   const zeroOutlay = outlay === 0;
   let equityIrr: number | null = null;
   if (!zeroOutlay) {
@@ -173,6 +200,8 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
     signChanges,
     irr: equityIrr,
     irrAmbiguous: signChanges > 1,
+    ambiguityCause,
+    ambiguityNote,
     zeroOutlay,
   };
   return {

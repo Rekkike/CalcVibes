@@ -10,6 +10,36 @@ export function countSignChanges(flows: number[]): number {
   return changes;
 }
 
+// v0.6.11 Task D: the ambiguity note — composed once by the engine, single-sourced for
+// both views; every warning surface renders it verbatim, none composes its own wording.
+// The rate clause composes from the headline source; the equity view carries none (it has
+// no headline aggregate).
+export function composeAmbiguityNote(
+  cause: "financing" | "operational",
+  view: "main" | "equity",
+  signChanges: number,
+  headlineSource: "monthly" | "yearly" | "ambiguous" | null
+): string {
+  const equity = view === "equity";
+  const irrPhrase = equity ? "the equity IRR" : "the IRR";
+  const rateClause = equity || headlineSource === "monthly"
+    ? null
+    : headlineSource === "yearly"
+      ? "the yearly-aggregate rate is shown"
+      : "no unique IRR is shown";
+  if (cause === "financing") {
+    const subject = equity
+      ? "Funding receipts and debt service alternate the equity net flow"
+      : "Funding receipts alternate the net flow";
+    const mid = rateClause
+      ? `${rateClause}; the NPV at WACC and the MIRR are unaffected and remain the reliable criteria.`
+      : "the NPV at WACC and the MIRR are unaffected and remain the reliable criteria.";
+    return `${subject} (${signChanges} sign changes), so ${irrPhrase} may not be unique - ${mid}`;
+  }
+  const flowPhrase = equity ? "The equity net flow" : "The net flow";
+  return `${flowPhrase} alternates ${signChanges} times beyond the funding pattern - collections below operating costs or one-off cost spikes can do this - so ${irrPhrase} may not be unique${rateClause ? `; ${rateClause}` : ""}. The NPV at WACC and the MIRR remain the reliable criteria, and the operating years at the alternations merit a look.`;
+}
+
 export function npvMonthly(rateM: number, flows: number[]): number {
   let acc = 0;
   for (let i = 0; i < flows.length; i++) acc += flows[i] / Math.pow(1 + rateM, i + 1);
@@ -534,13 +564,17 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   let tariffBaseUnitPrice: number | null = null;
   if (tariffCfg.mode !== "off") {
     if (tariffCfg.mode === "decompose") {
-      // v0.6.10 Task C.3: the coverage refusal — every year carrying required collections must
-      // be a grid year; the tariff owns its span, it never borrows the repayment shape.
+      // v0.6.10 Task C.3 / v0.6.11 Task C: the coverage refusal — every year carrying required
+      // collections must be a grid year; the tariff owns its span, it never borrows the
+      // repayment shape. The v0.6.11 sentence names the declared bounds and prescribes the
+      // check: the diagnosis, the cause, and the check in one sentence.
+      const gridFirst = gridYears[0];
+      const gridLast = gridYears[gridYears.length - 1];
       const gridYearSet = new Set(gridYears);
       for (const sl of slots) {
         const slotYear = Math.floor((sl.monthIndex - 1) / 12) + 1;
         if (payment * sl.escFactor > 0 && !gridYearSet.has(slotYear)) {
-          throw new EngineInputError([`Tariff span does not cover the required collection stream: year ${slotYear} carries required collections outside the tariff grid.`]);
+          throw new EngineInputError([`The required collections extend to year ${slotYear}, beyond the declared tariff span (years ${gridFirst}-${gridLast}): widen the tariff span or shorten the term.`]);
         }
       }
       for (let k = 0; k < gridYears.length; k++) {
@@ -747,6 +781,34 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         }
         return countSignChanges(yearlyFlows) <= 1 ? "yearly" : "ambiguous";
       })();
+  // v0.6.11 Task D: the ambiguity classifier — mechanical and data-driven, no heuristics.
+  // When the sign changes exceed one, re-count on the flow with the financing cash removed
+  // (the exact v0.6.10 Task A.3 contributions: each receipt at its year-end month, each
+  // interest-free installment at its month). A re-count at or below one means the
+  // alternations are the financing pattern itself — cause "financing"; beyond it the
+  // operations alternate on their own — cause "operational".
+  let irrAmbiguityCause: "financing" | "operational" | null = null;
+  let irrAmbiguityNote: string | null = null;
+  if (monthlySignChanges > 1) {
+    const withoutFinancing = monthlyFlows.slice();
+    if (fundingPresent) {
+      for (const fr of fundingRows) {
+        const receiptMonth = fr.year * 12;
+        if (receiptMonth >= 1 && receiptMonth <= withoutFinancing.length) withoutFinancing[receiptMonth - 1] -= fr.amount;
+        if (fr.kind === "interest-free-loan") {
+          const loanTerm = fr.termYears ?? 1;
+          const loanStart = fr.repaymentStartYear ?? 1;
+          const installment = fr.amount / loanTerm;
+          for (let k = 0; k < loanTerm; k++) {
+            const im = (loanStart + k) * 12;
+            if (im >= 1 && im <= withoutFinancing.length) withoutFinancing[im - 1] += installment;
+          }
+        }
+      }
+    }
+    irrAmbiguityCause = countSignChanges(withoutFinancing) <= 1 ? "financing" : "operational";
+    irrAmbiguityNote = composeAmbiguityNote(irrAmbiguityCause, "main", monthlySignChanges, headlineSource);
+  }
   const achieved = headlineSource === "monthly"
     ? irrAnnual(monthlyFlows)
     : headlineSource === "yearly"
@@ -1060,6 +1122,9 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       projectIrr: achieved,
       costLineTotals: lineTotals,
       costs: inp.costs,
+      // v0.6.11 Task D: the funding rows ride the context so the equity-view classifier
+      // can strip the financing cash (receipts and interest-free installments).
+      fundingRows: fundingRows,
     }, finCfg);
   }
   return {
@@ -1078,6 +1143,9 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     lastCostYear: lastCostYear, repaymentStartYear: repaymentStartYear,
     monthly: monthly, yearly: yearly, lineTotals: lineTotals,
     signChanges: signChanges, irrAmbiguous: signChanges > 1,
+    // v0.6.11 Task D: the engine-composed ambiguity note, rendered verbatim by the surfaces.
+    irrAmbiguityCause: irrAmbiguityCause,
+    irrAmbiguityNote: irrAmbiguityNote,
     npvAtTarget: npvAtTarget, npvAtWacc: npvAtWacc,
     firstPaymentMonth: profileMode ? profileFirstMonth : firstCollectionMonth,
     lastPaymentMonth: profileMode

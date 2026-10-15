@@ -39,34 +39,66 @@ export const SCENARIO_SETS: Record<"base" | "optimistic" | "pessimistic", Scenar
   pessimistic: { burnMultiplier: 1.1, escalationShift: 1, targetShift: 2, termShift: -1 },
 };
 
-export function scenarioResults(inp: ModelInputs): Record<"base" | "optimistic" | "pessimistic", ModelResult> {
+// v0.6.11 Task A: the named set degrades per scenario. Each optional reality computes under
+// its own stated terms; a variant that cannot exist under its terms is disclosed as exactly
+// that, with the engine's refusal verbatim. The catch takes ONLY EngineInputError — a
+// genuine defect never masquerades as a refusal (the v0.6.10 Task D.2 precedent).
+export type ScenarioOutcome = { result: ModelResult; refusal: null } | { result: null; refusal: string };
+
+function scenarioOutcome(inp: ModelInputs, shift: ScenarioShift): ScenarioOutcome {
+  try {
+    return { result: computeModel(applyScenario(inp, shift)), refusal: null };
+  } catch (e) {
+    if (e instanceof EngineInputError) return { result: null, refusal: e.message };
+    throw e;
+  }
+}
+
+export function scenarioResults(inp: ModelInputs): Record<"base" | "optimistic" | "pessimistic", ScenarioOutcome> {
   return {
-    base: computeModel(applyScenario(inp, SCENARIO_SETS.base)),
-    optimistic: computeModel(applyScenario(inp, SCENARIO_SETS.optimistic)),
-    pessimistic: computeModel(applyScenario(inp, SCENARIO_SETS.pessimistic)),
+    base: scenarioOutcome(inp, SCENARIO_SETS.base),
+    optimistic: scenarioOutcome(inp, SCENARIO_SETS.optimistic),
+    pessimistic: scenarioOutcome(inp, SCENARIO_SETS.pessimistic),
   };
 }
 
+// v0.6.11 Task B: the tornado degrades per cell. Each of the eight cells computes
+// individually; a refused cell is null with its refusal string set; a computed cell is the
+// number with its refusal null. A legitimately null paymentAmount (no refusal thrown)
+// keeps its refusal null — null alone never means refusal.
 export interface TornadoRow {
   factor: string;
   low: number | null;
   high: number | null;
+  lowRefusal: string | null;
+  highRefusal: string | null;
+}
+
+type TornadoCell = { value: number | null; refusal: string | null };
+
+function tornadoCell(inp: ModelInputs): TornadoCell {
+  try {
+    return { value: computeModel(inp).paymentAmount, refusal: null };
+  } catch (e) {
+    if (e instanceof EngineInputError) return { value: null, refusal: e.message };
+    throw e;
+  }
 }
 
 export function tornado(inp: ModelInputs): TornadoRow[] {
-  const burnLow = computeModel({ ...inp, costs: inp.costs.map((c) => ({ ...c, amount: c.amount * 0.9 })) }).paymentAmount;
-  const burnHigh = computeModel({ ...inp, costs: inp.costs.map((c) => ({ ...c, amount: c.amount * 1.1 })) }).paymentAmount;
-  const targetLow = computeModel({ ...inp, targetIrr: inp.targetIrr - 2 }).paymentAmount;
-  const targetHigh = computeModel({ ...inp, targetIrr: inp.targetIrr + 2 }).paymentAmount;
-  const termLow = computeModel({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears - 1 } }).paymentAmount;
-  const termHigh = computeModel({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears + 1 } }).paymentAmount;
-  const escLow = computeModel({ ...inp, costs: inp.costs.map((c) => (c.category === "recurring" ? { ...c, escalation: c.escalation - 1 } : c)) }).paymentAmount;
-  const escHigh = computeModel({ ...inp, costs: inp.costs.map((c) => (c.category === "recurring" ? { ...c, escalation: c.escalation + 1 } : c)) }).paymentAmount;
+  const burnLow = tornadoCell({ ...inp, costs: inp.costs.map((c) => ({ ...c, amount: c.amount * 0.9 })) });
+  const burnHigh = tornadoCell({ ...inp, costs: inp.costs.map((c) => ({ ...c, amount: c.amount * 1.1 })) });
+  const targetLow = tornadoCell({ ...inp, targetIrr: inp.targetIrr - 2 });
+  const targetHigh = tornadoCell({ ...inp, targetIrr: inp.targetIrr + 2 });
+  const termLow = tornadoCell({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears - 1 } });
+  const termHigh = tornadoCell({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears + 1 } });
+  const escLow = tornadoCell({ ...inp, costs: inp.costs.map((c) => (c.category === "recurring" ? { ...c, escalation: c.escalation - 1 } : c)) });
+  const escHigh = tornadoCell({ ...inp, costs: inp.costs.map((c) => (c.category === "recurring" ? { ...c, escalation: c.escalation + 1 } : c)) });
   return [
-    { factor: "burn", low: burnLow, high: burnHigh },
-    { factor: "targetIrr", low: targetLow, high: targetHigh },
-    { factor: "term", low: termLow, high: termHigh },
-    { factor: "escalation", low: escLow, high: escHigh },
+    { factor: "burn", low: burnLow.value, high: burnHigh.value, lowRefusal: burnLow.refusal, highRefusal: burnHigh.refusal },
+    { factor: "targetIrr", low: targetLow.value, high: targetHigh.value, lowRefusal: targetLow.refusal, highRefusal: targetHigh.refusal },
+    { factor: "term", low: termLow.value, high: termHigh.value, lowRefusal: termLow.refusal, highRefusal: termHigh.refusal },
+    { factor: "escalation", low: escLow.value, high: escHigh.value, lowRefusal: escLow.refusal, highRefusal: escHigh.refusal },
   ];
 }
 
