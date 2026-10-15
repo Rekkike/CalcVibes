@@ -1,38 +1,11 @@
 # CHECKPOINT — wip/v0.6.11-scenario-granularity
 
-The scenario-granularity pass (directive docs/directives/v0.6.11-scenario-granularity.md; the directive parent b75ff427).
+Running state of the v0.6.11 scenario-granularity pass. Updated at every checkpoint push.
 
-## Last verified step (checkpoint 2 — the core chunk, byte-verified)
-
-The core chunk is complete, green, and byte-verified at this tip:
-
-- Task C: the span-coverage refusal reworded to carry its cause and its check; gridFirst/gridLast are the actual grid bounds, data-driven (core/src/engine.ts).
-- Task A: scenarioResults returns per-variant outcomes — { result, refusal } per variant, EngineInputError-only catch, refusal verbatim (core/src/scenarios.ts).
-- Task B: the tornado degrades per cell; TornadoRow gains lowRefusal/highRefusal; null alone never means refusal (core/src/scenarios.ts).
-- Task D: ModelResult gains irrAmbiguityCause/irrAmbiguityNote; EquityMetrics gains ambiguityCause/ambiguityNote; the classifier re-counts the sign changes with the financing cash removed (main: the v0.6.10 Task A.3 contributions; equity: also the draws and debt service); one composer in engine.ts serves both views; FinancingContext gains fundingRows (core/src/engine.ts, core/src/financing.ts, core/src/types.ts).
-- New suite core/test/scenarios0611.test.ts (17 tests): Task A pins, Task B cell pins, Task C string with data-driven bounds, Task D classifier branches and the three pinned notes verbatim plus every composition branch, the synthetic operational fixture pins, the PRE-failing assertions.
-- The program fixture of record extracted to core/test/_program0610.ts (byte-identical values) so the new suite does not re-register the funding0610 describe blocks; funding0610.test.ts imports it.
-- Re-anchors: funding0610.test.ts W35 coverage-string anchor moves to the Task C sentence; scenarios.test.ts moves to the Task A outcome shape (values byte-identical).
-
-## The checkpoint-2 correction (disclosed)
-
-Checkpoint 1 (a66d0f87) was found, on byte verification, to carry a leftover from an earlier interrupted session: that session had pushed its own core-chunk checkpoint (6d47b682) whose program-fixture extraction landed in core/test/_shared.ts; the fresh push of this session replaced every other file but left that _shared.ts in place, leaving two fixtures in the tree. This checkpoint restores core/test/_shared.ts to the pristine b75ff427 form (the fixture lives solely in core/test/_program0610.ts, imported by funding0610.test.ts and scenarios0611.test.ts). The tip is now byte-identical to the locally verified tree.
-
-## Battery at this checkpoint
-
-- core: 27 test files / 294 tests green; tsc clean. (Baseline of record 26 files / 277 tests; +1 suite file, +17 tests; the fixture module adds no tests.)
-- web: untouched at this checkpoint (41 files / 356 tests at the baseline of record, verified green on the pristine tree before the chunk).
-
-## Outstanding (the next chunk — the web pass)
-
-- Task E: ScenariosSection — the framing line of record, the named-set table always rendering three rows with per-variant refusals, the tornado always rendering four rows, the retired testids (scenarios-refusal, scenario-set-refusal), the two-way tables unchanged in values.
-- Task F: the deck scenario slide consumes per-variant outcomes; the per-variant disclosure sentences; the pessimistic delta item (rawValue 865489.9467288586, the exact double).
-- ResultsSection and deck render the engine-composed ambiguity notes verbatim (the four retyped warning sites).
-- Task H: VERSION v0.6.11 with the version pins re-anchored.
-- Web suite re-anchors (appraisal-ui, funding-ui, remediation061, remediation062, demo-rotation, design-remediation, multicontract-ui, polish), full battery both workspaces, then the squash-merge citing the directive parent verbatim.
-
-## Session notes
-
-- The execution environment wiped /tmp twice this session; the core chunk was rebuilt from the directive parent tarball and every directive pin re-verified digit for digit after the rebuild; no pin drift.
-- The earlier interrupted session's checkpoint 1 (6d47b682) is fully superseded by this implementation; only its _shared.ts survived and is restored here.
-- Branch deletion after the squash-merge is not possible with the available tooling (no deletion function in the connector); disclosed in the completion report.
+- Last verified step: the core chunk delivered — Task A (per-variant ScenarioOutcome), Task B (per-cell tornado refusals), Task C (the reworded span-coverage refusal), the Task D core half (types, the mechanical classifier, the single-sourced composer, FinancingContext.fundingRows, the equity cause/note). Core battery 26 files / 277 tests green; core tsc clean. Both core re-anchors applied (scenarios.test.ts shape consumers, values unchanged; the funding0610 W35 message anchor, values unchanged).
+- Pins scratch-verified on the live tree this session: the Task A base / optimistic-refusal / pessimistic pins; all eight Task B cells; the Task C message (years 3-23, year 24); the classifier re-counts (main 3 -> 1 financing; equity 4 -> 1 financing); the three pinned notes verbatim; the synthetic operational fixture pins; the pessimistic delta double 865489.9467288586.
+- PRE red proofs observed on the pristine b75ff427 tree: scenarioResults and tornado throw the wholesale coverage refusal (the whole set and table dead); per-variant PRE facts recorded (base computes, optimistic throws, pessimistic computes); grep-verifiable absences recorded (no scenarios-framing testid; the retired testids present; the wholesale deck disclosure at web/src/deck.ts:457; the four retyped warning sites; VERSION v0.6.10).
+- Outstanding unverified edits: none beyond this commit.
+- Next action: write core/test/scenarios0611.test.ts with every pin (checkpoint 2), then the web chunk (Tasks E, F, the G web re-anchors, H).
+- Baseline of record verified this session on the rebuilt tree: core 26/277, web 41/356, tsc clean both.
+- Environment note: one full /tmp wipe occurred mid-session (the twelfth historical wipe); the environment was rebuilt per docs/ENVIRONMENT_DISCIPLINE.md and every patch replayed verbatim from the live session transcript. The rebuilt installer's fix-4 copy step uses tar --strip-components=1 (this sandbox's cp nested the tarball root inside the destination); disclosed in the completion report.

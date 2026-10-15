@@ -4,10 +4,9 @@ import { templateLike } from "./_shared.js";
 
 describe("Chunk 4: scenarios and sensitivity", () => {
   it("scenario payments and headline figures; strict ordering", () => {
-    // v0.6.11 Task A re-anchor: scenarioResults returns per-variant outcomes; the template
-    // fixture computes all three variants, so every refusal is null and the figure pins
-    // are byte-identical to the pre-change values.
     const sc = scenarioResults(templateLike());
+    // v0.6.11 Task A re-anchor: per-variant outcomes; the template computes every variant,
+    // so all three refusals are null and every figure pin is unchanged.
     expect(sc.base.refusal).toBeNull();
     expect(sc.optimistic.refusal).toBeNull();
     expect(sc.pessimistic.refusal).toBeNull();
