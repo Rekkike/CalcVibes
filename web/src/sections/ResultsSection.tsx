@@ -15,9 +15,9 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
           {result.goalMet
             ? `The project meets its target: the solved structure achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(targetIrr, 2)}% — target achieved.`
             : `The project falls short: the solved structure achieves an IRR of ${percentForDisplay(result.achievedIrr, 2)} against a target of ${roundForDisplay(targetIrr, 2)}% — target not achieved.`}
-          {result.irrAmbiguous && (
+          {result.irrAmbiguityNote !== null && (
             <span data-testid="irr-ambiguity-warning" className="warning">
-              {" "}Warning: the net flow has {result.signChanges} sign changes; the IRR may not be unique.
+              {" "}{result.irrAmbiguityNote}
             </span>
           )}
         </p>
@@ -100,9 +100,9 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
               {result.financing.equity.zeroOutlay
                 ? "Not applicable (zero equity outlay)"
                 : result.financing.equity.irr === null ? "—" : percentForDisplay(result.financing.equity.irr)}
-              {result.financing.equity.irrAmbiguous && (
+              {result.financing.equity.ambiguityNote !== null && (
                 <span data-testid="equity-ambiguity-warning" className="warning">
-                  {" "}Warning: the equity net flow has {result.financing.equity.signChanges} sign changes; the equity IRR may not be unique.
+                  {" "}{result.financing.equity.ambiguityNote}
                 </span>
               )}
             </dd>
