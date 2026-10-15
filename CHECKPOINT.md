@@ -2,9 +2,9 @@
 
 The scenario-granularity pass (directive docs/directives/v0.6.11-scenario-granularity.md; the directive parent b75ff427).
 
-## Last verified step (checkpoint 1 — the core chunk)
+## Last verified step (checkpoint 2 — the core chunk, byte-verified)
 
-Complete and green at this tip, verified on the rebuilt tree:
+The core chunk is complete, green, and byte-verified at this tip:
 
 - Task C: the span-coverage refusal reworded to carry its cause and its check; gridFirst/gridLast are the actual grid bounds, data-driven (core/src/engine.ts).
 - Task A: scenarioResults returns per-variant outcomes — { result, refusal } per variant, EngineInputError-only catch, refusal verbatim (core/src/scenarios.ts).
@@ -13,6 +13,10 @@ Complete and green at this tip, verified on the rebuilt tree:
 - New suite core/test/scenarios0611.test.ts (17 tests): Task A pins, Task B cell pins, Task C string with data-driven bounds, Task D classifier branches and the three pinned notes verbatim plus every composition branch, the synthetic operational fixture pins, the PRE-failing assertions.
 - The program fixture of record extracted to core/test/_program0610.ts (byte-identical values) so the new suite does not re-register the funding0610 describe blocks; funding0610.test.ts imports it.
 - Re-anchors: funding0610.test.ts W35 coverage-string anchor moves to the Task C sentence; scenarios.test.ts moves to the Task A outcome shape (values byte-identical).
+
+## The checkpoint-2 correction (disclosed)
+
+Checkpoint 1 (a66d0f87) was found, on byte verification, to carry a leftover from an earlier interrupted session: that session had pushed its own core-chunk checkpoint (6d47b682) whose program-fixture extraction landed in core/test/_shared.ts; the fresh push of this session replaced every other file but left that _shared.ts in place, leaving two fixtures in the tree. This checkpoint restores core/test/_shared.ts to the pristine b75ff427 form (the fixture lives solely in core/test/_program0610.ts, imported by funding0610.test.ts and scenarios0611.test.ts). The tip is now byte-identical to the locally verified tree.
 
 ## Battery at this checkpoint
 
@@ -29,5 +33,6 @@ Complete and green at this tip, verified on the rebuilt tree:
 
 ## Session notes
 
-- The execution environment wiped /tmp twice this session (the twelfth and thirteenth historical wipes). The core chunk was rebuilt from the directive parent tarball and every directive pin re-verified digit for digit after the rebuild; no pin drift.
+- The execution environment wiped /tmp twice this session; the core chunk was rebuilt from the directive parent tarball and every directive pin re-verified digit for digit after the rebuild; no pin drift.
+- The earlier interrupted session's checkpoint 1 (6d47b682) is fully superseded by this implementation; only its _shared.ts survived and is restored here.
 - Branch deletion after the squash-merge is not possible with the available tooling (no deletion function in the connector); disclosed in the completion report.
