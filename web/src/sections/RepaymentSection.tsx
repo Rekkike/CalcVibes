@@ -185,7 +185,7 @@ export function RepaymentSection(props: {
                       delete next[Number(y)];
                       next[parseFloat(e.target.value) || 0] = amount;
                       setRepayment({ collectionsOverrides: next });
-                    }} /></td>
+                    }} /> <span className="muted" data-testid="col-override-calendar-label">{yearHeader(Number(y), startYear)}</span></td>
                     <td><MoneyEditor dataField="col-override-amount" value={amount} entryUnit={entryUnit} onChange={(v) => {
                       const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
                       next[Number(y)] = v;

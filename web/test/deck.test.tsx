@@ -122,7 +122,8 @@ describe("EX-1 stable-tariff variant (the golden stable configuration)", () => {
 describe("EX-1 variant titles (structural)", () => {
   it("decompose, manual, fixed titles of record", () => {
     const decInputs = { ...demoProject(), tariff: { mode: "decompose" as const, escalationPerYear: 2, rows, fixedAnnualAmount: null, manualPrices: null } };
-    expect(deckSlides(decInputs, computeModel(decInputs)).slides[3].title).toBe("The recovery — per-lift prices");
+    // v0.6.12 Task C re-anchor (Round 46 Supplement 12): no priceUnitLabel is declared, so the unit-free fallback.
+    expect(deckSlides(decInputs, computeModel(decInputs)).slides[3].title).toBe("The recovery — the tariff");
     const prices = computeModel({ ...demoProject(), tariff: { mode: "stable" as const, escalationPerYear: 2, rows, fixedAnnualAmount: null, manualPrices: null } }).tariffYears.map((y) => y.unitPrice as number);
     const manInputs = { ...demoProject(), tariff: { mode: "manual" as const, escalationPerYear: 2, rows, fixedAnnualAmount: null, manualPrices: prices } };
     expect(deckSlides(manInputs, computeModel(manInputs)).slides[3].title).toBe("The recovery — evaluated, not solved");

@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "main": "src/index.ts",
+  "engines": {
+    "node": ">=22.12.0 <23"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

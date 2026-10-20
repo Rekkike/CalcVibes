@@ -62,6 +62,30 @@ describe("Task B: TOKEN-SET / surfaces / typography (structural)", () => {
     const row = document.querySelector('[data-override-year]') as HTMLElement;
     expect(row.getAttribute("data-calendar-label")).toBe("2028");
   });
+
+  it("COLL-LABELS-VISIBLE: each collections row shows the yearHeader label beside the model-year input, matching the row attribute (v0.6.12 Task B)", () => {
+    render(<App />);
+    fireEvent.click(byAction("load-demo"));
+    fireEvent.change(document.querySelector('[data-field="startYear"]') as HTMLElement, { target: { value: "2026" } });
+    fireEvent.click(byNav("repayment"));
+    const editor = document.querySelector('[data-testid="collections-editor"]') as HTMLElement;
+    fireEvent.click(editor.querySelector('[data-action="add-col-override"]') as HTMLElement);
+    const row = document.querySelector('[data-override-year]') as HTMLElement;
+    const label = row.querySelector('td [data-testid="col-override-calendar-label"]') as HTMLElement;
+    expect(label).not.toBeNull();
+    expect(label.classList.contains("muted")).toBe(true);
+    expect(label.parentElement?.querySelector('[data-field="col-override-year"]')).not.toBeNull();
+    expect(label.textContent).toBe("2028");
+    expect(label.textContent).toBe(row.getAttribute("data-calendar-label"));
+
+    fireEvent.click(byNav("overview"));
+    fireEvent.change(document.querySelector('[data-field="startYear"]') as HTMLElement, { target: { value: "" } });
+    fireEvent.click(byNav("repayment"));
+    const unsetRow = document.querySelector('[data-override-year]') as HTMLElement;
+    const unsetLabel = unsetRow.querySelector('[data-testid="col-override-calendar-label"]') as HTMLElement;
+    expect(unsetLabel.textContent).toBe("Year 3");
+    expect(unsetLabel.textContent).toBe(unsetRow.getAttribute("data-calendar-label"));
+  });
 });
 
 describe("Task C: STAGE-BG / GLOWS / FADE / DISPLAY-TYPE / CHROME (structural)", () => {
