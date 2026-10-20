@@ -191,7 +191,9 @@ export function TariffSection(props: {
                 {/* v0.6.9 Task D: the compact per-year headers — the short token (Y3, Y4, …)
                     via yearHeader's null-startYear path when no start year is set; the
                     bare-year form is already compact and unchanged. */}
-                {gridYears.map((y) => <th key={y} {...(startYear === null ? { "data-short-year": "true" } : {})}>{startYear === null ? `Y${y}` : yearHeader(y, startYear)}</th>)}
+                {/* v0.6.12 Task B: the machine-readable twin always carries the yearHeader vocabulary;
+                    the visible header keeps its v0.6.9 form. */}
+                {gridYears.map((y) => <th key={y} data-calendar-label={yearHeader(y, startYear)} {...(startYear === null ? { "data-short-year": "true" } : {})}>{startYear === null ? `Y${y}` : yearHeader(y, startYear)}</th>)}
                 {/* v0.6.10 Task E.2 (W35): the optional per-row span columns — empty means
                     the row inherits the common span. */}
                 <th>Row span start</th><th>Row span term</th>

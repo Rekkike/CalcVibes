@@ -113,4 +113,29 @@ describe("Task E-1: one flow of time across both surfaces", () => {
     const firstRow = dec && dec.querySelector("tbody tr td");
     expect(firstRow && firstRow.textContent).toContain("Year 3");
   });
+
+  it("GRID-CALENDAR-TWIN: every per-year volume-grid header carries the yearHeader twin; the visible header keeps its v0.6.9 form (v0.6.12 Task B)", async () => {
+    const first = render(<App />);
+    await loadRows("decompose", () => {
+      fireEvent.change(document.querySelector('[data-field="startYear"]') as HTMLElement, { target: { value: "2026" } });
+    });
+    const setHeaders = Array.from(document.querySelectorAll('[data-testid="tariff-rows"] thead th[data-calendar-label]'));
+    expect(setHeaders.length).toBe(8);
+    setHeaders.forEach((th, k) => {
+      expect(th.getAttribute("data-calendar-label")).toBe(String(2026 + (k + 3) - 1));
+      expect(th.textContent).toBe(th.getAttribute("data-calendar-label"));
+      expect(th.hasAttribute("data-short-year")).toBe(false);
+    });
+    first.unmount();
+
+    render(<App />);
+    await loadRows("decompose");
+    const unsetHeaders = Array.from(document.querySelectorAll('[data-testid="tariff-rows"] thead th[data-calendar-label]'));
+    expect(unsetHeaders.length).toBe(8);
+    unsetHeaders.forEach((th, k) => {
+      expect(th.getAttribute("data-calendar-label")).toBe("Year " + (k + 3));
+      expect(th.textContent).toBe("Y" + (k + 3));
+      expect(th.getAttribute("data-short-year")).toBe("true");
+    });
+  });
 });
