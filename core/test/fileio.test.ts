@@ -153,6 +153,23 @@ describe("v0.6.3 project file format", () => {
     expect(() => parseProject(JSON.stringify(badAppraisal))).toThrowError(new ProjectFileError("FILE-PROJECT: the project's appraisal entry is not an object and cannot be opened."));
   });
 
+  it("FILE-PROJECT-REQUIRED (v0.6.12.1, AUD-1): a project record missing its costs or repayment entry is refused by name; the file layer stays engine-blind", () => {
+    const base = JSON.parse(validFileText());
+    // the demonstrated crash class: a parseable record carrying neither required entry
+    const incomplete = { fileKind: "calcvibes-project", fileVersion: 1, project: { projectName: "x" }, settings: base.settings };
+    expect(() => parseProject(JSON.stringify(incomplete))).toThrowError(new ProjectFileError("FILE-PROJECT: the project's costs entry is missing and the file cannot be opened."));
+    const noCosts = JSON.parse(validFileText());
+    delete noCosts.project.costs;
+    expect(() => parseProject(JSON.stringify(noCosts))).toThrowError(new ProjectFileError("FILE-PROJECT: the project's costs entry is missing and the file cannot be opened."));
+    const noRepayment = JSON.parse(validFileText());
+    delete noRepayment.project.repayment;
+    expect(() => parseProject(JSON.stringify(noRepayment))).toThrowError(new ProjectFileError("FILE-PROJECT: the project's repayment entry is missing and the file cannot be opened."));
+    // a present-but-empty costs list still parses (the always-valid-editor seam: the engine, not the file layer, judges content)
+    const emptyCosts = JSON.parse(validFileText());
+    emptyCosts.project.costs = [];
+    expect(parseProject(JSON.stringify(emptyCosts)).inputs.costs).toEqual([]);
+  });
+
   it("FILE-SETTINGS: the settings guards refuse with the named errors", () => {
     const base = JSON.parse(validFileText());
     expect(() => parseProject(JSON.stringify({ fileKind: "calcvibes-project", fileVersion: 1, project: base.project }))).toThrowError(new ProjectFileError("FILE-SETTINGS: the file carries no settings object and cannot be opened."));
