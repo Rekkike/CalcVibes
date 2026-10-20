@@ -125,7 +125,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const issues = validateInputs(inp);
   const finCfgIn = inp.financing && inp.financing.enabled ? inp.financing : null;
   if (finCfgIn) {
-    const derivedStart = inp.costs.reduce((mx, c) => Math.max(mx, c.category === "capex" ? c.startYear : c.startYear + Math.max(1, c.durationYears) - 1), 0) || 1;
+    // v0.6.12.1 (AUD-2): the last cost year honors the per-year profiles (lastCostYearOf).
+    const derivedStart = lastCostYearOf(inp);
     const preliminaryHorizon = Math.max(
       Math.ceil(derivedStart * 12),
       (inp.repayment.firstCollectionYear ?? derivedStart + inp.repayment.graceYears) * 12 + Math.round(Math.max(0, inp.repayment.termYears) * 12)
@@ -419,12 +420,11 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       if (c.category !== "recurring" && c.category !== "capex") return;
       const share = (finCfg.perLineSharePct?.[c.id] ?? finCfg.sharePct) / 100;
       if (share <= 0) return;
-      if (c.category === "capex") {
-        if (c.startYear * 12 > S) fundableAfterStart = true;
-      } else {
-        const endMonth = (c.startYear + Math.max(1, c.durationYears) - 1) * 12;
-        if (endMonth > S) fundableAfterStart = true;
-      }
+      // v0.6.12.1 (AUD-2): the line's last incurred year (the profile years when profiled; the
+      // start year for a plain CAPEX lump; start + duration - 1 for a plain recurring line).
+      let lastYear = 0;
+      for (const [y] of lineIncurred(c)) lastYear = Math.max(lastYear, y);
+      if (lastYear * 12 > S) fundableAfterStart = true;
     });
     if (fundableAfterStart) {
       throw new EngineInputError([`A debt-funded fundable cost lands strictly after the service start month ${S} (FIN-FUNDABLE-AFTER-START).`]);
@@ -509,22 +509,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
     let bal = 0;
     const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
-    const drawAt = new Array<number>(totalMonths).fill(0);
-    inp.costs.forEach((c) => {
-      if (c.category !== "recurring" && c.category !== "capex") return;
-      const share = (finCfg.perLineSharePct?.[c.id] ?? finCfg.sharePct) / 100;
-      if (c.category === "capex") {
-        const m = Math.min(totalMonths, c.startYear * 12);
-        if (m >= 1) drawAt[m - 1] += share * c.amount;
-      } else {
-        const dur = Math.max(1, c.durationYears);
-        for (let y = c.startYear; y < c.startYear + dur; y++) {
-          const esc = Math.pow(1 + c.escalation / 100, y - c.startYear);
-          const monthly = (c.amount * esc) / 12;
-          for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= totalMonths; mm++) drawAt[mm - 1] += share * monthly;
-        }
-      }
-    });
+    // v0.6.12.1 (AUD-2): the draws derive from the profile-honoring incurred basis (fundableDraws).
+    const drawAt = fundableDraws(inp.costs, finCfg, totalMonths);
     for (let m = 1; m <= S; m++) bal = (bal + drawAt[m - 1]) * (1 + rD);
     for (let m = 1; m <= S; m++) pvDraws += drawAt[m - 1] / Math.pow(1 + rM, m);
     const N = finCfg.termYears * 12;
@@ -618,22 +604,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
           const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
           let bal = 0;
           const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
-          const drawAt = new Array<number>(totalMonths).fill(0);
-          inp.costs.forEach((c) => {
-            if (c.category !== "recurring" && c.category !== "capex") return;
-            const share = (finCfg.perLineSharePct?.[c.id] ?? finCfg.sharePct) / 100;
-            if (c.category === "capex") {
-              const m = Math.min(totalMonths, c.startYear * 12);
-              if (m >= 1) drawAt[m - 1] += share * c.amount;
-            } else {
-              const dur = Math.max(1, c.durationYears);
-              for (let y = c.startYear; y < c.startYear + dur; y++) {
-                const esc = Math.pow(1 + c.escalation / 100, y - c.startYear);
-                const monthly = (c.amount * esc) / 12;
-                for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= totalMonths; mm++) drawAt[mm - 1] += share * monthly;
-              }
-            }
-          });
+          // v0.6.12.1 (AUD-2): the draws derive from the profile-honoring incurred basis.
+          const drawAt = fundableDraws(inp.costs, finCfg, totalMonths);
           for (let m = 1; m <= S; m++) bal = (bal + drawAt[m - 1]) * (1 + rD);
           for (let m = 1; m <= S; m++) pvDraws += drawAt[m - 1] / Math.pow(1 + rM, m);
           const N = finCfg.termYears * 12;
@@ -1184,7 +1156,7 @@ import { EngineInputError, validateInputs } from "./validate.js";
 import { normalizeContracts, allReinvestments, contractLastCollectionMonth } from "./contracts.js";
 import { computeBookSchedule, lineIncurred } from "./depreciation.js";
 import type { PaymentSlot } from "./slots.js";
-import { computeFinancingOverlay, validateFinancing } from "./financing.js";
+import { computeFinancingOverlay, fundableDraws, validateFinancing } from "./financing.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;
 
