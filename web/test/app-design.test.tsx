@@ -30,6 +30,16 @@ describe("Task A: application-wide design system (structural pins)", () => {
     expect(css).toMatch(/\.app-root \.muted\s*\{[^}]*color:\s*var\(--mut\)/);
   });
 
+  it("SECTION-HEADINGS-MUT: the section h3/h4 rule block consumes --mut (v0.6.12 Task A; a flip to a literal goes red)", () => {
+    const css = fs.readFileSync("src/index.css", "utf8");
+    expect(css).toMatch(/\.app-root section h3,\s*\.app-root section h4\s*\{[^}]*color:\s*var\(--mut\)/);
+  });
+
+  it("DT-MUT: the results dt rule block consumes --mut (v0.6.12 Task A; a flip to a literal goes red)", () => {
+    const css = fs.readFileSync("src/index.css", "utf8");
+    expect(css).toMatch(/\.app-root dt\s*\{[^}]*color:\s*var\(--mut\)/);
+  });
+
   it("the viewport meta and a responsive rule are pinned", () => {
     const html = fs.readFileSync("index.html", "utf8");
     expect(html).toMatch(/name="viewport"/);
