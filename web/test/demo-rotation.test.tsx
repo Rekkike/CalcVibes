@@ -301,9 +301,10 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
       "Province & municipality grant (grant, year 1): €3 500 000",
       "Municipality interest-free note (interest-free note, year 1, term 10 years): €10 000 000",
     ]);
-    // The recovery slide: per-lift prices with the unit-price exemption and the segment rates.
+    // The recovery slide: the declared-vocabulary title (v0.6.12 Task C re-anchor, Round 46
+    // Supplement 12) with the unit-price exemption and the segment rates.
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
-    expect(recovery?.textContent).toBe("The recovery — per-lift prices");
+    expect(recovery?.textContent).toBe("The recovery — " + inputs.tariff?.priceUnitLabel + " prices");
     expect(bodyFigureValue("recovery", "Payments")).toBe("240");
     expect(bodyFigureValue("recovery", "Payment per period")).toBe("€2 843 366");
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€855 907 745");

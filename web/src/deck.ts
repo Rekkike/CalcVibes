@@ -260,7 +260,10 @@ export function deckSlides(
     recoveryBody.push({ label: "Payment per period", value: fee(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
     if (inputs.tariff?.mode === "decompose") {
-      recoveryTitle = "The recovery — per-lift prices";
+      // v0.6.12 Task C (Round 46 Supplement 12): the title composes from the declared vocabulary;
+      // the unit-free fallback when no price unit is declared.
+      const priceUnit = typeof inputs.tariff.priceUnitLabel === "string" ? inputs.tariff.priceUnitLabel.trim() : "";
+      recoveryTitle = priceUnit !== "" ? "The recovery — " + inputs.tariff.priceUnitLabel + " prices" : "The recovery — the tariff";
       const firstPrice = result.tariffYears[0]?.unitPrice;
       // v0.6.10 Task E.3/G.3 (W20): the unit-price exemption extends the fee class — a unit
       // price renders at unit ones with the currency form, never the entry-unit collapse
