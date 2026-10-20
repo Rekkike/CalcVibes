@@ -1,5 +1,5 @@
 # Deploys the web build to GitHub Pages — the project site serves at /CalcVibes/.
-# Trigger: every push to main, plus manual dispatch. Order: install → typecheck → test → build → deploy.
+# Trigger: every push to main, plus manual dispatch. Order: core install → core typecheck → core tests → web install → typecheck → test → build → deploy.
 name: Deploy to GitHub Pages
 
 on:
@@ -27,7 +27,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            core/package-lock.json
+            web/package-lock.json
       - name: Ensure GitHub Pages site exists
         # Idempotent: creates the Pages site (build_type workflow) on first run;
         # returns 409 (already exists) afterwards, which curl reports without failing.
@@ -40,6 +42,15 @@ jobs:
           -d '{"build_type": "workflow"}' || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install core dependencies
+        run: npm ci
+        working-directory: core
+      - name: Core typecheck
+        run: npm run typecheck
+        working-directory: core
+      - name: Core tests
+        run: npm test
+        working-directory: core
       - name: Install dependencies
         run: npm ci
         working-directory: web
