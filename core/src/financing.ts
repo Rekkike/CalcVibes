@@ -1,5 +1,33 @@
 import { composeAmbiguityNote, countSignChanges, npvMonthly } from "./engine.js";
-import type { DscrRow, EquityMetrics, FinancingConfig, FinancingResult, FinancingYearlyRow, FundingRow } from "./types.js";
+import { lineIncurred } from "./depreciation.js";
+import type { CostLine, DscrRow, EquityMetrics, FinancingConfig, FinancingResult, FinancingYearlyRow, FundingRow } from "./types.js";
+
+// v0.6.12.1 (AUD-2): the fundable-cost draw schedule on the profile-honoring incurred basis —
+// the same lineIncurred amounts the book view consumes. A CAPEX year lands as a lump at that
+// year's month 12 x year; a recurring year spreads over its twelve months. Every draw is the
+// applicable share times the cost at the cost's own month. For a line without per-year
+// profiles the arithmetic is the pre-existing arithmetic term for term (the byte-identity lock).
+export function fundableDraws(
+  costs: CostLine[],
+  config: { sharePct: number; perLineSharePct?: Record<string, number> },
+  horizon: number,
+): number[] {
+  const draws = new Array<number>(horizon).fill(0);
+  for (const c of costs) {
+    if (c.category !== "recurring" && c.category !== "capex") continue;
+    const share = (config.perLineSharePct?.[c.id] ?? config.sharePct) / 100;
+    for (const [y, amount] of lineIncurred(c)) {
+      if (c.category === "capex") {
+        const m = Math.min(horizon, y * 12);
+        if (m >= 1) draws[m - 1] += share * amount;
+      } else {
+        const monthly = amount / 12;
+        for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= horizon; mm++) draws[mm - 1] += share * monthly;
+      }
+    }
+  }
+  return draws;
+}
 
 export interface FinancingContext {
   costM: number[];
@@ -12,7 +40,7 @@ export interface FinancingContext {
   lastCostMonth: number;
   projectIrr: number | null;
   costLineTotals: { id: string; total: number }[];
-  costs: { id: string; category: string; amount: number; startYear: number; durationYears: number; escalation: number; name: string }[];
+  costs: CostLine[];
   // v0.6.11 Task D: the funding rows ride the context for the equity-view classifier.
   fundingRows: FundingRow[];
 }
@@ -51,22 +79,7 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
   const N = config.termYears * 12;
   const G = config.graceYears * 12;
   const horizon = Math.max(ctx.horizon, S + N);
-  const draws = new Array<number>(horizon).fill(0);
-  ctx.costs.forEach((c) => {
-    if (c.category !== "recurring" && c.category !== "capex") return;
-    const share = (config.perLineSharePct?.[c.id] ?? config.sharePct) / 100;
-    if (c.category === "capex") {
-      const m = c.startYear * 12;
-      if (m >= 1 && m <= horizon) draws[m - 1] += share * c.amount;
-    } else {
-      const dur = Math.max(1, c.durationYears);
-      for (let y = c.startYear; y < c.startYear + dur; y++) {
-        const esc = Math.pow(1 + c.escalation / 100, y - c.startYear);
-        const monthly = (c.amount * esc) / 12;
-        for (let mm = (y - 1) * 12 + 1; mm <= y * 12 && mm <= horizon; mm++) draws[mm - 1] += share * monthly;
-      }
-    }
-  });
+  const draws = fundableDraws(ctx.costs, config, horizon);
   let drawnTotal = 0;
   for (let m = 1; m <= horizon; m++) drawnTotal += draws[m - 1];
   let balance = 0;
@@ -143,7 +156,14 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
   ctx.costs.forEach((c) => {
     if (c.category !== "recurring" && c.category !== "capex") return;
     const share = (config.perLineSharePct?.[c.id] ?? config.sharePct) / 100;
-    if (c.category === "capex") {
+    // v0.6.12.1 (AUD-2): the equity outlay follows the same incurred basis as the draws for a
+    // line carrying per-year profiles. A profile-free line keeps its pre-existing association
+    // order, ((1 - share) * amount) * growth, term for term: the multiplication order is part of
+    // the byte-identity lock (the incurred form (1 - share) * (amount * growth) differs in the
+    // last digit on some inputs).
+    if (c.yearOverrides !== undefined && Object.keys(c.yearOverrides).length > 0) {
+      for (const [, amount] of lineIncurred(c)) outlay += (1 - share) * amount;
+    } else if (c.category === "capex") {
       outlay += (1 - share) * c.amount;
     } else {
       const dur = Math.max(1, c.durationYears);

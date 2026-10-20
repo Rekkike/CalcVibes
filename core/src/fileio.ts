@@ -95,13 +95,22 @@ export function parseProject(text: string): { inputs: ModelInputs; settings: Pro
     throw new ProjectFileError("FILE-PROJECT: the file carries no project object and cannot be opened.");
   }
   const project = record.project as Record<string, unknown>;
-  if (project.costs !== undefined && !Array.isArray(project.costs)) {
+  // v0.6.12.1 (AUD-1): the required-shape checks. The costs and repayment entries must be
+  // present; a parseable record without them would reach the editor and crash it. This is
+  // file-format work only: presence and container type, never content (the engine judges that).
+  if (project.costs === undefined) {
+    throw new ProjectFileError("FILE-PROJECT: the project's costs entry is missing and the file cannot be opened.");
+  }
+  if (!Array.isArray(project.costs)) {
     throw new ProjectFileError("FILE-PROJECT: the project's costs entry is not a list and cannot be opened.");
   }
   if (project.contracts !== undefined && !Array.isArray(project.contracts)) {
     throw new ProjectFileError("FILE-PROJECT: the project's contracts entry is not a list and cannot be opened.");
   }
-  if (project.repayment !== undefined && !isPlainObject(project.repayment)) {
+  if (project.repayment === undefined) {
+    throw new ProjectFileError("FILE-PROJECT: the project's repayment entry is missing and the file cannot be opened.");
+  }
+  if (!isPlainObject(project.repayment)) {
     throw new ProjectFileError("FILE-PROJECT: the project's repayment entry is not an object and cannot be opened.");
   }
   if (project.appraisal !== undefined && !isPlainObject(project.appraisal)) {

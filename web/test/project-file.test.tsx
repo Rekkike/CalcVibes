@@ -60,6 +60,19 @@ describe("v0.6.3 project file save/load", () => {
     expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore-power program (Rotterdam)");
   });
 
+  it("OPEN-INCOMPLETE (v0.6.12.1, AUD-1): a parseable but incomplete project file renders the refusal panel; the root is not blank and the current project is untouched", async () => {
+    const { container } = render(<App />);
+    fireEvent.click(byAction("load-demo"));
+    const incomplete = JSON.stringify({ fileKind: "calcvibes-project", fileVersion: 1, project: { projectName: "x" }, settings: { startYear: null, entryUnit: "ones", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null } });
+    fireEvent.change(fileInput(), { target: { files: [new File([incomplete], "incomplete.calcvibes.json", { type: "application/json" })] } });
+    await waitFor(() => {
+      expect(byTest("load-error")?.textContent).toBe("FILE-PROJECT: the project's costs entry is missing and the file cannot be opened.");
+    });
+    expect(container.innerHTML.length).toBeGreaterThan(0);
+    expect(document.querySelector(".app-root")).toBeTruthy();
+    expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Shore-power program (Rotterdam)");
+  });
+
   it("SAVE-NAME: the project file name is the slugified project name with the .calcvibes.json extension", () => {
     expect(projectFileName("Project Alpha")).toBe("project-alpha.calcvibes.json");
     expect(projectFileName("")).toBe("project.calcvibes.json");
