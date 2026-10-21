@@ -10,9 +10,12 @@ import type { ModelInputs, TimelineBlock } from "../../core/src/types.js";
 
 const synthetic = (): TimelineBlock => ({
   projectScale: "full",
+  // v0.6.13.2: the carried fields (phase vocabulary, lane visibility, source markers) are inert too.
+  phases: [{ id: "prestudy", label: "Prestudy" }, { id: "production", label: "Production" }, { id: "extra", label: "Extra" }],
+  laneVisibility: { extra: true, prestudy: false },
   activities: [
     { id: "a1", label: "Study", startYear: 1, endYear: 2, phase: "prestudy" },
-    { id: "a2", label: "Build", startYear: 2, endYear: 4, phase: "production" },
+    { id: "a2", label: "Build", startYear: 2, endYear: 4, phase: "production", derivedFrom: "cost-program" },
   ],
   decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "BP1", outcome: "continue" }],
   milestones: [{ id: "m1", label: "Done", year: 4, tie: { kind: "engine-event", event: "construction-complete" } }],

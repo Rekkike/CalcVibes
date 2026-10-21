@@ -1,8 +1,10 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
+import { GANTT_LANE_LABEL_CHARS, ganttWindow, layoutLane, wrapLabel } from "./ganttLayout.js";
+import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { PPS_DISCLOSURE, TIMELINE_PHASES, programSpanYears, timelineAuthored, timelineOf, validateTimeline, yearHeader } from "./state.js";
+import { PPS_DISCLOSURE, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -87,14 +89,21 @@ export interface DeckFundingBlock {
 // phases as lanes, the activities as bars, the decision points as full-height gate lines labeled
 // with their BP codes, the milestones as diamond markers, the time axis in program years through
 // the shared yearHeader labels. The Presentation and the PDF render it; neither recomputes.
-export interface DeckGanttBar { id: string; label: string; startYear: number; endYear: number }
-export interface DeckGanttLane { phase: TimelinePhase; label: string; bars: DeckGanttBar[] }
+// v0.6.13.2: the stacked sub-row layout, the label placement and the adaptive year window are composed
+// here once (web/src/ganttLayout.ts); the renderers consume them and never recompute.
+export type DeckGanttBar = GanttBarLaid;
+export interface DeckGanttLane { phase: TimelinePhase; label: string; labelLines: string[]; rowCount: number; rowLines: number[]; bars: DeckGanttBar[] }
 export interface DeckGanttGate { id: string; code: string | null; title: string; year: number; outcome: string | null }
 export interface DeckGanttMilestone { id: string; label: string; year: number; tie: string | null }
 export interface DeckGantt {
+  // the program span; the axis and the plot cover the year window only
   spanYears: number;
+  window: { firstYear: number; lastYear: number };
   axis: { year: number; label: string }[];
   lanes: DeckGanttLane[];
+  // markers (gates and milestones) outside the window are omitted from the chart and counted
+  omittedMarkers: number;
+  caption: string | null;
   gates: DeckGanttGate[];
   milestones: DeckGanttMilestone[];
 }
@@ -640,19 +649,36 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   const gates = [...tl.decisionPoints].sort((a, b) => a.year - b.year).map((d) => ({
     id: d.id, code: d.code ?? null, title: d.title, year: d.year, outcome: d.outcome ?? null,
   }));
+  // v0.6.13.2: the lanes are the visible vocabulary lanes; the year window is the extent of their
+  // activities (the program span when none); the bars stack on sub-rows; markers outside the window
+  // are omitted and counted. All of it composes here, once.
+  const lanes = visibleLanes(tl);
+  const win = ganttWindow(lanes.flatMap((l) => l.activities), spanYears);
+  const allMilestones = [...tl.milestones].sort((a, b) => a.year - b.year).map((m) => ({
+    id: m.id, label: m.label, year: m.year,
+    tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity ${m.tie.activityId}` : m.tie.event,
+  }));
+  const inWindow = (y: number) => y >= win.firstYear && y <= win.lastYear;
+  const omittedMarkers = gates.filter((g) => !inWindow(g.year)).length + allMilestones.filter((m) => !inWindow(m.year)).length;
+  const captionParts: string[] = [];
+  if (win.narrowed) {
+    captionParts.push(`The axis shows ${yearHeader(win.firstYear, startYear)}–${yearHeader(win.lastYear, startYear)} of the program span ${yearHeader(1, startYear)}–${yearHeader(spanYears, startYear)}.`);
+  }
+  if (omittedMarkers > 0) {
+    captionParts.push(`${omittedMarkers} ${omittedMarkers === 1 ? "marker falls" : "markers fall"} outside this window and ${omittedMarkers === 1 ? "is" : "are"} not drawn; the gates and milestones listed on this slide name ${omittedMarkers === 1 ? "it" : "them"}.`);
+  }
   const gantt: DeckGantt = {
     spanYears,
-    axis: Array.from({ length: spanYears }, (_, k) => ({ year: k + 1, label: yearHeader(k + 1, startYear) })),
-    lanes: TIMELINE_PHASES.map((p) => ({
-      phase: p.id,
-      label: p.label,
-      bars: tl.activities.filter((a) => a.phase === p.id).sort((a, b) => a.startYear - b.startYear).map((a) => ({ id: a.id, label: a.label, startYear: a.startYear, endYear: a.endYear })),
-    })),
-    gates,
-    milestones: [...tl.milestones].sort((a, b) => a.year - b.year).map((m) => ({
-      id: m.id, label: m.label, year: m.year,
-      tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity ${m.tie.activityId}` : m.tie.event,
-    })),
+    window: { firstYear: win.firstYear, lastYear: win.lastYear },
+    axis: Array.from({ length: win.years }, (_, k) => ({ year: win.firstYear + k, label: yearHeader(win.firstYear + k, startYear) })),
+    lanes: lanes.map((l) => {
+      const laid = layoutLane(l.activities.map((a) => ({ id: a.id, label: a.label, startYear: a.startYear, endYear: a.endYear })), win);
+      return { phase: l.id, label: l.label, labelLines: wrapLabel(l.label, GANTT_LANE_LABEL_CHARS), rowCount: laid.rowCount, rowLines: laid.rowLines, bars: laid.bars };
+    }),
+    gates: gates.filter((g) => inWindow(g.year)),
+    milestones: allMilestones.filter((m) => inWindow(m.year)),
+    omittedMarkers,
+    caption: captionParts.length > 0 ? captionParts.join(" ") : null,
   };
   const body: DeckFigure[] = [
     { label: "Program span", value: `${yearHeader(1, startYear)}–${yearHeader(spanYears, startYear)}`, kind: "text", rawValue: spanYears },
@@ -663,7 +689,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
       kind: "text" as const,
       rawValue: g.year,
     })),
-    ...gantt.milestones.map((m) => ({ label: "Milestone", value: `${m.label} — ${yearHeader(m.year, startYear)}`, kind: "text" as const, rawValue: m.year })),
+    ...allMilestones.map((m) => ({ label: "Milestone", value: `${m.label} — ${yearHeader(m.year, startYear)}`, kind: "text" as const, rawValue: m.year })),
   ];
   return {
     name: "timeline",

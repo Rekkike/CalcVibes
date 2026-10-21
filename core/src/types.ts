@@ -184,7 +184,10 @@ export interface FundingView {
 
 // v0.6.13: the timeline block — a planning and presentation layer. The engine never reads it:
 // computeModel is inert to the block (the byte-identity lock). Years are program years (1-based).
-export type TimelinePhase = "prestudy" | "detail-design" | "production";
+// v0.6.13.2: a phase is a plain string id into the block's own vocabulary (the curated defaults live in the
+// web layer; the block may carry its own list plus per-lane visibility, both presentation-only).
+export type TimelinePhase = string;
+export type TimelineSource = "cost-program" | "contracts" | "funding" | "financing" | "operating" | "tariff";
 export type TimelineOutcome = "continue" | "change" | "terminate";
 export type TimelineEngineEvent = "construction-complete" | "first-collection-year" | "funding-received";
 
@@ -194,6 +197,8 @@ export interface TimelineActivity {
   startYear: number;
   endYear: number;
   phase: TimelinePhase;
+  // v0.6.13.2: the source marker of a suggested activity; hand-authored activities carry none.
+  derivedFrom?: TimelineSource;
 }
 
 export interface TimelineDecisionPoint {
@@ -217,6 +222,10 @@ export interface TimelineMilestone {
 
 export interface TimelineBlock {
   projectScale?: "mini" | "full";
+  // v0.6.13.2: the carried phase vocabulary (absent reads as the curated defaults) and the
+  // per-lane visibility (absent entry = automatic; true = render even when empty; false = hide).
+  phases?: { id: string; label: string }[];
+  laneVisibility?: Record<string, boolean>;
   activities: TimelineActivity[];
   decisionPoints: TimelineDecisionPoint[];
   milestones: TimelineMilestone[];

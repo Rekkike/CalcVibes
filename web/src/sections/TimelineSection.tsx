@@ -1,9 +1,47 @@
 import { useState } from "react";
-import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineTie } from "../../../core/src/types.js";
+import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineSource, TimelineTie } from "../../../core/src/types.js";
 import {
-  PPS_DISCLOSURE, TIMELINE_EVENT_LABELS, TIMELINE_PHASES, availableEngineEvents, nextId, nextUnusedBp, programSpanYears,
-  suggestActivitiesFromCosts, timelineAuthored, timelineOf, validateTimeline, yearHeader,
+  PPS_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedBp,
+  phaseVocabularyIssues, phasesOf, programSpanYears, replaceSourceActivities, sourceHasActivities, suggestActivitiesFromContracts,
+  suggestActivitiesFromCosts, suggestActivitiesFromFinancing, suggestActivitiesFromFunding, suggestActivitiesFromOperating,
+  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, yearHeader,
 } from "../state.js";
+
+// v0.6.13.2 Task B: the per-source suggestion buttons. Each derives one source of the project into
+// activities carrying that source's marker; the review note names what was derived.
+const plural = (n: number) => `${n} ${n === 1 ? "activity" : "activities"}`;
+const SOURCES: { source: TimelineSource; action: string; label: string; noun: string; zero: string; note: (n: number) => string }[] = [
+  {
+    source: "cost-program", action: "suggest-activities", label: "Suggest activities from the cost program", noun: "cost-program",
+    zero: "The cost program has no lines to derive activities from.",
+    note: (n) => `Suggested ${plural(n)}, one per cost line. Operating lines are excluded from this button: the operating-lines button derives them. Every activity enters in the Production phase because the phase cannot be derived from a cost line; review the spans and phases and adjust them.`,
+  },
+  {
+    source: "contracts", action: "suggest-contracts", label: "Suggest activities from the contracts", noun: "contracts",
+    zero: "The project has no contracts to derive activities from.",
+    note: (n) => `Suggested ${plural(n)} from the contracts: one per contract over its term, plus one short activity per reinvestment. They enter in the Revenue phase; review the spans and adjust them.`,
+  },
+  {
+    source: "funding", action: "suggest-funding", label: "Suggest activities from the funding", noun: "funding",
+    zero: "The project has no funding rows to derive activities from.",
+    note: (n) => `Suggested ${plural(n)} from the funding: one per row, a grant at its receipt year and an interest-free note from the draw to the final repayment. They enter in the Funding phase; review the spans and adjust them.`,
+  },
+  {
+    source: "financing", action: "suggest-financing", label: "Suggest the debt facility from the financing", noun: "financing",
+    zero: "The financing derives no activity.",
+    note: () => "Suggested the debt facility activity over its service term. It enters in the Financing phase; review the span and adjust it.",
+  },
+  {
+    source: "operating", action: "suggest-operating", label: "Suggest activities from the operating lines", noun: "operating-lines",
+    zero: "The project has no operating lines to derive activities from.",
+    note: (n) => `Suggested ${plural(n)} from the operating lines, one per line over its years. They enter in the Operations phase; review the spans and adjust them.`,
+  },
+  {
+    source: "tariff", action: "suggest-tariff", label: "Suggest activities from the tariff rows", noun: "tariff",
+    zero: "The tariff derives no activities.",
+    note: (n) => `Suggested ${plural(n)} from the tariff rows that declare a span, one per row over its span. They enter in the Revenue phase; review the spans and adjust them.`,
+  },
+];
 
 const OUTCOMES: { id: TimelineOutcome; label: string }[] = [
   { id: "continue", label: "Continue (fortsätta)" },
@@ -29,15 +67,61 @@ export function TimelineSection(props: {
   const events = availableEngineEvents(inputs, result);
   const refusals = validateTimeline(inputs, result);
   const authored = timelineAuthored(inputs);
-  const commit = (patch: Partial<TimelineBlock>) => setTimeline({ ...tl, ...patch });
-  // v0.6.13.1: the one-click suggestion — the only route from the cost program into the timeline.
-  // The click IS authorship (it commits through the setTimeline seam); the count drives the
-  // review note, which disappears again once the grid is emptied.
-  const [suggested, setSuggested] = useState<number | null>(null);
-  const suggest = () => {
-    const derived = suggestActivitiesFromCosts(inputs);
-    commit({ activities: derived });
-    setSuggested(derived.length);
+  // A patch value of undefined removes the key (an emptied lane-visibility map leaves the block).
+  const commit = (patch: Partial<TimelineBlock>) => {
+    const next = { ...tl, ...patch } as Record<string, unknown>;
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    setTimeline(next as unknown as TimelineBlock);
+  };
+  // v0.6.13.1/2: the one-click suggestions — the only route from the project's sources into the
+  // timeline. The click IS authorship per source (it commits through the setTimeline seam and
+  // replaces exactly that source's marked entries); the count drives the review note, which
+  // disappears again once that source's entries are removed.
+  const [suggested, setSuggested] = useState<Partial<Record<TimelineSource, number>>>({});
+  const [phaseNote, setPhaseNote] = useState<string | null>(null);
+  const [newPhase, setNewPhase] = useState<{ id: string; label: string }>({ id: "", label: "" });
+  const derive = (source: TimelineSource, taken: string[]): TimelineActivity[] =>
+    source === "cost-program" ? suggestActivitiesFromCosts(inputs, taken)
+    : source === "contracts" ? suggestActivitiesFromContracts(inputs, taken)
+    : source === "funding" ? suggestActivitiesFromFunding(inputs, taken)
+    : source === "financing" ? suggestActivitiesFromFinancing(inputs, result, taken)
+    : source === "operating" ? suggestActivitiesFromOperating(inputs, taken)
+    : suggestActivitiesFromTariff(inputs, taken);
+  const suggest = (source: TimelineSource) => {
+    const taken = tl.activities.filter((a) => a.derivedFrom !== source).map((a) => a.id);
+    const derived = derive(source, taken);
+    commit({ activities: replaceSourceActivities(tl.activities, source, derived), phases: ensurePhases(tl, derived) });
+    setSuggested((s) => ({ ...s, [source]: derived.length }));
+  };
+  const blockReason = (source: TimelineSource): string | null =>
+    source === "financing" ? financingSuggestionBlock(inputs, result) : source === "tariff" ? tariffSuggestionBlock(inputs) : null;
+  const phases = phasesOf(tl);
+  const vocabularyIssues = phaseVocabularyIssues(tl);
+  const setLane = (id: string, mode: string) => {
+    const next = { ...(tl.laneVisibility ?? {}) };
+    if (mode === "auto") delete next[id];
+    else next[id] = mode === "show";
+    commit({ laneVisibility: Object.keys(next).length > 0 ? next : undefined });
+  };
+  const addPhase = () => {
+    const id = newPhase.id.trim().toLowerCase().replace(/\s+/g, "-");
+    const label = newPhase.label.trim();
+    if (id === "" || label === "") { setPhaseNote("A phase needs an id and a label."); return; }
+    if (phases.some((p) => p.id === id)) { setPhaseNote(`The phase id "${id}" already exists in the vocabulary: choose a different id.`); return; }
+    commit({ phases: [...phases, { id, label }] });
+    setNewPhase({ id: "", label: "" });
+    setPhaseNote(null);
+  };
+  const removePhase = (id: string) => {
+    const users = activitiesInPhase(tl, id);
+    if (users.length > 0) {
+      setPhaseNote(`The phase "${id}" cannot be deleted while activities reference it: ${users.map((a) => `${a.id} (${a.label || "unnamed"})`).join(", ")}; move or remove them first.`);
+      return;
+    }
+    const vis = { ...(tl.laneVisibility ?? {}) };
+    delete vis[id];
+    commit({ phases: phases.filter((p) => p.id !== id), laneVisibility: Object.keys(vis).length > 0 ? vis : undefined });
+    setPhaseNote(null);
   };
   const updateActivity = (id: string, patch: Partial<TimelineActivity>) =>
     commit({ activities: tl.activities.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
@@ -80,20 +164,62 @@ export function TimelineSection(props: {
         </select>
       </label>
       {!authored && (
-        <p data-testid="timeline-empty" className="muted">No timeline authored yet. Add an activity, a decision gate or a milestone to start, or suggest activities from the cost program; the deck shows a program Gantt slide once the timeline is authored and refusal-free.</p>
+        <p data-testid="timeline-empty" className="muted">No timeline authored yet. Add an activity, a decision gate or a milestone to start, or suggest activities from the cost program, the contracts, the funding, the financing, the operating lines or the tariff rows; the deck shows a program Gantt slide once the timeline is authored and refusal-free.</p>
       )}
-      <button
-        data-action="suggest-activities"
-        disabled={tl.activities.length > 0}
-        title={tl.activities.length > 0 ? "The suggestion is a starting draft and never merges into authored work: remove every activity to use it again." : undefined}
-        onClick={suggest}
-      >Suggest activities from the cost program</button>
-      {suggested !== null && (suggested === 0 || tl.activities.length > 0) && (
-        <p data-testid="timeline-suggestion-note" className="muted">
-          {suggested === 0
-            ? "The cost program has no lines to derive activities from."
-            : `Suggested ${suggested} ${suggested === 1 ? "activity" : "activities"}, one per cost line. Operating lines are excluded: they are a separate block, not program activities. Every activity enters in the Production phase because the phase cannot be derived from a cost line; review the spans and phases and adjust them.`}
-        </p>
+      <div data-testid="timeline-suggest-buttons">
+        {SOURCES.map((s) => {
+          const reason = blockReason(s.source);
+          const has = sourceHasActivities(tl, s.source);
+          return (
+            <button
+              key={s.source}
+              data-action={s.action}
+              data-source={s.source}
+              disabled={has || reason !== null}
+              title={has ? `The ${s.noun} suggestion is already in the grid: remove its activities to use it again. A suggestion replaces only its own source's entries and never touches hand-authored activities.` : reason ?? undefined}
+              onClick={() => suggest(s.source)}
+            >{s.label}</button>
+          );
+        })}
+      </div>
+      {SOURCES.map((s) => {
+        const n = suggested[s.source];
+        if (n === undefined || !(n === 0 || sourceHasActivities(tl, s.source))) return null;
+        return (
+          <p key={s.source} data-testid="timeline-suggestion-note" data-source={s.source} className="muted">{n === 0 ? s.zero : s.note(n)}</p>
+        );
+      })}
+
+      <h3>Phases</h3>
+      <p className="muted">The phase vocabulary is the lane set of the program Gantt. A lane is shown when it carries an activity; choose Always show to draw it empty or Hide to leave it off. The visibility is presentation-only: hiding a lane never removes its activities.</p>
+      <div className="editor-scroll" data-testid="timeline-phases-scroll">
+        <table data-testid="timeline-phases">
+          <thead><tr><th>Id</th><th>Label</th><th>Activities</th><th>Lane</th><th></th></tr></thead>
+          <tbody>
+            {phases.map((p, i) => (
+              <tr key={p.id + ":" + i} data-kind="phase" data-line={p.id}>
+                <td data-field="phaseId">{p.id}</td>
+                <td><input data-field="phaseLabel" value={p.label} onChange={(e) => commit({ phases: phases.map((q, j) => (j === i ? { ...q, label: e.target.value } : q)) })} /></td>
+                <td data-field="phaseCount">{activitiesInPhase(tl, p.id).length}</td>
+                <td>
+                  <select data-field="laneVisibility" value={tl.laneVisibility?.[p.id] === undefined ? "auto" : tl.laneVisibility[p.id] ? "show" : "hide"} onChange={(e) => setLane(p.id, e.target.value)}>
+                    <option value="auto">Automatic</option>
+                    <option value="show">Always show</option>
+                    <option value="hide">Hide</option>
+                  </select>
+                </td>
+                <td><button data-action="remove-phase" onClick={() => removePhase(p.id)}>Remove</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <label>New phase id <input data-field="newPhaseId" value={newPhase.id} onChange={(e) => setNewPhase({ ...newPhase, id: e.target.value })} /></label>{" "}
+      <label>Label <input data-field="newPhaseLabel" value={newPhase.label} onChange={(e) => setNewPhase({ ...newPhase, label: e.target.value })} /></label>{" "}
+      <button data-action="add-phase" onClick={addPhase}>Add phase</button>
+      {phaseNote !== null && <p data-testid="timeline-phase-refusal" className="warning">{phaseNote}</p>}
+      {vocabularyIssues.length > 0 && (
+        <ul data-testid="timeline-phase-issues" className="warning">{vocabularyIssues.map((m, i) => <li key={i}>{m}</li>)}</ul>
       )}
 
       <h3>Activities</h3>
@@ -108,7 +234,7 @@ export function TimelineSection(props: {
                 <td><input data-field="activityEnd" type="number" value={a.endYear} onChange={(e) => updateActivity(a.id, { endYear: num(e.target.value) })} /><span className="muted"> {yearsNote(a.endYear)}</span></td>
                 <td>
                   <select data-field="activityPhase" value={a.phase} onChange={(e) => updateActivity(a.id, { phase: e.target.value as TimelinePhase })}>
-                    {TIMELINE_PHASES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                    {phases.map((p, i) => <option key={p.id + ":" + i} value={p.id}>{p.label}</option>)}
                   </select>
                 </td>
                 <td><button data-action="remove-activity" onClick={() => commit({ activities: tl.activities.filter((x) => x.id !== a.id) })}>Remove</button></td>
@@ -117,7 +243,7 @@ export function TimelineSection(props: {
           </tbody>
         </table>
       </div>
-      <button data-action="add-activity" onClick={() => commit({ activities: [...tl.activities, { id: nextId("a", tl.activities.map((a) => a.id)), label: "", startYear: 1, endYear: 1, phase: "prestudy" }] })}>Add activity</button>
+      <button data-action="add-activity" onClick={() => commit({ activities: [...tl.activities, { id: nextId("a", tl.activities.map((a) => a.id)), label: "", startYear: 1, endYear: 1, phase: phases[0]?.id ?? "prestudy" }] })}>Add activity</button>
 
       <h3>Decision points</h3>
       <div className="editor-scroll" data-testid="timeline-gates-scroll">

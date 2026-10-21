@@ -46,7 +46,7 @@ describe("v0.6.13.1 Task A: suggestActivitiesFromCosts (the pure derivation)", (
     expect(acts.map((a) => a.label)).toEqual(["First", "Second", "Third"]);
     expect(acts.map((a) => a.id)).toEqual(["a1", "a2", "a3"]);
     expect(new Set(acts.map((a) => a.phase))).toEqual(new Set(["production"]));
-    expect(Object.keys(acts[0]).sort()).toEqual(["endYear", "id", "label", "phase", "startYear"]);
+    expect(Object.keys(acts[0]).sort()).toEqual(["derivedFrom", "endYear", "id", "label", "phase", "startYear"]);
   });
 
   it("OPERATING-EXCLUDED: operating lines derive no activity", () => {
@@ -83,7 +83,7 @@ async function openProject(inputs: ModelInputs) {
 describe("v0.6.13.1 Task A: the suggest affordance in the Timeline section", () => {
   it("EMPTY-STATE: the re-anchored paragraph mentions the affordance; the button is seated and enabled while the grid is empty", async () => {
     await openProject(project());
-    expect(screen.getByTestId("timeline-empty").textContent).toBe("No timeline authored yet. Add an activity, a decision gate or a milestone to start, or suggest activities from the cost program; the deck shows a program Gantt slide once the timeline is authored and refusal-free.");
+    expect(screen.getByTestId("timeline-empty").textContent).toBe("No timeline authored yet. Add an activity, a decision gate or a milestone to start, or suggest activities from the cost program, the contracts, the funding, the financing, the operating lines or the tariff rows; the deck shows a program Gantt slide once the timeline is authored and refusal-free.");
     const btn = byAction("suggest-activities") as HTMLButtonElement;
     expect(btn.textContent).toBe("Suggest activities from the cost program");
     expect(btn.disabled).toBe(false);
@@ -108,7 +108,7 @@ describe("v0.6.13.1 Task A: the suggest affordance in the Timeline section", () 
     // the authored flip: the empty state is gone and the section shows no refusals
     expect(document.querySelector('[data-testid="timeline-empty"]')).toBeNull();
     expect(document.querySelector('[data-testid="timeline-refusals"]')).toBeNull();
-    expect(screen.getByTestId("timeline-suggestion-note").textContent).toBe("Suggested 3 activities, one per cost line. Operating lines are excluded: they are a separate block, not program activities. Every activity enters in the Production phase because the phase cannot be derived from a cost line; review the spans and phases and adjust them.");
+    expect(screen.getByTestId("timeline-suggestion-note").textContent).toBe("Suggested 3 activities, one per cost line. Operating lines are excluded from this button: the operating-lines button derives them. Every activity enters in the Production phase because the phase cannot be derived from a cost line; review the spans and phases and adjust them.");
   });
 
   it("DECK: after the click the Gantt slide composes (authored and refusal-free)", async () => {
@@ -118,21 +118,24 @@ describe("v0.6.13.1 Task A: the suggest affordance in the Timeline section", () 
     expect(document.querySelector('[data-slide-name="timeline"]')).toBeTruthy();
   });
 
-  it("GATING: once any activity exists the button is disabled with a reason; removing every activity re-enables it", async () => {
+  it("GATING: once the source's activities exist the button is disabled with a reason; removing them re-enables it", async () => {
     await openProject(project());
     fireEvent.click(byAction("suggest-activities"));
     const btn = () => byAction("suggest-activities") as HTMLButtonElement;
     expect(btn().disabled).toBe(true);
-    expect(btn().title).toBe("The suggestion is a starting draft and never merges into authored work: remove every activity to use it again.");
+    expect(btn().title).toBe("The cost-program suggestion is already in the grid: remove its activities to use it again. A suggestion replaces only its own source's entries and never touches hand-authored activities.");
     fireEvent.click(btn());
     expect(all('[data-kind="activity"]').length).toBe(3);
     while (document.querySelector('[data-action="remove-activity"]') !== null) fireEvent.click(document.querySelector('[data-action="remove-activity"]') as HTMLElement);
     expect(btn().disabled).toBe(false);
   });
 
-  it("GATING-AUTHORED: a hand-added activity disables the button too", async () => {
+  it("GATING-AUTHORED (v0.6.13.2 re-anchor: the per-source gate supersedes the empty-grid gate): a hand-added activity no longer disables the button and survives the suggestion", async () => {
     await openProject(project());
     fireEvent.click(byAction("add-activity"));
+    expect((byAction("suggest-activities") as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(byAction("suggest-activities"));
+    expect(all('[data-kind="activity"]').length).toBe(4);
     expect((byAction("suggest-activities") as HTMLButtonElement).disabled).toBe(true);
   });
 

@@ -183,77 +183,127 @@ function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number,
   return 48 * scale;
 }
 
-// v0.6.13: the program Gantt on the print route — the lanes, the bars, the BP-coded gate lines,
-// the milestone diamonds and the axis labels, in the print palette; it draws the deck model's
-// gantt and never recomputes it. Returns the height consumed.
-function drawPrintGantt(doc: jsPDF, g: DeckGantt, y: number, trace?: DeckPdfTrace): number {
-  const labelW = 28;
+// v0.6.13: the program Gantt on the print route — the lanes, the stacked bars, the BP-coded gate
+// lines, the milestone diamonds and the axis labels, in the print palette; it draws the deck model's
+// gantt (the year window, the sub-row layout and the label placement composed once in the deck
+// model) and never recomputes it. v0.6.13.2: the lanes flow across pages when the stacked layout is
+// taller than the page — nothing is clipped; each page segment repeats the axis and the marker
+// footer. Returns the y after the last segment.
+export const GANTT_PDF = { labelW: 32, plotW: 257 - 32, axisH: 7, footerH: 16, rowPad: 1.2, barH: 4.2, lineH: 2.7, capLine: 3.4 };
+const pdfRowH = (lines: number) => GANTT_PDF.rowPad + (lines > 0 ? lines * GANTT_PDF.lineH + 0.6 : 0) + GANTT_PDF.barH;
+const pdfLaneH = (l: DeckGantt["lanes"][number]) => Math.max(l.rowLines.reduce((a, n) => a + pdfRowH(n), 0) + GANTT_PDF.rowPad, l.labelLines.length * 3.4 + 2);
+function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => number, trace?: DeckPdfTrace): number {
+  const { labelW, plotW, axisH, footerH, rowPad, barH, lineH } = GANTT_PDF;
   const x0 = 20 + labelW;
-  const plotW = 257 - labelW;
-  const laneH = 11;
-  const axisH = 7;
-  const n = Math.max(1, g.spanYears);
+  const first = g.window.firstYear;
+  const n = Math.max(1, g.window.lastYear - first + 1);
   const colW = plotW / n;
-  const xStart = (yr: number) => x0 + (yr - 1) * colW;
-  const xMid = (yr: number) => x0 + (yr - 0.5) * colW;
-  const lanesTop = y + axisH;
-  const lanesBottom = lanesTop + laneH * g.lanes.length;
+  const xStart = (yr: number) => x0 + (yr - first) * colW;
+  const xMid = (yr: number) => x0 + (yr - first + 0.5) * colW;
   const step = Math.max(1, Math.ceil(n / 14));
-  doc.setFontSize(7);
-  doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-  for (const a of g.axis) {
-    doc.setDrawColor(229, 229, 234);
-    doc.line(xStart(a.year), lanesTop, xStart(a.year), lanesBottom);
-    if ((a.year - 1) % step === 0) {
-      doc.text(a.label, xMid(a.year), y + 4, { align: "center" });
-      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(a.label);
+  const push = (s: string) => { if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(s); };
+  // segment the lanes by page capacity
+  const segments: { top: number; lanes: DeckGantt["lanes"] }[] = [];
+  let top = y0;
+  let cur: DeckGantt["lanes"] = [];
+  let used = axisH + footerH;
+  for (const lane of g.lanes) {
+    const h = pdfLaneH(lane);
+    if (cur.length > 0 && top + used + h > CONTENT_BOTTOM) {
+      segments.push({ top, lanes: cur });
+      top = nextPage();
+      cur = [];
+      used = axisH + footerH;
     }
+    cur.push(lane);
+    used += h;
   }
-  doc.line(xStart(n + 1), lanesTop, xStart(n + 1), lanesBottom);
-  g.lanes.forEach((lane, i) => {
-    const ly = lanesTop + i * laneH;
-    doc.setDrawColor(150, 150, 150);
-    doc.line(x0, ly, x0 + plotW, ly);
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text(lane.label, 20, ly + laneH / 2 + 1.5);
-    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(lane.label);
-    for (const b of lane.bars) {
-      const bx = xStart(b.startYear);
-      const bw = Math.max(colW * 0.5, xStart(b.endYear + 1) - bx);
-      doc.setFillColor(0, 116, 186);
-      doc.rect(bx, ly + 2, bw, laneH - 4, "F");
-      doc.setFontSize(6);
-      doc.setTextColor(255, 255, 255);
-      doc.text(b.label, bx + 1, ly + laneH / 2 + 1, { maxWidth: bw - 2 });
-      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(b.label);
-    }
-  });
-  doc.setDrawColor(150, 150, 150);
-  doc.line(x0, lanesBottom, x0 + plotW, lanesBottom);
-  for (const gate of g.gates) {
-    doc.setDrawColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
-    doc.setLineWidth(0.6);
-    doc.line(xMid(gate.year), lanesTop - 2, xMid(gate.year), lanesBottom + 2);
-    doc.setLineWidth(0.2);
+  segments.push({ top, lanes: cur });
+  let endY = y0;
+  segments.forEach((seg) => {
+    const lanesTop = seg.top + axisH;
+    const heights = seg.lanes.map(pdfLaneH);
+    const lanesBottom = lanesTop + heights.reduce((a, h) => a + h, 0);
     doc.setFontSize(7);
-    doc.setTextColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
-    const code = gate.code ?? "Gate";
-    doc.text(code, xMid(gate.year), lanesBottom + 6, { align: "center" });
-    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(code);
-  }
-  for (const m of g.milestones) {
-    const cx = xMid(m.year);
-    const cy = lanesBottom + 11;
-    doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
-    doc.lines([[2.5, 2.5], [-2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]], cx, cy - 2.5, [1, 1], "F", true);
+    doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+    for (const a of g.axis) {
+      doc.setDrawColor(229, 229, 234);
+      doc.line(xStart(a.year), lanesTop, xStart(a.year), lanesBottom);
+      if ((a.year - first) % step === 0) {
+        doc.text(a.label, xMid(a.year), seg.top + 4, { align: "center" });
+        push(a.label);
+      }
+    }
+    doc.line(xStart(first + n), lanesTop, xStart(first + n), lanesBottom);
+    let ly = lanesTop;
+    seg.lanes.forEach((lane, i) => {
+      doc.setDrawColor(150, 150, 150);
+      doc.line(x0, ly, x0 + plotW, ly);
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      lane.labelLines.forEach((line, k) => {
+        doc.text(line, 20, ly + heights[i] / 2 - ((lane.labelLines.length - 1) * 3.4) / 2 + 1.2 + k * 3.4);
+      });
+      push(lane.label);
+      const rowTops: number[] = [];
+      let rc = ly + rowPad;
+      lane.rowLines.forEach((l) => { rowTops.push(rc); rc += pdfRowH(l); });
+      for (const b of lane.bars) {
+        const rowTop = rowTops[b.row];
+        const band = lane.rowLines[b.row] > 0 ? lane.rowLines[b.row] * lineH + 0.6 : 0;
+        const bx = xStart(b.startYear) + 0.3;
+        const bw = (b.endYear - b.startYear + 1) * colW - 0.6;
+        const by = rowTop + band;
+        doc.setFillColor(0, 116, 186);
+        doc.rect(bx, by, bw, barH, "F");
+        doc.setFontSize(6);
+        if (b.labelMode === "inside") {
+          doc.setTextColor(255, 255, 255);
+          doc.text(b.label, bx + 1, by + barH / 2 + 0.8);
+        } else {
+          doc.setTextColor(0, 0, 0);
+          b.lines.forEach((line, k) => doc.text(line, x0 + b.labelLeft * colW, rowTop + 2 + k * lineH));
+        }
+        push(b.label);
+      }
+      ly += heights[i];
+    });
+    doc.setDrawColor(150, 150, 150);
+    doc.line(x0, lanesBottom, x0 + plotW, lanesBottom);
+    for (const gate of g.gates) {
+      doc.setDrawColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+      doc.setLineWidth(0.6);
+      doc.line(xMid(gate.year), lanesTop - 2, xMid(gate.year), lanesBottom + 2);
+      doc.setLineWidth(0.2);
+      doc.setFontSize(7);
+      doc.setTextColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+      const code = gate.code ?? "Gate";
+      doc.text(code, xMid(gate.year), lanesBottom + 6, { align: "center" });
+      push(code);
+    }
+    for (const m of g.milestones) {
+      const cx = xMid(m.year);
+      const cy = lanesBottom + 11;
+      doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
+      doc.lines([[2.5, 2.5], [-2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]], cx, cy - 2.5, [1, 1], "F", true);
+    }
+    endY = lanesBottom + footerH;
+  });
+  // the axis-honesty caption (the window against the program span; the omitted-marker disclosure)
+  if (g.caption !== null) {
+    doc.setFontSize(7);
+    doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+    const lines = doc.splitTextToSize(g.caption, 257) as string[];
+    if (endY + lines.length * GANTT_PDF.capLine > CONTENT_BOTTOM) endY = nextPage();
+    doc.text(lines, 20, endY + 2);
+    push(g.caption);
+    endY += lines.length * GANTT_PDF.capLine + 1;
   }
   doc.setDrawColor(0, 0, 0);
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(12);
-  return axisH + laneH * g.lanes.length + 16;
+  return endY;
 }
-
 export function buildDeckPdf(model: DeckModel, projectName: string): jsPDF;
 export function buildDeckPdf(model: DeckModel, projectName: string, trace: DeckPdfTrace): jsPDF;
 export function buildDeckPdf(model: DeckModel, projectName: string, trace?: DeckPdfTrace): jsPDF {
@@ -307,7 +357,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     let y = CONTENT_TOP;
     // v0.6.13: the timeline slide draws its Gantt first, beneath the title.
     if (slide.gantt !== undefined) {
-      y += drawPrintGantt(doc, slide.gantt, y, trace) + 2;
+      y = drawPrintGantt(doc, slide.gantt, y, () => { doc.addPage(); footerPage += 1; return CONTENT_TOP; }, trace) + 2;
     }
     // v0.6.5 Task I: the deal slide is verdict-led — the verdict draws first, before the tiles.
     if (slide.verdict !== undefined) {
