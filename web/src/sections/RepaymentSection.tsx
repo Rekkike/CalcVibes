@@ -13,10 +13,12 @@ export function RepaymentSection(props: {
   setMode: (m: "A" | "B" | "C") => void;
   modePayment: number;
   setModePayment: (p: number) => void;
+  // v0.6.12.2 (AUD-8): the engine refusal of the mode solve, rendered verbatim (null when none).
+  modeRefusal?: string | null;
   startYear?: number | null;
   entryUnit: EntryUnit;
 }) {
-  const { inputs, result, setRepayment, setContracts, mode, setMode, modePayment, setModePayment, startYear = null, entryUnit } = props;
+  const { inputs, result, setRepayment, setContracts, mode, setMode, modePayment, setModePayment, modeRefusal = null, startYear = null, entryUnit } = props;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
   const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
   // v0.6.9 Task F (finding W28): the solved payment figure renders through feeForDisplay.
@@ -44,6 +46,9 @@ export function RepaymentSection(props: {
       </label>
       {mode !== "A" && (
         <label>Payment per period <MoneyEditor dataField="modePayment" value={modePayment} entryUnit={entryUnit} onChange={setModePayment} /></label>
+      )}
+      {mode !== "A" && modeRefusal !== null && (
+        <p data-testid="mode-refusal" className="warning">{modeRefusal}</p>
       )}
       {/* v0.6.8 Task E (finding W21): the optional, user-authored repayment basis note. Empty by
           default, never required, no engine semantics (engine-blind by the pinned check); the
