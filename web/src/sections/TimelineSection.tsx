@@ -1,7 +1,8 @@
+import { useState } from "react";
 import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineTie } from "../../../core/src/types.js";
 import {
   PPS_DISCLOSURE, TIMELINE_EVENT_LABELS, TIMELINE_PHASES, availableEngineEvents, nextId, nextUnusedBp, programSpanYears,
-  timelineAuthored, timelineOf, validateTimeline, yearHeader,
+  suggestActivitiesFromCosts, timelineAuthored, timelineOf, validateTimeline, yearHeader,
 } from "../state.js";
 
 const OUTCOMES: { id: TimelineOutcome; label: string }[] = [
@@ -29,6 +30,15 @@ export function TimelineSection(props: {
   const refusals = validateTimeline(inputs, result);
   const authored = timelineAuthored(inputs);
   const commit = (patch: Partial<TimelineBlock>) => setTimeline({ ...tl, ...patch });
+  // v0.6.13.1: the one-click suggestion — the only route from the cost program into the timeline.
+  // The click IS authorship (it commits through the setTimeline seam); the count drives the
+  // review note, which disappears again once the grid is emptied.
+  const [suggested, setSuggested] = useState<number | null>(null);
+  const suggest = () => {
+    const derived = suggestActivitiesFromCosts(inputs);
+    commit({ activities: derived });
+    setSuggested(derived.length);
+  };
   const updateActivity = (id: string, patch: Partial<TimelineActivity>) =>
     commit({ activities: tl.activities.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
   const updateGate = (id: string, patch: Partial<TimelineDecisionPoint>) =>
@@ -70,7 +80,20 @@ export function TimelineSection(props: {
         </select>
       </label>
       {!authored && (
-        <p data-testid="timeline-empty" className="muted">No timeline authored yet. Add an activity, a decision gate or a milestone to start; the deck shows a program Gantt slide once the timeline is authored and refusal-free.</p>
+        <p data-testid="timeline-empty" className="muted">No timeline authored yet. Add an activity, a decision gate or a milestone to start, or suggest activities from the cost program; the deck shows a program Gantt slide once the timeline is authored and refusal-free.</p>
+      )}
+      <button
+        data-action="suggest-activities"
+        disabled={tl.activities.length > 0}
+        title={tl.activities.length > 0 ? "The suggestion is a starting draft and never merges into authored work: remove every activity to use it again." : undefined}
+        onClick={suggest}
+      >Suggest activities from the cost program</button>
+      {suggested !== null && (suggested === 0 || tl.activities.length > 0) && (
+        <p data-testid="timeline-suggestion-note" className="muted">
+          {suggested === 0
+            ? "The cost program has no lines to derive activities from."
+            : `Suggested ${suggested} ${suggested === 1 ? "activity" : "activities"}, one per cost line. Operating lines are excluded: they are a separate block, not program activities. Every activity enters in the Production phase because the phase cannot be derived from a cost line; review the spans and phases and adjust them.`}
+        </p>
       )}
 
       <h3>Activities</h3>

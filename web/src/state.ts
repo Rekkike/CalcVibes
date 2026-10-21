@@ -1,6 +1,6 @@
 import type {
   ContractParams, CostLine, MaintenanceConfig, ModelInputs, ModelResult, OperatingLine,
-  TimelineBlock, TimelineEngineEvent, TimelinePhase,
+  TimelineActivity, TimelineBlock, TimelineEngineEvent, TimelinePhase,
 } from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
 
@@ -353,6 +353,39 @@ export function timelineOf(inputs: ModelInputs): TimelineBlock {
 export function timelineAuthored(inputs: ModelInputs): boolean {
   const t = timelineOf(inputs);
   return t.activities.length + t.decisionPoints.length + t.milestones.length > 0;
+}
+
+// v0.6.13.1: the cost-program suggestion — a pure derivation of one activity per cost line (the
+// one-click starting draft; never silent auto-population, never a merge into authored work).
+// Operating lines are excluded (a separate block, an operating cost). The span follows the
+// engine's own conventions: a recurring line runs startYear..startYear + ceil(duration) - 1 (a
+// 2.5-year duration is charged as three years); a CAPEX lump is its start year; a CAPEX line
+// with per-year overrides spans min..max of the override-year keys (the profile IS its program,
+// the inert startYear ignored); a recurring line's overrides refine amounts inside the nominal
+// span and never extend it (the engine refuses an override outside the span). The phase is not
+// derivable from a cost line, so every entry enters as production; no gates and no milestones
+// are derived.
+export function suggestActivitiesFromCosts(inputs: ModelInputs): TimelineActivity[] {
+  const out: TimelineActivity[] = [];
+  for (const c of inputs.costs) {
+    let startYear: number;
+    let endYear: number;
+    const overrideYears = c.yearOverrides === undefined ? [] : Object.keys(c.yearOverrides).map(Number);
+    if (c.category === "capex") {
+      if (overrideYears.length > 0) {
+        startYear = Math.min(...overrideYears);
+        endYear = Math.max(...overrideYears);
+      } else {
+        startYear = c.startYear;
+        endYear = c.startYear;
+      }
+    } else {
+      startYear = c.startYear;
+      endYear = c.startYear + Math.max(1, Math.ceil(c.durationYears)) - 1;
+    }
+    out.push({ id: nextId("a", out.map((a) => a.id)), label: c.name, startYear, endYear, phase: "production" });
+  }
+  return out;
 }
 
 // The next unused BP of the scale's set (the default for an added gate), or null when the set
