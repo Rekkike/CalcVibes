@@ -116,6 +116,19 @@ export function parseProject(text: string): { inputs: ModelInputs; settings: Pro
   if (project.appraisal !== undefined && !isPlainObject(project.appraisal)) {
     throw new ProjectFileError("FILE-PROJECT: the project's appraisal entry is not an object and cannot be opened.");
   }
+  // v0.6.13: the optional timeline block — presence and container type only, engine-blind (the
+  // AUD-1 pattern); the planning layer's content is judged by the application, never here.
+  if (project.timeline !== undefined) {
+    if (!isPlainObject(project.timeline)) {
+      throw new ProjectFileError("FILE-PROJECT: the project's timeline entry is not an object and cannot be opened.");
+    }
+    for (const key of ["activities", "decisionPoints", "milestones"] as const) {
+      const entry = (project.timeline as Record<string, unknown>)[key];
+      if (entry !== undefined && !Array.isArray(entry)) {
+        throw new ProjectFileError(`FILE-PROJECT: the project's timeline ${key} entry is not a list and cannot be opened.`);
+      }
+    }
+  }
   const settings = readSettings(record.settings);
   return { inputs: project as unknown as ModelInputs, settings };
 }

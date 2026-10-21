@@ -1,4 +1,7 @@
-import type { ContractParams, CostLine, MaintenanceConfig, ModelInputs, OperatingLine } from "../../core/src/types.js";
+import type {
+  ContractParams, CostLine, MaintenanceConfig, ModelInputs, ModelResult, OperatingLine,
+  TimelineBlock, TimelineEngineEvent, TimelinePhase,
+} from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
 
 export const CURRENCIES = ["EUR", "USD", "GBP", "SEK", "NOK", "DKK"] as const;
@@ -40,8 +43,17 @@ export function blankOperatingLine(id: string): OperatingLine {
   return { id, label: "", amount: 0, startYear: 1, yearCount: 1, escalation: 0 };
 }
 
+// v0.6.13 Task E (AUD-15): the one collision-proof id helper — the smallest unused positive
+// integer under the prefix. A length-plus-one id collides after a deletion; this never does.
+export function nextId(prefix: string, existing: string[]): string {
+  const taken = new Set(existing);
+  let n = 1;
+  while (taken.has(prefix + n)) n++;
+  return prefix + n;
+}
+
 export function nextOperatingId(lines: OperatingLine[]): string {
-  return "o" + (lines.length + 1);
+  return nextId("o", lines.map((l) => l.id));
 }
 
 export function yearHeader(k: number, startYear: number | null): string {
@@ -255,7 +267,7 @@ export function landNewbuildProject(): ModelInputs {
 }
 
 export function nextCostId(costs: CostLine[]): string {
-  return "c" + (costs.length + 1);
+  return nextId("c", costs.map((c) => c.id));
 }
 
 export function blankContract(id: string, startYear: number): ContractParams {
@@ -274,9 +286,165 @@ export function blankContract(id: string, startYear: number): ContractParams {
 }
 
 export function nextContractId(contracts: ContractParams[]): string {
-  return "k" + (contracts.length + 1);
+  return nextId("k", contracts.map((c) => c.id));
 }
 
 export function blankCostLine(id: string): CostLine {
   return { id, name: "", category: "recurring", amount: 0, startYear: 1, durationYears: 1, escalation: 0 };
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// v0.6.13 — the timeline (the PPS-aligned planning layer). Pure helpers; the engine never reads
+// the block. Years are program years (1-based, the engine's indexing).
+// ---------------------------------------------------------------------------------------------
+
+export const TIMELINE_PHASES: { id: TimelinePhase; label: string }[] = [
+  { id: "prestudy", label: "Prestudy" },
+  { id: "detail-design", label: "Detail design" },
+  { id: "production", label: "Production" },
+];
+
+// The PPS-aligned decision-point vocabulary of record (Praktisk Projektstyrning BP set). The
+// default titles are user-overridable labels.
+export const PPS_BP_SET: { code: string; title: string }[] = [
+  { code: "BP1", title: "Beslut om att starta projektet och initiera förberedelserna" },
+  { code: "BP2", title: "Beslut om att fortsätta, avbryta eller göra om förberedelsearbete" },
+  { code: "BP3", title: "Beslut om att det finns tillräckligt bra underlag för att göra ett åtagande för resterande del av projektet" },
+  { code: "BP4", title: "Beslut att starta genomförandet" },
+  { code: "BP5", title: "Beslut om att fortsätta eller förändra projektåtagandet" },
+  { code: "BP6", title: "Beslut om att godkänna leverans av projektets delresultat eller slutresultat" },
+  { code: "BP7", title: "Beslut om att godkänna överlämning av ansvaret för projektets resultat till förvaltningen" },
+  { code: "BP8", title: "Beslut om att avsluta projektet" },
+];
+
+// The full scale carries BP1 through BP8; the mini scale the condensed four-point set.
+export const PPS_SCALE_CODES: Record<"mini" | "full", string[]> = {
+  full: ["BP1", "BP2", "BP3", "BP4", "BP5", "BP6", "BP7", "BP8"],
+  mini: ["BP1", "BP3", "BP4", "BP8"],
+};
+
+export const PPS_DISCLOSURE = "The decision-point vocabulary is aligned with PPS (Praktisk Projektstyrning); this application does not implement or certify PPS.";
+
+export const TIMELINE_EVENT_LABELS: Record<TimelineEngineEvent, string> = {
+  "construction-complete": "Construction complete",
+  "first-collection-year": "First collection year",
+  "funding-received": "Funding received",
+};
+
+export function emptyTimeline(): TimelineBlock {
+  return { projectScale: "full", activities: [], decisionPoints: [], milestones: [] };
+}
+
+// A normalized view of the (possibly partial) block: absent collections read as empty and the
+// scale defaults to "full".
+export function timelineOf(inputs: ModelInputs): TimelineBlock {
+  const t = inputs.timeline;
+  return {
+    projectScale: t?.projectScale ?? "full",
+    activities: t?.activities ?? [],
+    decisionPoints: t?.decisionPoints ?? [],
+    milestones: t?.milestones ?? [],
+  };
+}
+
+// A timeline is authored when the block carries at least one object; an empty block is the
+// empty state and the deck omits the slide.
+export function timelineAuthored(inputs: ModelInputs): boolean {
+  const t = timelineOf(inputs);
+  return t.activities.length + t.decisionPoints.length + t.milestones.length > 0;
+}
+
+// The next unused BP of the scale's set (the default for an added gate), or null when the set
+// is exhausted.
+export function nextUnusedBp(tl: TimelineBlock): { code: string; title: string } | null {
+  const used = new Set(tl.decisionPoints.map((d) => d.code).filter((c): c is string => c !== undefined));
+  for (const code of PPS_SCALE_CODES[tl.projectScale ?? "full"]) {
+    if (!used.has(code)) {
+      const bp = PPS_BP_SET.find((b) => b.code === code);
+      if (bp !== undefined) return bp;
+    }
+  }
+  return null;
+}
+
+// The program span in years: the declared project length when declared, else the derived
+// horizon — the span the engine composes. Null while the model has no result.
+export function programSpanYears(inputs: ModelInputs, result: ModelResult | null): number | null {
+  if (result === null) return null;
+  if (inputs.projectLengthYears !== undefined && inputs.projectLengthYears !== null) return inputs.projectLengthYears;
+  return result.horizon?.totalYears ?? Math.ceil(result.monthly.length / 12);
+}
+
+// The engine events that compose for this project, with their program years, read from the solved
+// model (read-only; the ties never alter the model):
+//   construction-complete -> result.lastCostYear (the last year any cost line burns);
+//   first-collection-year -> the first collection year: the first profile year (firstPaymentMonth)
+//     in a collections profile, the earliest contract start (contractsInfo[].startYear) in
+//     contracts mode, the first grid year (tariffYears[0].year) in a tariff mode, else
+//     result.repaymentStartYear;
+//   funding-received -> the earliest funding row year (fundingView.rows[].year), only when the
+//     project carries a funding block.
+export function availableEngineEvents(inputs: ModelInputs, result: ModelResult | null): { event: TimelineEngineEvent; year: number }[] {
+  if (result === null) return [];
+  const out: { event: TimelineEngineEvent; year: number }[] = [{ event: "construction-complete", year: result.lastCostYear }];
+  const profile = inputs.repayment.collectionsOverrides !== undefined && Object.keys(inputs.repayment.collectionsOverrides).length > 0;
+  let firstCollection = result.repaymentStartYear;
+  if (profile) firstCollection = Math.ceil(result.firstPaymentMonth / 12);
+  else if ((inputs.contracts ?? []).length > 0 && (result.contractsInfo ?? []).length > 0) firstCollection = Math.min(...(result.contractsInfo ?? []).map((c) => c.startYear));
+  else if (result.tariffYears.length > 0) firstCollection = result.tariffYears[0].year;
+  out.push({ event: "first-collection-year", year: firstCollection });
+  const fundingRows = result.fundingView?.rows ?? [];
+  if (fundingRows.length > 0) out.push({ event: "funding-received", year: Math.min(...fundingRows.map((r) => r.year)) });
+  return out;
+}
+
+export interface TimelineRefusal {
+  code: "TIMELINE-ACTIVITY-SPAN" | "TIMELINE-ACTIVITY-ORDER" | "TIMELINE-GATE-SPAN" | "TIMELINE-MILESTONE-SPAN" | "TIMELINE-MILESTONE-TIE";
+  message: string;
+}
+
+// The section-local refusals (never compute-blocking): data-driven, cause and check in one
+// sentence, the true span carried. With no solved model the span is unknown and the refusals
+// stand down (the input-issues panel governs).
+export function validateTimeline(inputs: ModelInputs, result: ModelResult | null): TimelineRefusal[] {
+  const span = programSpanYears(inputs, result);
+  if (span === null) return [];
+  const tl = timelineOf(inputs);
+  const out: TimelineRefusal[] = [];
+  const inSpan = (y: number) => Number.isInteger(y) && y >= 1 && y <= span;
+  const spanText = `the program span of years 1–${span}`;
+  for (const a of tl.activities) {
+    if (!inSpan(a.startYear) || !inSpan(a.endYear)) {
+      out.push({ code: "TIMELINE-ACTIVITY-SPAN", message: `Activity ${a.id} (${a.label}) runs years ${a.startYear}–${a.endYear}, outside ${spanText}: set whole years inside the span or widen the project length (TIMELINE-ACTIVITY-SPAN).` });
+    }
+    if (a.startYear > a.endYear) {
+      out.push({ code: "TIMELINE-ACTIVITY-ORDER", message: `Activity ${a.id} (${a.label}) starts in year ${a.startYear}, after it ends in year ${a.endYear}: set the start year at or before the end year (TIMELINE-ACTIVITY-ORDER).` });
+    }
+  }
+  for (const d of tl.decisionPoints) {
+    if (!inSpan(d.year)) {
+      out.push({ code: "TIMELINE-GATE-SPAN", message: `Decision point ${d.id} (${d.title}) falls in year ${d.year}, outside ${spanText}: set a whole year inside the span or widen the project length (TIMELINE-GATE-SPAN).` });
+    }
+  }
+  const events = availableEngineEvents(inputs, result);
+  for (const m of tl.milestones) {
+    if (!inSpan(m.year)) {
+      out.push({ code: "TIMELINE-MILESTONE-SPAN", message: `Milestone ${m.id} (${m.label}) falls in year ${m.year}, outside ${spanText}: set a whole year inside the span or widen the project length (TIMELINE-MILESTONE-SPAN).` });
+    }
+    if (m.tie !== undefined && m.tie.kind === "activity") {
+      const aid = m.tie.activityId;
+      if (!tl.activities.some((a) => a.id === aid)) {
+        const present = tl.activities.map((a) => a.id).join(", ");
+        out.push({ code: "TIMELINE-MILESTONE-TIE", message: `Milestone ${m.id} (${m.label}) is tied to activity ${aid}, which does not exist; the activities present are ${present === "" ? "none" : present}: tie it to one of them or clear the tie (TIMELINE-MILESTONE-TIE).` });
+      }
+    } else if (m.tie !== undefined && m.tie.kind === "engine-event") {
+      const ev = m.tie.event;
+      if (!events.some((e) => e.event === ev)) {
+        const present = events.map((e) => e.event).join(", ");
+        out.push({ code: "TIMELINE-MILESTONE-TIE", message: `Milestone ${m.id} (${m.label}) is tied to the engine event ${ev}, which does not compose for this project; the events available are ${present === "" ? "none" : present}: tie it to one of them or clear the tie (TIMELINE-MILESTONE-TIE).` });
+      }
+    }
+  }
+  return out;
 }

@@ -1,8 +1,8 @@
-import type { ModelInputs, ModelResult, TariffRow } from "../../core/src/types.js";
+import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
 import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { yearHeader } from "./state.js";
+import { PPS_DISCLOSURE, TIMELINE_PHASES, programSpanYears, timelineAuthored, timelineOf, validateTimeline, yearHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -83,6 +83,22 @@ export interface DeckFundingBlock {
   rows: DeckFundingRow[];
 }
 
+// v0.6.13: the program Gantt — composed once by the deck model (variant-invariant): the three
+// phases as lanes, the activities as bars, the decision points as full-height gate lines labeled
+// with their BP codes, the milestones as diamond markers, the time axis in program years through
+// the shared yearHeader labels. The Presentation and the PDF render it; neither recomputes.
+export interface DeckGanttBar { id: string; label: string; startYear: number; endYear: number }
+export interface DeckGanttLane { phase: TimelinePhase; label: string; bars: DeckGanttBar[] }
+export interface DeckGanttGate { id: string; code: string | null; title: string; year: number; outcome: string | null }
+export interface DeckGanttMilestone { id: string; label: string; year: number; tie: string | null }
+export interface DeckGantt {
+  spanYears: number;
+  axis: { year: number; label: string }[];
+  lanes: DeckGanttLane[];
+  gates: DeckGanttGate[];
+  milestones: DeckGanttMilestone[];
+}
+
 export interface DeckSlide {
   name: string;
   title: string;
@@ -99,6 +115,7 @@ export interface DeckSlide {
   kickerNumber?: string;
   solverScenario?: { label: string; requiredPayment: string | null } | null;
   funding?: DeckFundingBlock;
+  gantt?: DeckGantt;
 }
 
 export const TERM_GLOSSES: { term: string; gloss: string }[] = [
@@ -250,6 +267,18 @@ export function deckSlides(
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
     ...(fundingBlock !== undefined ? { funding: fundingBlock } : {}),
   });
+
+  // v0.6.13: the timeline slide — ONE program-level slide, composed once (never per variant),
+  // immediately after the investment slide, only when the timeline is authored AND refusal-free;
+  // otherwise it is omitted and the provenance disclosure carries the reason.
+  let timelineProvenance: string | null = null;
+  if (!timelineAuthored(inputs)) {
+    timelineProvenance = "Timeline: not authored.";
+  } else if (validateTimeline(inputs, result).length > 0) {
+    timelineProvenance = "Timeline: refused — see the Timeline tab.";
+  } else {
+    slides.push(ganttSlide(inputs, result, startYearOf(opts)));
+  }
 
   // Slide 3 — recovery
   let recoveryTitle: string;
@@ -567,7 +596,7 @@ export function deckSlides(
     });
   }
 
-  const kickerNumbers = ["01", "02", "03", "04", "05", "06", "07"];
+  const kickerNumbers = ["01", "02", "03", "04", "05", "06", "07", "08"];
   let kickerIdx = 0;
   for (const sl of slides) {
     if (sl.name !== "title") {
@@ -589,7 +618,60 @@ export function deckSlides(
       `Funding grounding: the grants (${grantLabels}) ground in the national and municipal shore-power schemes and AFIF; the debt facility is grounded by the financing overlay${loanLabels !== "" ? `; the interest-free note (${loanLabels}) nets to zero over the horizon` : ""}.`,
     );
   }
+  if (timelineProvenance !== null) provenance.push(timelineProvenance);
   return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
+}
+
+const startYearOf = (opts: { startYear: number | null }): number | null => opts.startYear;
+
+const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+
+// The engine-composed action title: the program span and the gate count.
+export function ganttTitle(spanYears: number, gateCount: number, startYear: number | null): string {
+  const first = startYear === null ? "1" : String(startYear);
+  const last = startYear === null ? String(spanYears) : String(startYear + spanYears - 1);
+  const count = gateCount <= 10 ? NUMBER_WORDS[gateCount] : String(gateCount);
+  return `The program runs years ${first}–${last} with ${count} decision ${gateCount === 1 ? "gate" : "gates"}`;
+}
+
+function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number | null): DeckSlide {
+  const tl = timelineOf(inputs);
+  const spanYears = programSpanYears(inputs, result) as number;
+  const gates = [...tl.decisionPoints].sort((a, b) => a.year - b.year).map((d) => ({
+    id: d.id, code: d.code ?? null, title: d.title, year: d.year, outcome: d.outcome ?? null,
+  }));
+  const gantt: DeckGantt = {
+    spanYears,
+    axis: Array.from({ length: spanYears }, (_, k) => ({ year: k + 1, label: yearHeader(k + 1, startYear) })),
+    lanes: TIMELINE_PHASES.map((p) => ({
+      phase: p.id,
+      label: p.label,
+      bars: tl.activities.filter((a) => a.phase === p.id).sort((a, b) => a.startYear - b.startYear).map((a) => ({ id: a.id, label: a.label, startYear: a.startYear, endYear: a.endYear })),
+    })),
+    gates,
+    milestones: [...tl.milestones].sort((a, b) => a.year - b.year).map((m) => ({
+      id: m.id, label: m.label, year: m.year,
+      tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity ${m.tie.activityId}` : m.tie.event,
+    })),
+  };
+  const body: DeckFigure[] = [
+    { label: "Program span", value: `${yearHeader(1, startYear)}–${yearHeader(spanYears, startYear)}`, kind: "text", rawValue: spanYears },
+    { label: "Activities", value: String(tl.activities.length), kind: "count", rawValue: tl.activities.length },
+    ...gates.map((g) => ({
+      label: g.code ?? "Gate",
+      value: `${g.title} — ${yearHeader(g.year, startYear)}${g.outcome !== null ? ` (${g.outcome})` : ""}`,
+      kind: "text" as const,
+      rawValue: g.year,
+    })),
+    ...gantt.milestones.map((m) => ({ label: "Milestone", value: `${m.label} — ${yearHeader(m.year, startYear)}`, kind: "text" as const, rawValue: m.year })),
+  ];
+  return {
+    name: "timeline",
+    title: ganttTitle(spanYears, gates.length, startYear),
+    body,
+    disclosures: [PPS_DISCLOSURE],
+    gantt,
+  };
 }
 
 export type { TariffRow };

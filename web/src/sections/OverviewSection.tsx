@@ -1,5 +1,6 @@
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { roundForDisplay, percentForDisplay, deckMoneyForDisplay, deckYearsForDisplay, feeForDisplay } from "../engine.js";
+import { useEffect, useState } from "react";
 import { SignedCashflowChart } from "../charts.js";
 import { yearHeader } from "../state.js";
 
@@ -15,6 +16,10 @@ export function OverviewSection(props: {
   entryUnit?: import("../engine.js").EntryUnit;
 }) {
   const { inputs, result, startYear, setStartYear, startYearError, setProjectName, setTargetIrr, setProjectLength, entryUnit = "ones" } = props;
+  // v0.6.13 Task F (AUD-18): the writer refuses an out-of-range entry, so a refused entry never
+  // reaches the applied start year; the field shows the typed draft while the refusal stands.
+  const [draft, setDraft] = useState<string | null>(null);
+  useEffect(() => { setDraft(null); }, [startYear]);
   const currency = (inputs.currency as Parameters<typeof deckMoneyForDisplay>[1]) ?? "SEK";
   const money = (v: number) => deckMoneyForDisplay(v, currency, entryUnit);
   // v0.6.9 Task F (finding W28): the payment-per-period figure renders through feeForDisplay.
@@ -37,8 +42,9 @@ export function OverviewSection(props: {
       </label>
       <label>
         Project start year (optional, 1900–2200){" "}
-        <input data-field="startYear" type="number" value={startYear ?? ""} onChange={(e) => {
-          const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+        <input data-field="startYear" type="number" value={startYearError !== null && draft !== null ? draft : (startYear ?? "")} onChange={(e) => {
+          setDraft(e.target.value);
+          const v = e.target.value === "" ? null : parseFloat(e.target.value);
           setStartYear(v !== null && !Number.isNaN(v) ? v : null);
         }} />
       </label>

@@ -9,6 +9,7 @@ import type { CostLine } from "../../core/src/types.js";
 import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
 import { OverviewSection } from "./sections/OverviewSection.js";
+import { TimelineSection } from "./sections/TimelineSection.js";
 import { ResultsSection } from "./sections/ResultsSection.js";
 import { AppraisalSection } from "./sections/AppraisalSection.js";
 import { ScenariosSection } from "./sections/ScenariosSection.js";
@@ -22,7 +23,7 @@ import { RootErrorBoundary } from "./ErrorBoundary.js";
 import { parseProject, ProjectFileError } from "../../core/src/fileio.js";
 import { downloadProjectFile } from "./projectFile.js";
 
-type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "results" | "scenarios" | "detail";
+type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "timeline" | "results" | "scenarios" | "detail";
 
 export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
@@ -110,6 +111,7 @@ export function App() {
   const setProjectName = (v: string) => setInputs((p) => ({ ...p, projectName: v }));
   const setCurrency = (v: string) => setInputs((p) => ({ ...p, currency: v }));
   const setTargetIrr = (v: string) => setInputs((p) => ({ ...p, targetIrr: parseFloat(v) || 0 }));
+  const setTimeline = (tl: import("../../core/src/types.js").TimelineBlock) => setInputs((p) => ({ ...p, timeline: tl }));
   const setProjectLength = (v: number | null) => setInputs((p) => ({ ...p, projectLengthYears: v }));
   const setRepayment = (patch: Partial<ModelInputs["repayment"]>) =>
     setInputs((p) => ({ ...p, repayment: { ...p.repayment, ...patch } }));
@@ -272,6 +274,16 @@ export function App() {
               ))}
             </div>
           </div>
+          <div data-nav-group="plan" className="nav-group">
+            <span className="nav-group-label">Plan</span>
+            <div className="nav-group-views">
+              {(["timeline"] as View[]).map((v) => (
+                <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
+                  {v[0].toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
           <div data-nav-group="read" className="nav-group">
             <span className="nav-group-label">Read</span>
             <div className="nav-group-views">
@@ -299,10 +311,15 @@ export function App() {
         <RootErrorBoundary>
         {view === "overview" && (
           <OverviewSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setStartYear={(v) => {
-            setStartYear(v);
+            // v0.6.13 Task F (AUD-18): the writer refuses — symmetric with the file layer's
+            // FILE-SETTINGS bound (null or a whole year between 1900 and 2200); a refused entry
+            // never applies and the refusal follows.
             if (v !== null && (v < 1900 || v > 2200)) {
               setStartYearError("Project start year must be between 1900 and 2200.");
+            } else if (v !== null && !Number.isInteger(v)) {
+              setStartYearError("Project start year must be a whole year between 1900 and 2200.");
             } else {
+              setStartYear(v);
               setStartYearError(null);
             }
           }} startYearError={startYearError} setProjectName={setProjectName} setTargetIrr={setTargetIrr} setProjectLength={setProjectLength} />
@@ -332,6 +349,9 @@ export function App() {
         )}
         {view === "funding" && (
           <FundingSection inputs={inputs} result={result} setFunding={setFunding} startYear={startYear} entryUnit={entryUnit} />
+        )}
+        {view === "timeline" && (
+          <TimelineSection inputs={inputs} result={result} setTimeline={setTimeline} startYear={startYear} />
         )}
         {view === "financing" && (
           <FinancingSection inputs={inputs} setFinancing={setFinancing} />

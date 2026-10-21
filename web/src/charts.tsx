@@ -1,4 +1,5 @@
 import type { GridRow, LineTotal, YearlyRow } from "../../core/src/types.js";
+import type { DeckGantt } from "./deck.js";
 
 export const CHART_COLORS = {
   costBar: "#fb7185",
@@ -350,6 +351,75 @@ export function HurdlePlot(props: {
         <span data-testid="hurdle-margin-label" data-hurdle-mode={solved ? "solved" : "evaluated"} className="column-year-label">{solved ? "solved to the target" : goalMet ? "clears the hurdle" : "below the hurdle"}</span>
         <span data-testid="hurdle-achieved-label" className="column-year-label">Achieved {achieved.toFixed(2)}%</span>
       </div>
+    </div>
+  );
+}
+
+// v0.6.13: the program Gantt (the deck grammar of record — SVG authored in code, no external chart
+// library, direct labels, no free-form text). The three phases are horizontal lanes; activities
+// are bars within their lane; decision points are full-height vertical gate lines labeled with
+// their BP codes; milestones are diamonds; the axis is the shared yearHeader labels. It renders
+// the deck model's gantt, never recomputing it.
+export function GanttChart(props: { gantt: DeckGantt }) {
+  const { gantt } = props;
+  const labelW = 150;
+  const plotW = 840;
+  const laneH = 46;
+  const top = 34;
+  const n = Math.max(1, gantt.spanYears);
+  const colW = plotW / n;
+  const xStart = (y: number) => labelW + (y - 1) * colW;
+  const xMid = (y: number) => labelW + (y - 0.5) * colW;
+  const lanesBottom = top + laneH * gantt.lanes.length;
+  const height = lanesBottom + 44;
+  const step = Math.max(1, Math.ceil(n / 12));
+  return (
+    <div data-testid="gantt-chart" className="chart-block gantt-chart">
+      <svg viewBox={`0 0 ${labelW + plotW + 10} ${height}`} role="img" aria-label="Program timeline" className="gantt-svg">
+        {gantt.axis.map((a) => (
+          <g key={a.year}>
+            <line x1={xStart(a.year)} x2={xStart(a.year)} y1={top} y2={lanesBottom} stroke={STAGE_CHART_COLORS.gridline} />
+            {(a.year - 1) % step === 0 && (
+              <text data-gantt-axis={a.year} x={xMid(a.year)} y={top - 10} textAnchor="middle" fontSize={12} fill={STAGE_CHART_COLORS.axisText}>{a.label}</text>
+            )}
+          </g>
+        ))}
+        <line x1={xStart(n + 1)} x2={xStart(n + 1)} y1={top} y2={lanesBottom} stroke={STAGE_CHART_COLORS.gridline} />
+        {gantt.lanes.map((lane, i) => (
+          <g key={lane.phase} data-gantt-lane={lane.phase}>
+            <line x1={labelW} x2={labelW + plotW} y1={top + i * laneH} y2={top + i * laneH} stroke={STAGE_CHART_COLORS.zeroLine} />
+            <text x={labelW - 10} y={top + i * laneH + laneH / 2 + 4} textAnchor="end" fontSize={13} fill={STAGE_CHART_COLORS.axisText}>{lane.label}</text>
+            {lane.bars.map((b, j) => {
+              const bx = xStart(b.startYear);
+              const bw = Math.max(colW * 0.5, xStart(b.endYear + 1) - bx);
+              const by = top + i * laneH + 8 + (j % 2) * 2;
+              return (
+                <g key={b.id} data-gantt-bar={b.id}>
+                  <rect x={bx} y={by} width={bw} height={laneH - 18} rx={3} fill={STAGE_CHART_COLORS.accent} />
+                  <text x={bx + 5} y={by + (laneH - 18) / 2 + 4} fontSize={11} fill="#081c33">{b.label}</text>
+                </g>
+              );
+            })}
+          </g>
+        ))}
+        <line x1={labelW} x2={labelW + plotW} y1={lanesBottom} y2={lanesBottom} stroke={STAGE_CHART_COLORS.zeroLine} />
+        {gantt.gates.map((g) => (
+          <g key={g.id} data-gantt-gate={g.id} data-gate-code={g.code ?? ""}>
+            <line x1={xMid(g.year)} x2={xMid(g.year)} y1={top - 6} y2={lanesBottom + 6} stroke={STAGE_GOLD} strokeWidth={2} />
+            <text x={xMid(g.year)} y={lanesBottom + 20} textAnchor="middle" fontSize={12} fill={STAGE_GOLD}>{g.code ?? "Gate"}</text>
+          </g>
+        ))}
+        {gantt.milestones.map((m) => {
+          const cx = xMid(m.year);
+          const cy = lanesBottom + 34;
+          return (
+            <g key={m.id} data-gantt-milestone={m.id}>
+              <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />
+              <title>{m.label}</title>
+            </g>
+          );
+        })}
+      </svg>
     </div>
   );
 }

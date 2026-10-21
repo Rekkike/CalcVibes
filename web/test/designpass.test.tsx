@@ -6,14 +6,17 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
 describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", () => {
-  it("NAV-PRESERVED: all eleven views render inside their three groups and each navigates on one click (v0.6.10: the funding view joins the finance group)", () => {
+  it("NAV-PRESERVED: all twelve views render inside their four groups and each navigates on one click (v0.6.10: the funding view joins the finance group; v0.6.13: the timeline view joins the new plan group between finance and read)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     const groups = document.querySelectorAll(".nav-group");
-    expect(groups.length).toBe(3);
+    expect(groups.length).toBe(4);
     const model = document.querySelector('[data-nav-group="model"]') as HTMLElement;
     const finance = document.querySelector('[data-nav-group="finance"]') as HTMLElement;
     const read = document.querySelector('[data-nav-group="read"]') as HTMLElement;
+    const plan = document.querySelector('[data-nav-group="plan"]') as HTMLElement;
+    expect(Array.from(groups).map((g) => g.getAttribute("data-nav-group"))).toEqual(["model", "finance", "plan", "read"]);
+    expect(Array.from(plan.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav"))).toEqual(["timeline"]);
     expect(Array.from(model.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
       .toEqual(["overview", "costs", "operating", "repayment", "tariff"]);
     expect(Array.from(finance.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
@@ -21,7 +24,7 @@ describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", ()
     expect(Array.from(read.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
       .toEqual(["results", "scenarios", "detail"]);
     expect(model.querySelector('[data-nav="costs"]')?.textContent).toBe("Cost model");
-    for (const v of ["overview", "costs", "operating", "repayment", "tariff", "funding", "financing", "appraisal", "results", "scenarios", "detail"]) {
+    for (const v of ["overview", "costs", "operating", "repayment", "tariff", "funding", "financing", "appraisal", "timeline", "results", "scenarios", "detail"]) {
       fireEvent.click(byNav(v));
       expect(byNav(v).className).toContain("active");
     }
