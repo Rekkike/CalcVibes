@@ -299,10 +299,15 @@ export function App() {
         <RootErrorBoundary>
         {view === "overview" && (
           <OverviewSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setStartYear={(v) => {
-            setStartYear(v);
+            // v0.6.13 Task F (AUD-18): the writer refuses — symmetric with the file layer's
+            // FILE-SETTINGS bound (null or a whole year between 1900 and 2200); a refused entry
+            // never applies and the refusal follows.
             if (v !== null && (v < 1900 || v > 2200)) {
               setStartYearError("Project start year must be between 1900 and 2200.");
+            } else if (v !== null && !Number.isInteger(v)) {
+              setStartYearError("Project start year must be a whole year between 1900 and 2200.");
             } else {
+              setStartYear(v);
               setStartYearError(null);
             }
           }} startYearError={startYearError} setProjectName={setProjectName} setTargetIrr={setTargetIrr} setProjectLength={setProjectLength} />
