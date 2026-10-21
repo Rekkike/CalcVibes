@@ -32,21 +32,21 @@ describe("v0.6.13 the Timeline section", () => {
     expect(byAction("add-gate")).toBeTruthy();
     expect(byAction("add-milestone")).toBeTruthy();
     expect(document.querySelector('[data-testid="timeline-refusals"]')).toBeNull();
-    expect(screen.getByTestId("pps-disclosure").textContent).toBe("The decision-point vocabulary is aligned with PPS (Praktisk Projektstyrning); this application does not implement or certify PPS.");
+    expect(screen.getByTestId("decision-disclosure").textContent).toBe("The decision points follow the DP1–DP8 decision-point scale; this application does not implement or certify any external project-management methodology.");
     expect(document.querySelector('[data-testid="timeline-activities-scroll"]')?.className).toContain("editor-scroll");
   });
 
-  it("GATES: (v0.6.13.1 re-anchor: the blank project, since the demo now carries its gates) added gates take the BP defaults of the scale in order; the mini scale takes its condensed set", () => {
+  it("GATES: (v0.6.13.1 re-anchor: the blank project, since the demo now carries its gates) added gates take the DP defaults of the scale in order; the mini scale takes its condensed set", () => {
     render(<App />);
     fireEvent.click(byNav("timeline"));
     fireEvent.click(byAction("add-gate"));
     fireEvent.click(byAction("add-gate"));
     const codes = () => all('[data-kind="gate"]').map((r) => r.querySelector('[data-field="gateCode"]')!.textContent);
-    expect(codes()).toEqual(["BP1", "BP2"]);
-    expect(field(all('[data-kind="gate"]')[0], "gateTitle").value).toBe("Beslut om att starta projektet och initiera förberedelserna");
+    expect(codes()).toEqual(["DP1", "DP2"]);
+    expect(field(all('[data-kind="gate"]')[0], "gateTitle").value).toBe("Decision to start the project and initiate preparations");
     fireEvent.change(document.querySelector('[data-field="projectScale"]') as HTMLElement, { target: { value: "mini" } });
     fireEvent.click(byAction("add-gate"));
-    expect(codes()).toEqual(["BP1", "BP2", "BP3"]);
+    expect(codes()).toEqual(["DP1", "DP2", "DP3"]);
   });
 
   it("EDIT: activities, ids stay unique after a removal, and an out-of-span activity refuses in the section panel only", () => {

@@ -184,11 +184,11 @@ export function shorePowerProject(): ModelInputs {
 // cruise terminal €20M and the inland/public berths €20M are invented (the fixture
 // architecture of record). The fields are identical to the core test fixture of record
 // (programFixture0610) — every solved figure is a directive reproduction pin.
-// v0.6.13.1: a decision gate of the PPS set at a program year, seeded with the set's default title
+// v0.6.13.1: a decision gate of the decision-point set at a program year, seeded with the set's default title
 // (the demo timelines record no outcomes: no decision is held yet).
-function ppsGate(id: string, code: string, year: number): TimelineDecisionPoint {
-  const bp = PPS_BP_SET.find((b) => b.code === code);
-  return { id, title: bp?.title ?? "", year, code };
+function decisionGate(id: string, code: string, year: number): TimelineDecisionPoint {
+  const dp = DECISION_POINT_SET.find((d) => d.code === code);
+  return { id, title: dp?.title ?? "", year, code };
 }
 
 export function shorePowerProgram(): ModelInputs {
@@ -238,9 +238,9 @@ export function shorePowerProgram(): ModelInputs {
       { id: "l1", label: "Municipality interest-free note", kind: "interest-free-loan", amount: 10000000, year: 1, termYears: 10, repaymentStartYear: 4 },
     ] },
     financing: { enabled: true, sharePct: 0, perLineSharePct: { p1: 31.69, p2: 31.69, p3: 31.69 }, debtRatePct: 3.5, termYears: 20, graceYears: 3, serviceStartYear: null, amortization: "annuity", leveragedSolve: false },
-    // v0.6.13.1 Task B: the authored timeline of the demo (the full BP scale). Every span is read
+    // v0.6.13.1 Task B: the authored timeline of the demo (the full DP scale). Every span is read
     // from the program's own cost spans: the engineering and studies line runs years 1-2 (the
-    // preparation, concluding at BP3); the OPS installations, the market pillar, the cruise and
+    // preparation, concluding at DP3); the OPS installations, the market pillar, the cruise and
     // inland segments and the quay cabling follow their cost lines; the detail-design lane is
     // left empty (no cost line is a separate design activity). The gates sit where the program's
     // facts put the decisions: preparation in years 1-2, execution from year 2 (the first
@@ -260,8 +260,8 @@ export function shorePowerProgram(): ModelInputs {
         { id: "a6", label: "Inland & public berths", startYear: 1, endYear: 5, phase: "production" },
       ],
       decisionPoints: [
-        ppsGate("d1", "BP1", 1), ppsGate("d2", "BP2", 1), ppsGate("d3", "BP3", 2), ppsGate("d4", "BP4", 2),
-        ppsGate("d5", "BP5", 3), ppsGate("d6", "BP6", 4), ppsGate("d7", "BP7", 5), ppsGate("d8", "BP8", 5),
+        decisionGate("d1", "DP1", 1), decisionGate("d2", "DP2", 1), decisionGate("d3", "DP3", 2), decisionGate("d4", "DP4", 2),
+        decisionGate("d5", "DP5", 3), decisionGate("d6", "DP6", 4), decisionGate("d7", "DP7", 5), decisionGate("d8", "DP8", 5),
       ],
       milestones: [
         { id: "m1", label: "Funding received (the province grant and the public note)", year: 1, tie: { kind: "engine-event", event: "funding-received" } },
@@ -303,7 +303,7 @@ export function landNewbuildProject(): ModelInputs {
     ],
     appraisal: { wacc: 5, financeRate: 4, reinvestmentRate: 4, residual: { mode: "calculated", amount: 0, year: 23 } },
     maintenance: { mode: "off" },
-    // v0.6.13.1 Task B: the authored timeline of the demo (the full BP scale). Program years are
+    // v0.6.13.1 Task B: the authored timeline of the demo (the full DP scale). Program years are
     // 1-based and the turnkey cost starts in year 1, so the prestudy-and-design lanes open in
     // year 1 alongside the construction (they cannot precede it): the site acquisition is the
     // prestudy (its cost line, year 1), the design sits inside the total-enterprise contract (the
@@ -322,8 +322,8 @@ export function landNewbuildProject(): ModelInputs {
         { id: "a4", label: "Interior & hotel fit-out", startYear: 2, endYear: 2, phase: "production" },
       ],
       decisionPoints: [
-        ppsGate("d1", "BP1", 1), ppsGate("d2", "BP2", 1), ppsGate("d3", "BP3", 1), ppsGate("d4", "BP4", 1),
-        ppsGate("d5", "BP5", 2), ppsGate("d6", "BP6", 2), ppsGate("d7", "BP7", 3), ppsGate("d8", "BP8", 3),
+        decisionGate("d1", "DP1", 1), decisionGate("d2", "DP2", 1), decisionGate("d3", "DP3", 1), decisionGate("d4", "DP4", 1),
+        decisionGate("d5", "DP5", 2), decisionGate("d6", "DP6", 2), decisionGate("d7", "DP7", 3), decisionGate("d8", "DP8", 3),
       ],
       milestones: [
         { id: "m1", label: "Hotel fit-out complete", year: 2, tie: { kind: "activity", activityId: "a4" } },
@@ -363,7 +363,7 @@ export function blankCostLine(id: string): CostLine {
 
 
 // ---------------------------------------------------------------------------------------------
-// v0.6.13 — the timeline (the PPS-aligned planning layer). Pure helpers; the engine never reads
+// v0.6.13 — the timeline (the decision-point planning layer). Pure helpers; the engine never reads
 // the block. Years are program years (1-based, the engine's indexing).
 // ---------------------------------------------------------------------------------------------
 
@@ -379,26 +379,26 @@ export const TIMELINE_PHASES: { id: TimelinePhase; label: string }[] = [
   { id: "operations", label: "Operations" },
 ];
 
-// The PPS-aligned decision-point vocabulary of record (Praktisk Projektstyrning BP set). The
-// default titles are user-overridable labels.
-export const PPS_BP_SET: { code: string; title: string }[] = [
-  { code: "BP1", title: "Beslut om att starta projektet och initiera förberedelserna" },
-  { code: "BP2", title: "Beslut om att fortsätta, avbryta eller göra om förberedelsearbete" },
-  { code: "BP3", title: "Beslut om att det finns tillräckligt bra underlag för att göra ett åtagande för resterande del av projektet" },
-  { code: "BP4", title: "Beslut att starta genomförandet" },
-  { code: "BP5", title: "Beslut om att fortsätta eller förändra projektåtagandet" },
-  { code: "BP6", title: "Beslut om att godkänna leverans av projektets delresultat eller slutresultat" },
-  { code: "BP7", title: "Beslut om att godkänna överlämning av ansvaret för projektets resultat till förvaltningen" },
-  { code: "BP8", title: "Beslut om att avsluta projektet" },
+// The decision-point vocabulary of record: eight English-titled decision points, DP1 through DP8.
+// The default titles are user-overridable labels.
+export const DECISION_POINT_SET: { code: string; title: string }[] = [
+  { code: "DP1", title: "Decision to start the project and initiate preparations" },
+  { code: "DP2", title: "Decision to continue, abort, or redo preparation work" },
+  { code: "DP3", title: "Decision that the basis is sufficient to commit to the remaining part of the project" },
+  { code: "DP4", title: "Decision to start execution" },
+  { code: "DP5", title: "Decision to continue or change the project commitment" },
+  { code: "DP6", title: "Decision to approve delivery of the project's partial or final results" },
+  { code: "DP7", title: "Decision to approve handover of responsibility for the project's results to operations" },
+  { code: "DP8", title: "Decision to close the project" },
 ];
 
-// The full scale carries BP1 through BP8; the mini scale the condensed four-point set.
-export const PPS_SCALE_CODES: Record<"mini" | "full", string[]> = {
-  full: ["BP1", "BP2", "BP3", "BP4", "BP5", "BP6", "BP7", "BP8"],
-  mini: ["BP1", "BP3", "BP4", "BP8"],
+// The full scale carries DP1 through DP8; the mini scale the condensed four-point set.
+export const DECISION_SCALE_CODES: Record<"mini" | "full", string[]> = {
+  full: ["DP1", "DP2", "DP3", "DP4", "DP5", "DP6", "DP7", "DP8"],
+  mini: ["DP1", "DP3", "DP4", "DP8"],
 };
 
-export const PPS_DISCLOSURE = "The decision-point vocabulary is aligned with PPS (Praktisk Projektstyrning); this application does not implement or certify PPS.";
+export const DECISION_DISCLOSURE = "The decision points follow the DP1–DP8 decision-point scale; this application does not implement or certify any external project-management methodology.";
 
 export const TIMELINE_EVENT_LABELS: Record<TimelineEngineEvent, string> = {
   "construction-complete": "Construction complete",
@@ -597,14 +597,14 @@ export function ensurePhases(tl: TimelineBlock, derived: TimelineActivity[]): { 
   return [...have, ...add];
 }
 
-// The next unused BP of the scale's set (the default for an added gate), or null when the set
+// The next unused decision point of the scale's set (the default for an added gate), or null when the set
 // is exhausted.
-export function nextUnusedBp(tl: TimelineBlock): { code: string; title: string } | null {
+export function nextUnusedDecisionPoint(tl: TimelineBlock): { code: string; title: string } | null {
   const used = new Set(tl.decisionPoints.map((d) => d.code).filter((c): c is string => c !== undefined));
-  for (const code of PPS_SCALE_CODES[tl.projectScale ?? "full"]) {
+  for (const code of DECISION_SCALE_CODES[tl.projectScale ?? "full"]) {
     if (!used.has(code)) {
-      const bp = PPS_BP_SET.find((b) => b.code === code);
-      if (bp !== undefined) return bp;
+      const dp = DECISION_POINT_SET.find((d) => d.code === code);
+      if (dp !== undefined) return dp;
     }
   }
   return null;

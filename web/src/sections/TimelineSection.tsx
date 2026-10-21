@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineSource, TimelineTie } from "../../../core/src/types.js";
 import {
-  PPS_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedBp,
+  DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
   phaseVocabularyIssues, phasesOf, programSpanYears, replaceSourceActivities, sourceHasActivities, suggestActivitiesFromContracts,
   suggestActivitiesFromCosts, suggestActivitiesFromFinancing, suggestActivitiesFromFunding, suggestActivitiesFromOperating,
   suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, yearHeader,
@@ -44,15 +44,15 @@ const SOURCES: { source: TimelineSource; action: string; label: string; noun: st
 ];
 
 const OUTCOMES: { id: TimelineOutcome; label: string }[] = [
-  { id: "continue", label: "Continue (fortsätta)" },
-  { id: "change", label: "Change (förändra)" },
-  { id: "terminate", label: "Terminate (lägga ner)" },
+  { id: "continue", label: "Continue" },
+  { id: "change", label: "Change" },
+  { id: "terminate", label: "Terminate" },
 ];
 
 const tieValue = (t: TimelineTie | undefined): string =>
   t === undefined ? "" : t.kind === "activity" ? "activity:" + t.activityId : "engine-event:" + t.event;
 
-// v0.6.13: the Timeline section — the PPS-aligned planning layer. It edits the optional timeline
+// v0.6.13: the Timeline section — the decision-point planning layer. It edits the optional timeline
 // block only; the engine never reads it, and its refusals are section-local (they never join the
 // compute-blocking input issues).
 export function TimelineSection(props: {
@@ -152,15 +152,15 @@ export function TimelineSection(props: {
   return (
     <section data-testid="timeline">
       <h2>Timeline</h2>
-      <p data-testid="pps-disclosure" className="muted">{PPS_DISCLOSURE}</p>
+      <p data-testid="decision-disclosure" className="muted">{DECISION_DISCLOSURE}</p>
       <p className="muted">
         A planning and presentation layer: the timeline never alters the cash flows, the solver or the horizon.{" "}
         {span !== null ? `The program span is years 1–${span}.` : "The program span appears once the model solves."}
       </p>
       <label>Project scale{" "}
         <select data-field="projectScale" value={tl.projectScale ?? "full"} onChange={(e) => commit({ projectScale: e.target.value as "mini" | "full" })}>
-          <option value="full">Full (BP1–BP8)</option>
-          <option value="mini">Mini (BP1, BP3, BP4, BP8)</option>
+          <option value="full">Full (DP1–DP8)</option>
+          <option value="mini">Mini (DP1, DP3, DP4, DP8)</option>
         </select>
       </label>
       {!authored && (
@@ -275,8 +275,8 @@ export function TimelineSection(props: {
         </table>
       </div>
       <button data-action="add-gate" onClick={() => {
-        const bp = nextUnusedBp(tl);
-        const gate: TimelineDecisionPoint = { id: nextId("d", tl.decisionPoints.map((d) => d.id)), title: bp?.title ?? "", year: 1, ...(bp !== null ? { code: bp.code } : {}) };
+        const dp = nextUnusedDecisionPoint(tl);
+        const gate: TimelineDecisionPoint = { id: nextId("d", tl.decisionPoints.map((d) => d.id)), title: dp?.title ?? "", year: 1, ...(dp !== null ? { code: dp.code } : {}) };
         commit({ decisionPoints: [...tl.decisionPoints, gate] });
       }}>Add decision gate</button>
 
