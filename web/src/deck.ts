@@ -94,7 +94,10 @@ export interface DeckFundingBlock {
 export type DeckGanttBar = GanttBarLaid;
 export interface DeckGanttLane { phase: TimelinePhase; label: string; labelLines: string[]; rowCount: number; rowLines: number[]; bars: DeckGanttBar[] }
 export interface DeckGanttGate { id: string; code: string | null; title: string; year: number; outcome: string | null }
-export interface DeckGanttMilestone { id: string; label: string; year: number; tie: string | null }
+// v0.6.13.4: the ordinal is the milestone's rank in the chronological order of the FULL milestone set
+// (composed once, stable under the year window, never derived from the authored id); the row is the
+// stack position among the drawn milestones sharing a year (0 = the first).
+export interface DeckGanttMilestone { id: string; label: string; year: number; tie: string | null; ordinal: number; row: number }
 export interface DeckGantt {
   // the program span; the axis and the plot cover the year window only
   spanYears: number;
@@ -654,9 +657,13 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   // are omitted and counted. All of it composes here, once.
   const lanes = visibleLanes(tl);
   const win = ganttWindow(lanes.flatMap((l) => l.activities), spanYears);
-  const allMilestones = [...tl.milestones].sort((a, b) => a.year - b.year).map((m) => ({
+  // v0.6.13.4: the ordinal composes here, once, over the FULL set after the chronological sort (stable,
+  // so same-year milestones keep their authored order) and BEFORE the window filter: a milestone the
+  // window omits never renumbers the others, and the authored id plays no part.
+  const allMilestones = [...tl.milestones].sort((a, b) => a.year - b.year).map((m, i) => ({
     id: m.id, label: m.label, year: m.year,
     tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity ${m.tie.activityId}` : m.tie.event,
+    ordinal: i + 1,
   }));
   const inWindow = (y: number) => y >= win.firstYear && y <= win.lastYear;
   const omittedMarkers = gates.filter((g) => !inWindow(g.year)).length + allMilestones.filter((m) => !inWindow(m.year)).length;
@@ -667,6 +674,13 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   if (omittedMarkers > 0) {
     captionParts.push(`${omittedMarkers} ${omittedMarkers === 1 ? "marker falls" : "markers fall"} outside this window and ${omittedMarkers === 1 ? "is" : "are"} not drawn; the gates and milestones listed on this slide name ${omittedMarkers === 1 ? "it" : "them"}.`);
   }
+  // The drawn milestones stack on rows within a shared year so two diamonds never share a position.
+  const rowOfYear = new Map<number, number>();
+  const drawnMilestones: DeckGanttMilestone[] = allMilestones.filter((m) => inWindow(m.year)).map((m) => {
+    const row = rowOfYear.get(m.year) ?? 0;
+    rowOfYear.set(m.year, row + 1);
+    return { ...m, row };
+  });
   const gantt: DeckGantt = {
     spanYears,
     window: { firstYear: win.firstYear, lastYear: win.lastYear },
@@ -676,7 +690,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
       return { phase: l.id, label: l.label, labelLines: wrapLabel(l.label, GANTT_LANE_LABEL_CHARS), rowCount: laid.rowCount, rowLines: laid.rowLines, bars: laid.bars };
     }),
     gates: gates.filter((g) => inWindow(g.year)),
-    milestones: allMilestones.filter((m) => inWindow(m.year)),
+    milestones: drawnMilestones,
     omittedMarkers,
     caption: captionParts.length > 0 ? captionParts.join(" ") : null,
   };
@@ -689,7 +703,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
       kind: "text" as const,
       rawValue: g.year,
     })),
-    ...allMilestones.map((m) => ({ label: "Milestone", value: `${m.label} — ${yearHeader(m.year, startYear)}`, kind: "text" as const, rawValue: m.year })),
+    ...allMilestones.map((m) => ({ label: `Milestone ${m.ordinal}`, value: `${m.label} — ${yearHeader(m.year, startYear)}`, kind: "text" as const, rawValue: m.year })),
   ];
   return {
     name: "timeline",

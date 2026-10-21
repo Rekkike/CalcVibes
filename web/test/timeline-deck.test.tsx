@@ -50,7 +50,7 @@ describe("v0.6.13 the Gantt deck slide", () => {
     expect(g.gates.map((x) => x.code)).toEqual(["DP1", "DP2", "DP3", "DP4", "DP8"]);
     expect(g.axis.map((a) => a.label)).toEqual(["2026", "2027", "2028", "2029", "2030", "2031", "2032", "2033"]);
     expect(deckOf(withTl(timeline())).slides.find((s) => s.name === "timeline")!.gantt!.axis[0].label).toBe("Year 1");
-    expect(g.milestones).toEqual([{ id: "m1", label: "Handover", year: 8, tie: "activity a3" }]);
+    expect(g.milestones).toEqual([{ id: "m1", label: "Handover", year: 8, tie: "activity a3", ordinal: 1, row: 0 }]);
     const body = deckOf(withTl(timeline())).slides.find((s) => s.name === "timeline")!.body.map((f) => f.label);
     expect(body).toContain("DP1");
   });

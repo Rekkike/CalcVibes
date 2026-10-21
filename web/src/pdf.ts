@@ -183,7 +183,7 @@ function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number,
   return 48 * scale;
 }
 
-// v0.6.13: the program Gantt on the print route — the lanes, the stacked bars, the BP-coded gate
+// v0.6.13: the program Gantt on the print route — the lanes, the stacked bars, the DP-coded gate
 // lines, the milestone diamonds and the axis labels, in the print palette; it draws the deck model's
 // gantt (the year window, the sub-row layout and the label placement composed once in the deck
 // model) and never recomputes it. v0.6.13.2: the lanes flow across pages when the stacked layout is
@@ -191,9 +191,16 @@ function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number,
 // footer. Returns the y after the last segment.
 export const GANTT_PDF = { labelW: 32, plotW: 257 - 32, axisH: 7, footerH: 16, rowPad: 1.2, barH: 4.2, lineH: 2.7, capLine: 3.4 };
 const pdfRowH = (lines: number) => GANTT_PDF.rowPad + (lines > 0 ? lines * GANTT_PDF.lineH + 0.6 : 0) + GANTT_PDF.barH;
+// v0.6.13.4: the marker footer grows with the milestone stack: each same-year row is 9 mm (the diamond, then
+// its ordinal centered beneath it); with no milestone the footer stands at footerH.
+const pdfFooterH = (g: DeckGantt) => {
+  const rows = g.milestones.reduce((a, m) => Math.max(a, m.row + 1), 0);
+  return rows === 0 ? GANTT_PDF.footerH : Math.max(GANTT_PDF.footerH, 19.5 + (rows - 1) * 9);
+};
 const pdfLaneH = (l: DeckGantt["lanes"][number]) => Math.max(l.rowLines.reduce((a, n) => a + pdfRowH(n), 0) + GANTT_PDF.rowPad, l.labelLines.length * 3.4 + 2);
 function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => number, trace?: DeckPdfTrace): number {
-  const { labelW, plotW, axisH, footerH, rowPad, barH, lineH } = GANTT_PDF;
+  const { labelW, plotW, axisH, rowPad, barH, lineH } = GANTT_PDF;
+  const footerH = pdfFooterH(g);
   const x0 = 20 + labelW;
   const first = g.window.firstYear;
   const n = Math.max(1, g.window.lastYear - first + 1);
@@ -283,9 +290,13 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
     }
     for (const m of g.milestones) {
       const cx = xMid(m.year);
-      const cy = lanesBottom + 11;
+      const cy = lanesBottom + 11 + m.row * 9;
       doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
       doc.lines([[2.5, 2.5], [-2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]], cx, cy - 2.5, [1, 1], "F", true);
+      // the ordinal, centered beneath its diamond (7 pt; below the gate-code line, above the caption)
+      doc.setFontSize(7);
+      doc.setTextColor(0, 0, 0);
+      doc.text(String(m.ordinal), cx, cy + 5.7, { align: "center" });
     }
     endY = lanesBottom + footerH;
   });
