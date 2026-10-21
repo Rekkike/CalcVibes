@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import { deckMoneyForDisplay, percentTwoForDisplay } from "./engine.js";
 import type { CurrencyCode, EntryUnit } from "./engine.js";
-import type { DeckModel, DeckDonut, ScenarioTargetChart } from "./deck.js";
+import type { DeckModel, DeckDonut, DeckGantt, ScenarioTargetChart } from "./deck.js";
 
 export interface DeckPdfTrace {
   drawnTitles: string[];
@@ -183,6 +183,77 @@ function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number,
   return 48 * scale;
 }
 
+// v0.6.13: the program Gantt on the print route — the lanes, the bars, the BP-coded gate lines,
+// the milestone diamonds and the axis labels, in the print palette; it draws the deck model's
+// gantt and never recomputes it. Returns the height consumed.
+function drawPrintGantt(doc: jsPDF, g: DeckGantt, y: number, trace?: DeckPdfTrace): number {
+  const labelW = 28;
+  const x0 = 20 + labelW;
+  const plotW = 257 - labelW;
+  const laneH = 11;
+  const axisH = 7;
+  const n = Math.max(1, g.spanYears);
+  const colW = plotW / n;
+  const xStart = (yr: number) => x0 + (yr - 1) * colW;
+  const xMid = (yr: number) => x0 + (yr - 0.5) * colW;
+  const lanesTop = y + axisH;
+  const lanesBottom = lanesTop + laneH * g.lanes.length;
+  const step = Math.max(1, Math.ceil(n / 14));
+  doc.setFontSize(7);
+  doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+  for (const a of g.axis) {
+    doc.setDrawColor(229, 229, 234);
+    doc.line(xStart(a.year), lanesTop, xStart(a.year), lanesBottom);
+    if ((a.year - 1) % step === 0) {
+      doc.text(a.label, xMid(a.year), y + 4, { align: "center" });
+      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(a.label);
+    }
+  }
+  doc.line(xStart(n + 1), lanesTop, xStart(n + 1), lanesBottom);
+  g.lanes.forEach((lane, i) => {
+    const ly = lanesTop + i * laneH;
+    doc.setDrawColor(150, 150, 150);
+    doc.line(x0, ly, x0 + plotW, ly);
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text(lane.label, 20, ly + laneH / 2 + 1.5);
+    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(lane.label);
+    for (const b of lane.bars) {
+      const bx = xStart(b.startYear);
+      const bw = Math.max(colW * 0.5, xStart(b.endYear + 1) - bx);
+      doc.setFillColor(0, 116, 186);
+      doc.rect(bx, ly + 2, bw, laneH - 4, "F");
+      doc.setFontSize(6);
+      doc.setTextColor(255, 255, 255);
+      doc.text(b.label, bx + 1, ly + laneH / 2 + 1, { maxWidth: bw - 2 });
+      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(b.label);
+    }
+  });
+  doc.setDrawColor(150, 150, 150);
+  doc.line(x0, lanesBottom, x0 + plotW, lanesBottom);
+  for (const gate of g.gates) {
+    doc.setDrawColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+    doc.setLineWidth(0.6);
+    doc.line(xMid(gate.year), lanesTop - 2, xMid(gate.year), lanesBottom + 2);
+    doc.setLineWidth(0.2);
+    doc.setFontSize(7);
+    doc.setTextColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+    const code = gate.code ?? "Gate";
+    doc.text(code, xMid(gate.year), lanesBottom + 6, { align: "center" });
+    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(code);
+  }
+  for (const m of g.milestones) {
+    const cx = xMid(m.year);
+    const cy = lanesBottom + 11;
+    doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
+    doc.lines([[2.5, 2.5], [-2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]], cx, cy - 2.5, [1, 1], "F", true);
+  }
+  doc.setDrawColor(0, 0, 0);
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  return axisH + laneH * g.lanes.length + 16;
+}
+
 export function buildDeckPdf(model: DeckModel, projectName: string): jsPDF;
 export function buildDeckPdf(model: DeckModel, projectName: string, trace: DeckPdfTrace): jsPDF;
 export function buildDeckPdf(model: DeckModel, projectName: string, trace?: DeckPdfTrace): jsPDF {
@@ -234,6 +305,10 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     doc.text(slide.title, 20, 30, { maxWidth: 257 });
     doc.setFontSize(12);
     let y = CONTENT_TOP;
+    // v0.6.13: the timeline slide draws its Gantt first, beneath the title.
+    if (slide.gantt !== undefined) {
+      y += drawPrintGantt(doc, slide.gantt, y, trace) + 2;
+    }
     // v0.6.5 Task I: the deal slide is verdict-led — the verdict draws first, before the tiles.
     if (slide.verdict !== undefined) {
       const lines = doc.splitTextToSize(`Verdict: ${slide.verdict}`, 257) as string[];

@@ -5,7 +5,7 @@ import { deckSlides } from "../deck.js";
 import type { ScenarioTargetChart } from "../deck.js";
 import { deckMoneyForDisplay, feeForDisplay, percentTwoForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionRows, CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot, ScenarioComparisonBars } from "../charts.js";
+import { CompositionRows, CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot, ScenarioComparisonBars, GanttChart } from "../charts.js";
 import { STAGE_CHART_COLORS } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
@@ -259,6 +259,11 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                     </ul>
                   </div>
                 )}
+              </div>
+            )}
+            {sl.name === "timeline" && sl.gantt !== undefined && (
+              <div data-testid="deck-chart-slot" data-slide-chart="timeline">
+                <GanttChart gantt={sl.gantt} />
               </div>
             )}
             {sl.name === "recovery" && result !== null && (
