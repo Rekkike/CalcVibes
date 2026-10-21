@@ -201,6 +201,9 @@ export interface TimelineDecisionPoint {
   title: string;
   year: number;
   outcome?: TimelineOutcome;
+  // The PPS-aligned decision-point code (BP1..BP8) the gate was seeded with; the deck renders it
+  // with the title. Optional: a gate added beyond the scale's set carries none.
+  code?: string;
 }
 
 export type TimelineTie = { kind: "activity"; activityId: string } | { kind: "engine-event"; event: TimelineEngineEvent };
