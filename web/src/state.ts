@@ -1,6 +1,6 @@
 import type {
   ContractParams, CostLine, MaintenanceConfig, ModelInputs, ModelResult, OperatingLine,
-  TimelineActivity, TimelineBlock, TimelineEngineEvent, TimelinePhase,
+  TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelinePhase,
 } from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
 
@@ -184,6 +184,13 @@ export function shorePowerProject(): ModelInputs {
 // cruise terminal €20M and the inland/public berths €20M are invented (the fixture
 // architecture of record). The fields are identical to the core test fixture of record
 // (programFixture0610) — every solved figure is a directive reproduction pin.
+// v0.6.13.1: a decision gate of the PPS set at a program year, seeded with the set's default title
+// (the demo timelines record no outcomes: no decision is held yet).
+function ppsGate(id: string, code: string, year: number): TimelineDecisionPoint {
+  const bp = PPS_BP_SET.find((b) => b.code === code);
+  return { id, title: bp?.title ?? "", year, code };
+}
+
 export function shorePowerProgram(): ModelInputs {
   const liftsR1 = [200, 320, 380, ...new Array(18).fill(400)];
   const liftsR2 = [0, 0, 60, 90, 110, ...new Array(16).fill(120)];
@@ -231,6 +238,39 @@ export function shorePowerProgram(): ModelInputs {
       { id: "l1", label: "Municipality interest-free note", kind: "interest-free-loan", amount: 10000000, year: 1, termYears: 10, repaymentStartYear: 4 },
     ] },
     financing: { enabled: true, sharePct: 0, perLineSharePct: { p1: 31.69, p2: 31.69, p3: 31.69 }, debtRatePct: 3.5, termYears: 20, graceYears: 3, serviceStartYear: null, amortization: "annuity", leveragedSolve: false },
+    // v0.6.13.1 Task B: the authored timeline of the demo (the full BP scale). Every span is read
+    // from the program's own cost spans: the engineering and studies line runs years 1-2 (the
+    // preparation, concluding at BP3); the OPS installations, the market pillar, the cruise and
+    // inland segments and the quay cabling follow their cost lines; the detail-design lane is
+    // left empty (no cost line is a separate design activity). The gates sit where the program's
+    // facts put the decisions: preparation in years 1-2, execution from year 2 (the first
+    // installation and market-pillar spend), the first commissioning and first collections in
+    // year 3, delivery in year 4 (operations begin), construction complete, handover and closure
+    // in year 5 (the last cost year). No gate outcome is recorded (no decision is held yet). The
+    // engine-event milestones tie to the funding, the first collection year and construction
+    // complete; two activity ties mark the container-pillar and cruise segments.
+    timeline: {
+      projectScale: "full",
+      activities: [
+        { id: "a1", label: "Container pillar: engineering & studies (RSP JV)", startYear: 1, endYear: 2, phase: "prestudy" },
+        { id: "a2", label: "Container pillar: OPS installations (RSP JV)", startYear: 2, endYear: 3, phase: "production" },
+        { id: "a3", label: "Container pillar: quay cabling & commissioning", startYear: 3, endYear: 3, phase: "production" },
+        { id: "a4", label: "Market pillar: bulk & liquid berths", startYear: 2, endYear: 5, phase: "production" },
+        { id: "a5", label: "Cruise terminal shore power", startYear: 3, endYear: 3, phase: "production" },
+        { id: "a6", label: "Inland & public berths", startYear: 1, endYear: 5, phase: "production" },
+      ],
+      decisionPoints: [
+        ppsGate("d1", "BP1", 1), ppsGate("d2", "BP2", 1), ppsGate("d3", "BP3", 2), ppsGate("d4", "BP4", 2),
+        ppsGate("d5", "BP5", 3), ppsGate("d6", "BP6", 4), ppsGate("d7", "BP7", 5), ppsGate("d8", "BP8", 5),
+      ],
+      milestones: [
+        { id: "m1", label: "Funding received (the province grant and the public note)", year: 1, tie: { kind: "engine-event", event: "funding-received" } },
+        { id: "m2", label: "Container pillar OPS installations complete", year: 3, tie: { kind: "activity", activityId: "a2" } },
+        { id: "m3", label: "Cruise terminal commissioned", year: 3, tie: { kind: "activity", activityId: "a5" } },
+        { id: "m4", label: "First collection year: phased commissioning", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } },
+        { id: "m5", label: "Construction complete", year: 5, tie: { kind: "engine-event", event: "construction-complete" } },
+      ],
+    },
   } as ModelInputs;
 }
 
@@ -263,6 +303,34 @@ export function landNewbuildProject(): ModelInputs {
     ],
     appraisal: { wacc: 5, financeRate: 4, reinvestmentRate: 4, residual: { mode: "calculated", amount: 0, year: 23 } },
     maintenance: { mode: "off" },
+    // v0.6.13.1 Task B: the authored timeline of the demo (the full BP scale). Program years are
+    // 1-based and the turnkey cost starts in year 1, so the prestudy-and-design lanes open in
+    // year 1 alongside the construction (they cannot precede it): the site acquisition is the
+    // prestudy (its cost line, year 1), the design sits inside the total-enterprise contract (the
+    // fixture's own contract form), and the turnkey construction and the fit-out follow their cost
+    // spans. The preparation gates fall in year 1, execution starts in year 1 (the turnkey cost),
+    // the mid-construction review and the delivery approval in year 2 (construction complete),
+    // handover and closure in year 3 (the leases and operations begin). No gate outcome is
+    // recorded; the engine-event milestones tie to construction complete and the first collection
+    // year (the project has no funding block).
+    timeline: {
+      projectScale: "full",
+      activities: [
+        { id: "a1", label: "Site acquisition and prestudy (lakeside plot)", startYear: 1, endYear: 1, phase: "prestudy" },
+        { id: "a2", label: "Design within the total-enterprise contract", startYear: 1, endYear: 1, phase: "detail-design" },
+        { id: "a3", label: "Turnkey construction (18-storey timber tower)", startYear: 1, endYear: 2, phase: "production" },
+        { id: "a4", label: "Interior & hotel fit-out", startYear: 2, endYear: 2, phase: "production" },
+      ],
+      decisionPoints: [
+        ppsGate("d1", "BP1", 1), ppsGate("d2", "BP2", 1), ppsGate("d3", "BP3", 1), ppsGate("d4", "BP4", 1),
+        ppsGate("d5", "BP5", 2), ppsGate("d6", "BP6", 2), ppsGate("d7", "BP7", 3), ppsGate("d8", "BP8", 3),
+      ],
+      milestones: [
+        { id: "m1", label: "Hotel fit-out complete", year: 2, tie: { kind: "activity", activityId: "a4" } },
+        { id: "m2", label: "Construction complete", year: 2, tie: { kind: "engine-event", event: "construction-complete" } },
+        { id: "m3", label: "First collection year: the leases begin", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } },
+      ],
+    },
   };
 }
 

@@ -23,9 +23,8 @@ async function openProject(inputs: ModelInputs) {
 const alpha = (timeline?: TimelineBlock): ModelInputs => ({ ...demoProject(), projectLengthYears: 12, ...(timeline !== undefined ? { timeline } : {}) });
 
 describe("v0.6.13 the Timeline section", () => {
-  it("SEAT: the plan group sits between finance and read; the empty state offers the three affordances with no refusals", () => {
+  it("SEAT: the plan group sits between finance and read (v0.6.13.1 re-anchor: the blank project, since the demo now carries a timeline); the empty state offers the three affordances with no refusals", () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
     expect(all(".nav-group").map((g) => g.getAttribute("data-nav-group"))).toEqual(["model", "finance", "plan", "read"]);
     fireEvent.click(byNav("timeline"));
     expect(screen.getByTestId("timeline-empty")).toBeTruthy();
@@ -37,9 +36,8 @@ describe("v0.6.13 the Timeline section", () => {
     expect(document.querySelector('[data-testid="timeline-activities-scroll"]')?.className).toContain("editor-scroll");
   });
 
-  it("GATES: added gates take the BP defaults of the scale in order; the mini scale takes its condensed set", () => {
+  it("GATES: (v0.6.13.1 re-anchor: the blank project, since the demo now carries its gates) added gates take the BP defaults of the scale in order; the mini scale takes its condensed set", () => {
     render(<App />);
-    fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("timeline"));
     fireEvent.click(byAction("add-gate"));
     fireEvent.click(byAction("add-gate"));

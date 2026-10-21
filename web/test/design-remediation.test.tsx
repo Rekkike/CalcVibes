@@ -93,7 +93,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     expect(css).toMatch(/\[data-testid="presentation"\] \.deck-slide\b[^{]*\{[^}]*min-height/);
   });
 
-  it("DECK-CHROME and NUMBERED-KICKERS: every non-title slide carries its numbered kicker; the title slide carries the three-metric row (v0.6.7 re-anchor: the port preset axes mount the eighth slide, so seven numbered kickers render)", async () => {
+  it("DECK-CHROME and NUMBERED-KICKERS: every non-title slide carries its numbered kicker; the title slide carries the three-metric row (v0.6.7 re-anchor: the port preset axes mount the eighth slide, so seven numbered kickers render; v0.6.13.1 re-anchor: the demo now carries an authored timeline, so the Gantt slide mounts and eight numbered kickers render)", async () => {
     const { demoProject } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay, percentTwoForDisplay } = await import("../src/engine.js");
     const result = computeModel(demoProject());
@@ -108,7 +108,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const kickers = document.querySelectorAll('[data-testid="slide-kicker"]');
-    expect(kickers.length).toBe(7);
+    expect(kickers.length).toBe(8);
     expect(kickers[0].textContent).toMatch(/^01 — /);
     const titleMetrics = document.querySelector('[data-testid="title-metrics"]') as HTMLElement;
     expect(titleMetrics).toBeTruthy();

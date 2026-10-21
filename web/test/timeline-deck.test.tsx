@@ -133,9 +133,9 @@ describe("v0.6.13 the byte-identity lock: computeModel is inert to the timeline 
   lock("landNewbuildProject", landNewbuildProject);
   lock("shorePowerProgram", shorePowerProgram);
 
-  it("the demo fixtures carry no timeline block", () => {
-    expect(landNewbuildProject().timeline).toBeUndefined();
-    expect(shorePowerProgram().timeline).toBeUndefined();
+  it("the golden template carries no timeline block; the two demo fixtures carry their authored timelines (v0.6.13.1 re-anchor)", () => {
+    expect(landNewbuildProject().timeline).toBeDefined();
+    expect(shorePowerProgram().timeline).toBeDefined();
     expect(demoProject().timeline).toBeUndefined();
   });
 });

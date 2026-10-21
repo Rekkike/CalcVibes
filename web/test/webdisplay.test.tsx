@@ -63,6 +63,7 @@ describe("Task A3: NO-LEGEND / Task A4: consistency", () => {
     expect(document.querySelector('[data-testid="presentation"] .legend')).toBeNull();
     expect(document.querySelector(".app-root .legend")).toBeNull();
     for (const svg of Array.from(document.querySelectorAll('[data-testid="presentation"] svg'))) {
+      if (svg.closest('[data-testid="gantt-chart"]') !== null) continue; // v0.6.13.1 re-anchor: the Gantt SVG labels with direct text
       expect(svg.querySelector("text")).toBeNull();
     }
     for (const svg of Array.from(document.querySelectorAll(".app-root svg"))) {
