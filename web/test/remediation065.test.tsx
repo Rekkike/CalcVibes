@@ -238,15 +238,15 @@ describe("v0.6.5 Task F: the static navigation chrome (W14)", () => {
     expect(prev.className).toContain("stage-nav-button-disabled");
     expect(prev.textContent).toBe("‹");
     expect(next.textContent).toBe("›");
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 8");
-    expect(nav.querySelectorAll("[data-dot]").length).toBe(8);
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 9");
+    expect(nav.querySelectorAll("[data-dot]").length).toBe(9);
     expect(next.getAttribute("aria-disabled")).toBe("false");
-    for (let i = 0; i < 7; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("8 / 8");
+    for (let i = 0; i < 8; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("9 / 9");
     expect(next.getAttribute("aria-disabled")).toBe("true");
     expect(next.className).toContain("stage-nav-button-disabled");
     expect(prev.getAttribute("aria-disabled")).toBe("false");
-    expect(document.querySelectorAll('[data-dot="7"].stage-dot-active').length).toBe(1);
+    expect(document.querySelectorAll('[data-dot="8"].stage-dot-active').length).toBe(1);
   });
 
   it("F-SWIPE-SOURCE: the swipe handlers attach with a threshold and the dominant-axis test; the chrome reserves the safe area", () => {
