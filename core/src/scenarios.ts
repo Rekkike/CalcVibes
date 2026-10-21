@@ -1,12 +1,24 @@
 import { computeModel } from "./engine.js";
 import { EngineInputError } from "./validate.js";
-import type { ModelInputs, ModelResult } from "./types.js";
+import type { CostLine, ModelInputs, ModelResult } from "./types.js";
 
 function assertNoCollectionsProfile(inp: ModelInputs): void {
   const profile = inp.repayment.collectionsOverrides;
   if (profile && Object.keys(profile).length > 0) {
     throw new EngineInputError(["The payment sensitivity tables require the solved payment stream; they do not apply while a collections profile is present (SCE-PROFILE)."]);
   }
+}
+
+// v0.6.12.2 (AUD-5): one shared burn helper — the multiplier scales the amount AND every
+// per-year override value; a line without overrides keeps its exact shape.
+function scaleBurn(c: CostLine, multiplier: number): CostLine {
+  const scaled: CostLine = { ...c, amount: c.amount * multiplier };
+  if (c.yearOverrides !== undefined) {
+    const overrides: Record<number, number> = {};
+    for (const [y, v] of Object.entries(c.yearOverrides)) overrides[Number(y)] = v * multiplier;
+    scaled.yearOverrides = overrides;
+  }
+  return scaled;
 }
 
 export interface ScenarioShift {
@@ -26,8 +38,7 @@ export function applyScenario(inp: ModelInputs, shift: ScenarioShift): ModelInpu
       ? inp.contracts?.map((c) => ({ ...c, termYears: c.termYears + shift.termShift }))
       : inp.contracts,
     costs: inp.costs.map((c) => ({
-      ...c,
-      amount: c.amount * shift.burnMultiplier,
+      ...scaleBurn(c, shift.burnMultiplier),
       escalation: c.category === "recurring" ? c.escalation + shift.escalationShift : c.escalation,
     })),
   };
@@ -86,8 +97,8 @@ function tornadoCell(inp: ModelInputs): TornadoCell {
 }
 
 export function tornado(inp: ModelInputs): TornadoRow[] {
-  const burnLow = tornadoCell({ ...inp, costs: inp.costs.map((c) => ({ ...c, amount: c.amount * 0.9 })) });
-  const burnHigh = tornadoCell({ ...inp, costs: inp.costs.map((c) => ({ ...c, amount: c.amount * 1.1 })) });
+  const burnLow = tornadoCell({ ...inp, costs: inp.costs.map((c) => scaleBurn(c, 0.9)) });
+  const burnHigh = tornadoCell({ ...inp, costs: inp.costs.map((c) => scaleBurn(c, 1.1)) });
   const targetLow = tornadoCell({ ...inp, targetIrr: inp.targetIrr - 2 });
   const targetHigh = tornadoCell({ ...inp, targetIrr: inp.targetIrr + 2 });
   const termLow = tornadoCell({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears - 1 } });

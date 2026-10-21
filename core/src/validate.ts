@@ -19,6 +19,11 @@ export function validateInputs(inp: ModelInputs): string[] {
     if (c.yearOverrides) {
       for (const [yStr, amount] of Object.entries(c.yearOverrides)) {
         const y = Number(yStr);
+        // v0.6.12.2 (AUD-6): override years validate whole-from-1-up in both categories,
+        // collect-all — the collections-profile discipline.
+        if (!Number.isInteger(y) || y < 1) {
+          issues.push(`Cost line ${c.id} (${c.name}) has an override year ${yStr} that is not an integer of at least 1.`);
+        }
         if (!(amount > 0) || !Number.isFinite(amount)) {
           issues.push(`Cost line ${c.id} (${c.name}) has a non-positive or non-finite override amount at year ${y}.`);
         }

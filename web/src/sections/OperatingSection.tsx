@@ -15,7 +15,9 @@ export function OperatingSection(props: {
   const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
   const lines = inputs.operatingLines ?? [];
   const maintenance = inputs.maintenance ?? { mode: "off" as const };
-  const capexTotal = inputs.costs.filter((c) => c.category === "capex").reduce((a, c) => a + c.amount, 0);
+  // v0.6.12.2 (AUD-3): the heading renders the basis the engine emitted on the maintenance entry
+  // (the one-story rule); with maintenance off the engine emits none and the heading names none.
+  const emittedBasis = result?.operatingLines.find((o) => o.id === "maintenance")?.basis;
   const update = (id: string, patch: Partial<OperatingLine>) =>
     setOperating(lines.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   return (
@@ -49,7 +51,7 @@ export function OperatingSection(props: {
         </tbody>
       </table>
       <button data-action="add-operating" onClick={() => setOperating([...lines, { id: "o" + (lines.length + 1), label: "", amount: 0, startYear: 1, yearCount: 1, escalation: 0 }])}>Add operating line</button>
-      <h3>Maintenance (derived from total CAPEX {money(capexTotal)})</h3>
+      <h3>Maintenance (derived from total CAPEX{emittedBasis !== undefined ? ` ${money(emittedBasis)}` : ""})</h3>
       <label>Mode{" "}
         <select data-field="maintenanceMode" value={maintenance.mode} onChange={(e) => {
           const mode = e.target.value as MaintenanceConfig["mode"];

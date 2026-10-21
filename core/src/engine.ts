@@ -292,6 +292,10 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     });
     fundingAllocation.push({ grantId: fr.id, label: fr.label, year: fr.year, amount: fr.amount, shares });
   }
+  // v0.6.12.2 (AUD-7): a calculated residual dated beyond the horizon keeps a sale-year
+  // schedule of the remaining book value, computed through the residual year. A positive
+  // sale-year value extends the horizon and enters the vector; a zero value appears nowhere.
+  let saleYearSchedule: ReturnType<typeof computeBookSchedule> | null = null;
   if (residualMode === "calculated" && residualYear * 12 > totalMonths) {
     const provisional = computeBookSchedule(
       inp.costs,
@@ -301,6 +305,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       lineTotalsMap,
       nettingByLine,
     );
+    saleYearSchedule = provisional;
     if (provisional.remainingBookValueAt(residualYear) > 0) {
       horizonConstituents.push({ label: "book-value residual horizon extension", month: residualYear * 12 });
     }
@@ -332,9 +337,12 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     lineTotalsMap,
     nettingByLine,
   );
+  const residualBookValue = saleYearSchedule !== null
+    ? saleYearSchedule.remainingBookValueAt(residualYear)
+    : bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears));
   let residualAmountUsed = residualSetAmount;
   if (residualMode === "calculated") {
-    residualAmountUsed = bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears));
+    residualAmountUsed = residualBookValue;
   }
   const costM = new Array<number>(totalMonths).fill(0);
   costs.forEach((c) => {
@@ -383,20 +391,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   // interest-free loan additionally contributes its repayments (equal annual installments)
   // as negative present value (its subsidy element). It is subtracted from every solve
   // numerator; the identity npvAtTarget = 0 at the target rate holds on the full stream.
-  let fundingNpv = 0;
-  if (fundingPresent) {
-    for (const fr of fundingRows) {
-      fundingNpv += fr.amount * df(fr.year * 12);
-      if (fr.kind === "interest-free-loan") {
-        const loanTerm = fr.termYears ?? 1;
-        const loanStart = fr.repaymentStartYear ?? 1;
-        const installment = fr.amount / loanTerm;
-        for (let k = 0; k < loanTerm; k++) {
-          fundingNpv -= installment * df((loanStart + k) * 12);
-        }
-      }
-    }
-  }
+  const fundingNpv = fundingNpvOf(fundingRows, rM);
   const balloonMonthProfile = profileEndMonth;
   const balloonDf = (profileMode ? balloonMonthProfile : balloonMonth) <= totalMonths ? df(profileMode ? balloonMonthProfile : balloonMonth) : 0;
   if (!profileMode && inp.repayment.balloon > 0 && inp.repayment.balloon * balloonDf >= costNpv) {
@@ -434,19 +429,29 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const maintenanceCfg = inp.maintenance ?? { mode: "off" };
   const tariffCfg = tariffCfg0;
   const tariffCollectionMode = tariffCollectionMode0;
-  const capexTotal = inp.costs
-    .filter((c) => c.category === "capex")
-    .reduce((acc, c) => acc + c.amount, 0);
+  const capexTotal = capexIncurredTotal(inp.costs);
+  // v0.6.12.2 (AUD-4): the operating and maintenance window is the full actual collection span
+  // of the solved model, both ends. The profile and contracts modes read their own span; the
+  // dormant repayment block governs only the plain and tariff paths.
+  let windowFirstMonth = firstCollectionMonth;
+  let windowLastMonth = lastInflowMonth;
+  if (profileMode) {
+    windowFirstMonth = profileFirstMonth;
+    windowLastMonth = Math.max(profileEndMonth, residualAmountUsed > 0 ? residualMonth : 0);
+  } else if (contractsMode) {
+    windowFirstMonth = Math.min(...contracts.map(contractFirstCollectionMonth));
+    windowLastMonth = Math.max(Math.max(...contracts.map(contractLastCollectionMonth)), residualAmountUsed > 0 ? residualMonth : 0);
+  }
   const operatingInfos: import("./types.js").OperatingLineInfo[] = [];
   let operatingNpv = 0;
-  const addOperating = (line: { id: string; label: string; amount: number; startYear: number; yearCount: number; escalation: number }) => {
+  const addOperating = (line: { id: string; label: string; amount: number; startYear: number; yearCount: number; escalation: number }, basis?: number) => {
     const nominalFirst = line.startYear * 12 - 11;
     const nominalLast = (line.startYear + line.yearCount - 1) * 12;
-    const effFirst = Math.max(nominalFirst, firstCollectionMonth);
-    const effLast = Math.min(nominalLast, lastInflowMonth);
+    const effFirst = Math.max(nominalFirst, windowFirstMonth);
+    const effLast = Math.min(nominalLast, windowLastMonth);
     if (effFirst > effLast) {
       throw new EngineInputError([
-        `Operating line ${line.id} (${line.label}) falls entirely outside the collection window [${firstCollectionMonth}, ${lastInflowMonth}].`,
+        `Operating line ${line.id} (${line.label}) falls entirely outside the collection window [${windowFirstMonth}, ${windowLastMonth}].`,
       ]);
     }
     let total = 0;
@@ -458,14 +463,16 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       total += monthly;
       operatingNpv += monthly / Math.pow(1 + rM, m);
     }
-    operatingInfos.push({ id: line.id, label: line.label, nominalSpan: [nominalFirst, nominalLast], effectiveWindow: [effFirst, effLast], total: total });
+    operatingInfos.push(basis === undefined
+      ? { id: line.id, label: line.label, nominalSpan: [nominalFirst, nominalLast], effectiveWindow: [effFirst, effLast], total: total }
+      : { id: line.id, label: line.label, nominalSpan: [nominalFirst, nominalLast], effectiveWindow: [effFirst, effLast], total: total, basis });
   };
   for (const line of operatingLinesIn) addOperating(line);
   if (maintenanceCfg.mode !== "off") {
     const annual = maintenanceCfg.mode === "percent"
       ? ((maintenanceCfg.percentPerYear ?? 0) / 100) * capexTotal
       : (maintenanceCfg.fixedAnnualAmount ?? 0);
-    addOperating({ id: "maintenance", label: "Maintenance (derived)", amount: annual, startYear: Math.floor((firstCollectionMonth - 1) / 12) + 1, yearCount: Math.ceil(totalMonths / 12), escalation: 0 });
+    addOperating({ id: "maintenance", label: "Maintenance (derived)", amount: annual, startYear: Math.floor((windowFirstMonth - 1) / 12) + 1, yearCount: Math.ceil(totalMonths / 12), escalation: 0 }, capexTotal);
   }
   const operatingTotal = operatingInfos.reduce((acc, o) => acc + o.total, 0);
   const costNpvWithOperating = costNpv + operatingNpv;
@@ -1047,7 +1054,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       return { year, beginning: row.beginning, charge: row.charge, ending: row.ending, collections, operating, bookResult: collections - operating - row.charge };
     }),
     totalCharge: bookSchedule.totalCharge,
-    remainingBookValueAtResidualYear: bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears)),
+    remainingBookValueAtResidualYear: residualBookValue,
     gainOrLossOnSale: residualMode === "amount" ? residualSetAmount - bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears)) : 0,
     residualMode: residualMode,
     setAmount: residualSetAmount,
@@ -1061,9 +1068,13 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         const cumNet = trunc.length > 0 ? trunc[trunc.length - 1].cumulative : 0;
         const truncNpvWacc = npvMonthly(waccM, flows);
         const truncNpvTarget = npvMonthly(rM, flows);
+        // v0.6.12.2 (AUD-9): crossing-based — the first month the cumulative reaches zero from
+        // below on a positive net; a position that never crosses carries no payback.
         let pb: number | null = null;
+        let prevCum = 0;
         for (const row of trunc) {
-          if (row.cumulative >= 0) { pb = row.period / 12; break; }
+          if (row.cumulative >= 0 && prevCum < 0 && row.net > 0) { pb = row.period / 12; break; }
+          prevCum = row.cumulative;
         }
         return {
           contractId: c.id,
@@ -1154,11 +1165,57 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
 
 import { EngineInputError, validateInputs } from "./validate.js";
 import { normalizeContracts, allReinvestments, contractLastCollectionMonth } from "./contracts.js";
+import type { NormalizedContract } from "./contracts.js";
 import { computeBookSchedule, lineIncurred } from "./depreciation.js";
 import type { PaymentSlot } from "./slots.js";
 import { computeFinancingOverlay, fundableDraws, validateFinancing } from "./financing.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;
+type CostLine = import("./types.js").CostLine;
+
+// v0.6.10 Task A.2 (single-sourced for the term solver, v0.6.12.2 AUD-8): the present value at
+// the target monthly rate of the funding rows — each receipt discounted at its year-end month;
+// an interest-free loan additionally contributes its equal annual installments as negative PV.
+function fundingNpvOf(rows: import("./types.js").FundingRow[], rM: number): number {
+  const df = (m: number) => 1 / Math.pow(1 + rM, m);
+  let fundingNpv = 0;
+  for (const fr of rows) {
+    fundingNpv += fr.amount * df(fr.year * 12);
+    if (fr.kind === "interest-free-loan") {
+      const loanTerm = fr.termYears ?? 1;
+      const loanStart = fr.repaymentStartYear ?? 1;
+      const installment = fr.amount / loanTerm;
+      for (let k = 0; k < loanTerm; k++) {
+        fundingNpv -= installment * df((loanStart + k) * 12);
+      }
+    }
+  }
+  return fundingNpv;
+}
+
+// v0.6.12.2 (AUD-3): the maintenance basis — the profile-honoring capex incurred total (the
+// lineIncurred basis the book view uses), gross of grants; recurring lines and rent stay out.
+function capexIncurredTotal(costs: CostLine[]): number {
+  let total = 0;
+  for (const c of costs) {
+    if (c.category !== "capex") continue;
+    let line = 0;
+    for (const [, amt] of lineIncurred(c)) line += amt;
+    total += line;
+  }
+  return total;
+}
+
+// v0.6.12.2 (AUD-4): the first month a contract collects (a profile year opens at its month 1;
+// slots start at the first payment month; a slot-less contract starts at its start month).
+function contractFirstCollectionMonth(c: NormalizedContract): number {
+  let first = c.slots.length > 0 ? c.slots[0].monthIndex : c.startMonth;
+  if (c.evaluatedProfile !== null) {
+    const years = Object.keys(c.evaluatedProfile).map(Number).sort((a, b) => a - b);
+    if (years.length > 0) first = c.slots.length > 0 ? Math.min(first, (years[0] - 1) * 12 + 1) : (years[0] - 1) * 12 + 1;
+  }
+  return first;
+}
 
 function lastCostYearOf(inp: ModelInputsLike): number {
   let last = 0;
@@ -1175,7 +1232,14 @@ function lastCostYearOf(inp: ModelInputsLike): number {
   return last === 0 ? 1 : last;
 }
 
-function costNpvOf(inp: ModelInputsLike, rM: number, operatingWindowEnd: number | null = null): number {
+function costNpvOf(
+  inp: ModelInputsLike,
+  rM: number,
+  operatingWindowEnd: number | null = null,
+  // v0.6.12.2 (AUD-8): the contracts basis — the window start of the contracts' collection span
+  // and the contracts' reinvestments (cost-side cash the solved payment must also recover).
+  contractsBasis: { windowStart: number; reinvestments: import("./types.js").Reinvestment[] } | null = null,
+): number {
   const lastCostYear = lastCostYearOf(inp);
   const totalMonths = Math.max(Math.ceil(lastCostYear * 12), (lastCostYear + inp.repayment.graceYears) * 12 + Math.round(Math.max(0, inp.repayment.termYears) * 12));
   const costM = new Array<number>(totalMonths).fill(0);
@@ -1205,11 +1269,12 @@ function costNpvOf(inp: ModelInputsLike, rM: number, operatingWindowEnd: number 
   });
   let costNpv = 0;
   for (let i = 0; i < totalMonths; i++) costNpv += costM[i] / Math.pow(1 + rM, i + 1);
+  if (contractsBasis !== null) {
+    for (const ri of contractsBasis.reinvestments) costNpv += ri.amount / Math.pow(1 + rM, ri.year * 12);
+  }
   if (operatingWindowEnd !== null) {
-    const startMonth = (inp.repayment.firstCollectionYear ?? lastCostYear + inp.repayment.graceYears) * 12;
-    const capexTotal = inp.costs
-      .filter((c) => c.category === "capex")
-      .reduce((acc, c) => acc + c.amount, 0);
+    const startMonth = contractsBasis !== null ? contractsBasis.windowStart : (inp.repayment.firstCollectionYear ?? lastCostYear + inp.repayment.graceYears) * 12;
+    const capexTotal = capexIncurredTotal(inp.costs);
     const addLine = (line: { amount: number; startYear: number; yearCount: number; escalation: number }) => {
       const nominalFirst = line.startYear * 12 - 11;
       const nominalLast = (line.startYear + line.yearCount - 1) * 12;
@@ -1244,6 +1309,11 @@ export interface SolveTermResult {
   result: import("./types.js").ModelResult;
 }
 
+// v0.6.12.2 (AUD-8): Mode B (solveTerm) is the true inverse of Mode A (computeModel). The solver
+// takes the full basis: the funding NPV netted (grants and the interest-free-loan subsidy), the
+// calculated (book-value) residual honored, and exactly one solved contract solved on its own
+// slots (the balloon rides the solved end; payments per year and escalation honored). Multiple
+// solved contracts refuse (SCE-CONTRACTS); tariff collection modes refuse (SCE-TARIFF).
 export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResult {
   const profileGuard = inp.repayment.collectionsOverrides;
   if (profileGuard && Object.keys(profileGuard).length > 0) {
@@ -1251,81 +1321,166 @@ export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResul
   }
   const target = inp.targetIrr;
   const rM = Math.pow(1 + target / 100, 1 / 12) - 1;
-  const ppy = [1, 2, 4, 12].indexOf(inp.repayment.paymentsPerYear) >= 0 ? inp.repayment.paymentsPerYear : 1;
-  const spacing = 12 / ppy;
   const issues = validateInputs(inp);
   if (issues.length > 0) throw new EngineInputError(issues);
+  const tariffMode = inp.tariff?.mode;
+  if (tariffMode === "stable" || tariffMode === "manual" || tariffMode === "fixed") {
+    throw new EngineInputError(["The term solver requires the solved payment stream; tariff collection modes carry none (SCE-TARIFF)."]);
+  }
+  const explicitContracts = inp.contracts !== undefined && inp.contracts.length > 0;
+  const contractsAll = explicitContracts ? normalizeContracts(inp, lastCostYearOf(inp)) : [];
+  const solvedCount = contractsAll.filter((c) => c.mode === "solved").length;
+  if (explicitContracts && solvedCount !== 1) {
+    throw new EngineInputError([`The term solver applies to exactly one solved contract; this project carries ${solvedCount} solved contracts (SCE-CONTRACTS).`]);
+  }
+  const solvedC = explicitContracts ? (contractsAll.find((c) => c.mode === "solved") as NormalizedContract) : null;
+  const ppy = solvedC !== null ? solvedC.paymentsPerYear : ([1, 2, 4, 12].indexOf(inp.repayment.paymentsPerYear) >= 0 ? inp.repayment.paymentsPerYear : 1);
+  const spacing = 12 / ppy;
   const appraisal = inp.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } };
   const residualPosturePre = appraisal.residual.posture
     ?? ((appraisal.residual.mode ?? "amount") === "amount" && appraisal.residual.amount > 0 ? "set-price"
       : appraisal.residual.mode === "calculated" ? "book-value"
       : "none");
-  const residualAmount = residualPosturePre === "none" ? 0 : appraisal.residual.amount;
   const residualYear = appraisal.residual.year;
   const overrideYear = inp.repayment.firstCollectionYear ?? null;
-  const startMonth = overrideYear !== null ? overrideYear * 12 : (lastCostYearOf(inp) + inp.repayment.graceYears) * 12;
+  const startMonth = solvedC !== null
+    ? solvedC.startMonth
+    : (overrideYear !== null ? overrideYear * 12 : (lastCostYearOf(inp) + inp.repayment.graceYears) * 12);
   const residualMonth = residualYear * 12;
-  const residualDf = residualAmount > 0 ? 1 / Math.pow(1 + rM, Math.max(residualMonth, startMonth + 1)) : 0;
-  const esc = inp.repayment.paymentEscalation / 100;
+  const esc = (solvedC !== null ? solvedC.escalationPerYear : inp.repayment.paymentEscalation) / 100;
   const hasOperating = (inp.operatingLines && inp.operatingLines.length > 0) || (inp.maintenance && inp.maintenance.mode !== "off");
-  let n: number | null = null;
-  let windowEnd = startMonth;
-  let targetNpv = 0;
-  let dfSum = 0;
-  let infeasible = false;
-  for (let iter = 0; iter < 100; iter++) {
-    const balloonMonth = startMonth + Math.round(inp.repayment.termYears * 12);
-    const balloonDf = inp.repayment.balloon > 0 ? 1 / Math.pow(1 + rM, balloonMonth) : 0;
-    const costNpvBase = costNpvOf(inp, rM, hasOperating ? windowEnd : null);
-    targetNpv = costNpvBase - inp.repayment.balloon * balloonDf - residualAmount * residualDf;
-    let dfSumIter = 0;
-    let nIter: number | null = null;
-    let bad = false;
-    if (payment <= 0 || targetNpv <= 0) {
-      bad = payment <= 0;
-      if (bad) { infeasible = true; n = null; dfSum = dfSumIter; break; }
+  const df = (m: number) => 1 / Math.pow(1 + rM, m);
+  const fundingNpv = fundingNpvOf(inp.funding?.rows ?? [], rM);
+  // The contracts basis: the evaluated companions' balloons and inflows net the requirement; the
+  // solved contract's balloon rides the solved end inside the loop; the window spans the contracts.
+  let companionsPv = 0;
+  let contractsBasis: { windowStart: number; reinvestments: import("./types.js").Reinvestment[] } | null = null;
+  let companionsLastMonth = 0;
+  if (solvedC !== null) {
+    for (const c of contractsAll) {
+      if (c === solvedC) continue;
+      if (c.balloon > 0) companionsPv += c.balloon * df(c.endMonth);
+      if (c.evaluatedProfile !== null) {
+        for (const [yStr, amt] of Object.entries(c.evaluatedProfile)) {
+          const y = Number(yStr);
+          for (let m = (y - 1) * 12 + 1; m <= y * 12; m++) companionsPv += ((amt as number) / 12) * df(m);
+        }
+      } else if (c.evaluatedPayment !== null && c.evaluatedPayment > 0) {
+        for (const sl of c.slots) companionsPv += (c.evaluatedPayment as number) * sl.escFactor * df(sl.monthIndex);
+      }
+      companionsLastMonth = Math.max(companionsLastMonth, contractLastCollectionMonth(c));
     }
-    for (let k = 0; ; k++) {
-      const escFactor = Math.pow(1 + esc, Math.floor(k / ppy));
-      const monthIndex = startMonth + k * spacing;
-      const d = payment * escFactor / Math.pow(1 + rM, monthIndex);
-      if (!isFinite(d) || d <= 0) { bad = true; break; }
-      if (dfSumIter + d >= targetNpv) {
+    contractsBasis = {
+      windowStart: Math.min(...contractsAll.map(contractFirstCollectionMonth)),
+      reinvestments: allReinvestments(contractsAll),
+    };
+  }
+  const solvedBalloon = solvedC !== null ? solvedC.balloon : 0;
+  // The window end of a candidate payment count: the plain solver ends at the last payment; the
+  // contracts basis ends at the last collection of any contract (the solved balloon included) or
+  // the sale month of a booked residual, as computeModel does.
+  const windowEndOf = (nn: number, residualUsed: number): number => {
+    if (solvedC === null) return startMonth + (nn - 1) * spacing;
+    const solvedLast = solvedBalloon > 0 ? startMonth + nn * spacing : startMonth + (nn - 1) * spacing;
+    return Math.max(solvedLast, companionsLastMonth, residualUsed > 0 ? residualMonth : 0);
+  };
+
+  const solveFor = (residualAmount: number) => {
+    const residualDf = residualAmount > 0 ? 1 / Math.pow(1 + rM, Math.max(residualMonth, startMonth + 1)) : 0;
+    let n: number | null = null;
+    let windowEnd = startMonth;
+    let targetNpv = 0;
+    let needNow = 0;
+    let dfSum = 0;
+    let infeasible = false;
+    for (let iter = 0; iter < 100; iter++) {
+      const balloonMonth = startMonth + Math.round(inp.repayment.termYears * 12);
+      const balloonDf = inp.repayment.balloon > 0 ? 1 / Math.pow(1 + rM, balloonMonth) : 0;
+      const costNpvBase = costNpvOf(inp, rM, hasOperating ? windowEnd : null, contractsBasis);
+      targetNpv = solvedC !== null
+        ? costNpvBase - companionsPv - residualAmount * residualDf - fundingNpv
+        : costNpvBase - inp.repayment.balloon * balloonDf - residualAmount * residualDf - fundingNpv;
+      needNow = targetNpv;
+      let dfSumIter = 0;
+      let nIter: number | null = null;
+      let bad = false;
+      if (payment <= 0 || targetNpv <= 0) {
+        bad = payment <= 0;
+        if (bad) { infeasible = true; n = null; dfSum = dfSumIter; break; }
+      }
+      for (let k = 0; ; k++) {
+        const escFactor = Math.pow(1 + esc, Math.floor(k / ppy));
+        const monthIndex = startMonth + k * spacing;
+        const d = payment * escFactor / Math.pow(1 + rM, monthIndex);
+        if (!isFinite(d) || d <= 0) { bad = true; break; }
+        // The solved contract's balloon rides the solved end: it lands one spacing after the
+        // k-th payment, so the requirement the stream must clear is net of its present value.
+        const need = solvedBalloon > 0 ? targetNpv - solvedBalloon / Math.pow(1 + rM, startMonth + (k + 1) * spacing) : targetNpv;
+        needNow = need;
+        if (dfSumIter + d >= need) {
+          dfSumIter += d;
+          nIter = k + 1;
+          break;
+        }
         dfSumIter += d;
-        nIter = k + 1;
+        if (need - dfSumIter < 1e-9 * need) { nIter = k + 1; break; }
+        if (d < 1e-12 * dfSumIter) { bad = true; break; }
+      }
+      if (bad) { infeasible = true; n = null; dfSum = dfSumIter; break; }
+      const solvedLast = windowEndOf(nIter as number, residualAmount);
+      if (solvedLast === windowEnd || !hasOperating) {
+        n = nIter;
+        dfSum = dfSumIter;
+        windowEnd = solvedLast;
         break;
       }
-      dfSumIter += d;
-      if (targetNpv - dfSumIter < 1e-9 * targetNpv) { nIter = k + 1; break; }
-      if (d < 1e-12 * dfSumIter) { bad = true; break; }
-    }
-    if (bad) { infeasible = true; n = null; dfSum = dfSumIter; break; }
-    const solvedLast = startMonth + ((nIter as number) - 1) * spacing;
-    if (solvedLast === windowEnd || !hasOperating) {
+      if (solvedLast > windowEnd && iter > 0 && solvedLast === windowEnd) break;
+      windowEnd = solvedLast;
       n = nIter;
       dfSum = dfSumIter;
-      windowEnd = solvedLast;
-      break;
+      if (iter === 99) { n = nIter; dfSum = dfSumIter; windowEnd = solvedLast; }
     }
-    if (solvedLast > windowEnd && iter > 0 && solvedLast === windowEnd) break;
-    windowEnd = solvedLast;
-    n = nIter;
-    dfSum = dfSumIter;
-    if (iter === 99) { n = nIter; dfSum = dfSumIter; windowEnd = solvedLast; }
+    return { n, dfSum, needNow, infeasible };
+  };
+
+  // The calculated residual: its sale-year book value is the amount the solve nets. The initial
+  // guess reads the project at its own term; the final Mode A model at the solved term confirms it
+  // (the fixed point is reached in one pass wherever the schedule does not depend on the term).
+  let residualGuess = residualPosturePre === "none" ? 0 : appraisal.residual.amount;
+  if (residualPosturePre === "book-value") {
+    try {
+      residualGuess = computeModel(inp).residualAmountUsed ?? 0;
+    } catch (e) {
+      if (!(e instanceof EngineInputError)) throw e;
+      residualGuess = 0;
+    }
   }
-  if (infeasible || n === null) {
-    const result = computeModel({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears } });
-    return { paymentCount: null, termYears: null, lastPaymentMonth: null, shortfall: targetNpv - dfSum, minimalityShortfall: null, result };
+  const modelAt = (termYears: number) => {
+    if (solvedC === null) return { ...inp, repayment: { ...inp.repayment, termYears } };
+    return { ...inp, contracts: (inp.contracts ?? []).map((c) => (c.id === solvedC.id ? { ...c, termYears } : c)) };
+  };
+  let state = solveFor(residualGuess);
+  for (let pass = 0; ; pass++) {
+    if (state.infeasible || state.n === null) {
+      const result = computeModel({ ...inp, repayment: { ...inp.repayment, termYears: inp.repayment.termYears } });
+      return { paymentCount: null, termYears: null, lastPaymentMonth: null, shortfall: state.needNow - state.dfSum, minimalityShortfall: null, result };
+    }
+    const n = state.n;
+    const termYears = n / ppy;
+    const lastPaymentMonth = startMonth + (n - 1) * spacing;
+    const result = computeModel(modelAt(termYears), { fixedPayment: payment });
+    if (residualPosturePre === "book-value" && pass < 5 && Math.abs((result.residualAmountUsed ?? 0) - residualGuess) > 1e-9 * Math.max(1, Math.abs(residualGuess))) {
+      residualGuess = result.residualAmountUsed ?? 0;
+      state = solveFor(residualGuess);
+      continue;
+    }
+    const shortfall = result.costNpv - state.dfSum;
+    let dfSumMinusOne = 0;
+    for (let j = 0; j < n - 1; j++) {
+      const escFactor = Math.pow(1 + esc, Math.floor(j / ppy));
+      dfSumMinusOne += escFactor / Math.pow(1 + rM, startMonth + j * spacing);
+    }
+    const minimalityShortfall = result.costNpv - payment * dfSumMinusOne;
+    return { paymentCount: n, termYears, lastPaymentMonth, shortfall, minimalityShortfall, result };
   }
-  const termYears = n / ppy;
-  const lastPaymentMonth = startMonth + (n - 1) * spacing;
-  const result = computeModel({ ...inp, repayment: { ...inp.repayment, termYears } }, { fixedPayment: payment });
-  const shortfall = result.costNpv - dfSum;
-  let dfSumMinusOne = 0;
-  for (let j = 0; j < (n as number) - 1; j++) {
-    const escFactor = Math.pow(1 + esc, Math.floor(j / ppy));
-    dfSumMinusOne += escFactor / Math.pow(1 + rM, startMonth + j * spacing);
-  }
-  const minimalityShortfall = result.costNpv - payment * dfSumMinusOne;
-  return { paymentCount: n, termYears, lastPaymentMonth, shortfall, minimalityShortfall, result };
 }

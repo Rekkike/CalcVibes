@@ -98,8 +98,9 @@ export function App() {
       if (mode === "B") return { kind: "B" as const, ...solveTerm(inputs, modePayment) };
       if (mode === "C") return { kind: "C" as const, result: computeModel(inputs, { fixedPayment: modePayment }) };
     } catch (e) {
-      // v0.6.10 (ratified deviation): the mode solves are gross of funding and respect the
-      // declared tariff span; a refusal renders the honest refusal panel, never a crash.
+      // v0.6.12.2 (AUD-8): Mode B is the true inverse of Mode A — it nets the funding, honors the
+      // calculated residual and solves exactly one solved contract; the engine refusals
+      // (SCE-PROFILE, SCE-CONTRACTS, SCE-TARIFF) render verbatim, never a crash.
       if (e instanceof EngineInputError) return { kind: "refusal" as const, message: e.issues.join(" ") };
       throw e;
     }
@@ -321,7 +322,7 @@ export function App() {
           />
         )}
         {view === "repayment" && (
-          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} setContracts={setContracts} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} startYear={startYear} entryUnit={entryUnit} />
+          <RepaymentSection inputs={inputs} result={result} setRepayment={setRepayment} setContracts={setContracts} mode={mode} setMode={setMode} modePayment={modePayment} setModePayment={setModePayment} modeRefusal={modeResult !== null && modeResult.kind === "refusal" ? modeResult.message : null} startYear={startYear} entryUnit={entryUnit} />
         )}
         {view === "operating" && (
           <OperatingSection inputs={inputs} result={result} setOperating={setOperating} setMaintenance={setMaintenance} entryUnit={entryUnit} />
