@@ -358,7 +358,7 @@ export function HurdlePlot(props: {
 // v0.6.13: the program Gantt (the deck grammar of record — SVG authored in code, no external chart
 // library, direct labels, no free-form text). The three phases are horizontal lanes; activities
 // are bars within their lane; decision points are full-height vertical gate lines labeled with
-// their BP codes; milestones are diamonds; the axis is the shared yearHeader labels. It renders
+// their DP codes; milestones are diamonds each numbered with its composed ordinal; the axis is the shared yearHeader labels. It renders
 // the deck model's gantt, never recomputing it.
 export const GANTT_SVG = { labelW: 150, plotW: 840, top: 34, rowPad: 6, barH: 18, lineH: 13, barInset: 1.5 };
 // The height of one sub-row: the padding, the reserved above-label lines and the bar.
@@ -382,7 +382,10 @@ export function GanttChart(props: { gantt: DeckGantt }) {
     cursor += ganttLaneHeight(lane);
   }
   const lanesBottom = cursor;
-  const height = lanesBottom + 44;
+  // v0.6.13.4: a milestone row (one per same-year stack position) is 30 units tall: the diamond, then its
+  // ordinal centered beneath it. With no milestone the height stands as before.
+  const milestoneRows = gantt.milestones.reduce((a, m) => Math.max(a, m.row + 1), 0);
+  const height = milestoneRows === 0 ? lanesBottom + 44 : lanesBottom + 34 + (milestoneRows - 1) * 30 + 26;
   const step = Math.max(1, Math.ceil(n / 12));
   return (
     <div data-testid="gantt-chart" className="chart-block gantt-chart">
@@ -439,11 +442,12 @@ export function GanttChart(props: { gantt: DeckGantt }) {
         ))}
         {gantt.milestones.map((m) => {
           const cx = xMid(m.year);
-          const cy = lanesBottom + 34;
+          const cy = lanesBottom + 34 + m.row * 30;
           return (
-            <g key={m.id} data-gantt-milestone={m.id}>
+            <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
               <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />
-              <title>{m.label}</title>
+              <text data-gantt-milestone-number={m.ordinal} x={cx} y={cy + 19} textAnchor="middle" fontSize={12} fontWeight={700} fill={STAGE_CHART_COLORS.axisText}>{m.ordinal}</text>
+              <title>{`Milestone ${m.ordinal}: ${m.label}`}</title>
             </g>
           );
         })}
