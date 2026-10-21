@@ -1068,9 +1068,13 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         const cumNet = trunc.length > 0 ? trunc[trunc.length - 1].cumulative : 0;
         const truncNpvWacc = npvMonthly(waccM, flows);
         const truncNpvTarget = npvMonthly(rM, flows);
+        // v0.6.12.2 (AUD-9): crossing-based — the first month the cumulative reaches zero from
+        // below on a positive net; a position that never crosses carries no payback.
         let pb: number | null = null;
+        let prevCum = 0;
         for (const row of trunc) {
-          if (row.cumulative >= 0) { pb = row.period / 12; break; }
+          if (row.cumulative >= 0 && prevCum < 0 && row.net > 0) { pb = row.period / 12; break; }
+          prevCum = row.cumulative;
         }
         return {
           contractId: c.id,
