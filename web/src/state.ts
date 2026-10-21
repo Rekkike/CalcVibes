@@ -40,8 +40,17 @@ export function blankOperatingLine(id: string): OperatingLine {
   return { id, label: "", amount: 0, startYear: 1, yearCount: 1, escalation: 0 };
 }
 
+// v0.6.13 Task E (AUD-15): the one collision-proof id helper — the smallest unused positive
+// integer under the prefix. A length-plus-one id collides after a deletion; this never does.
+export function nextId(prefix: string, existing: string[]): string {
+  const taken = new Set(existing);
+  let n = 1;
+  while (taken.has(prefix + n)) n++;
+  return prefix + n;
+}
+
 export function nextOperatingId(lines: OperatingLine[]): string {
-  return "o" + (lines.length + 1);
+  return nextId("o", lines.map((l) => l.id));
 }
 
 export function yearHeader(k: number, startYear: number | null): string {
@@ -255,7 +264,7 @@ export function landNewbuildProject(): ModelInputs {
 }
 
 export function nextCostId(costs: CostLine[]): string {
-  return "c" + (costs.length + 1);
+  return nextId("c", costs.map((c) => c.id));
 }
 
 export function blankContract(id: string, startYear: number): ContractParams {
@@ -274,7 +283,7 @@ export function blankContract(id: string, startYear: number): ContractParams {
 }
 
 export function nextContractId(contracts: ContractParams[]): string {
-  return "k" + (contracts.length + 1);
+  return nextId("k", contracts.map((c) => c.id));
 }
 
 export function blankCostLine(id: string): CostLine {

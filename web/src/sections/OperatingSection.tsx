@@ -2,6 +2,7 @@ import type { MaintenanceConfig, ModelInputs, ModelResult, OperatingLine } from 
 import { moneyForDisplay } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
+import { nextOperatingId } from "../state.js";
 
 export function OperatingSection(props: {
   inputs: ModelInputs;
@@ -50,7 +51,7 @@ export function OperatingSection(props: {
           })}
         </tbody>
       </table>
-      <button data-action="add-operating" onClick={() => setOperating([...lines, { id: "o" + (lines.length + 1), label: "", amount: 0, startYear: 1, yearCount: 1, escalation: 0 }])}>Add operating line</button>
+      <button data-action="add-operating" onClick={() => setOperating([...lines, { id: nextOperatingId(lines), label: "", amount: 0, startYear: 1, yearCount: 1, escalation: 0 }])}>Add operating line</button>
       <h3>Maintenance (derived from total CAPEX{emittedBasis !== undefined ? ` ${money(emittedBasis)}` : ""})</h3>
       <label>Mode{" "}
         <select data-field="maintenanceMode" value={maintenance.mode} onChange={(e) => {
