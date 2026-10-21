@@ -105,7 +105,7 @@ describe("chunk 6: calendar headers, mode results, MIRR helper", () => {
     expect(screen.getByTestId("yearly-table").textContent).not.toContain("Year 1");
   });
 
-  it("Mode B results render in the results panel (v0.6.10 re-anchor: the mode solves run gross of funding — the term-20 payment on the gross basis is 4017471.445590696, entry unit ones; the default 400000 is infeasible on the program base)", () => {
+  it("Mode B results render in the results panel (v0.6.12.2 re-anchor, AUD-8: the term solver nets the funding — the payment 4017471.445590696, the term-20 payment of the gross basis, now solves a 10-year term on the grant-netted basis; entry unit ones; the default 400000 is infeasible on the program base)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("repayment"));
@@ -113,7 +113,7 @@ describe("chunk 6: calendar headers, mode results, MIRR helper", () => {
     fireEvent.change(byField("entryUnit"), { target: { value: "ones" } });
     fireEvent.change(byField("modePayment"), { target: { value: "4017471.445590696" } });
     fireEvent.click(byNav("results"));
-    expect(screen.getByTestId("mode-results").textContent).toContain("Solved term: 20 years (240 payments; last payment month 275)");
+    expect(screen.getByTestId("mode-results").textContent).toContain("Solved term: 10 years (120 payments; last payment month 155)");
   });
 
   it("Mode C results render in the results panel", () => {
