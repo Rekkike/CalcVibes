@@ -1,5 +1,5 @@
 import type { AppraisalParams, ModelInputs } from "../../../core/src/types.js";
-import { percentForDisplay, moneyForDisplay, roundForDisplay } from "../engine.js";
+import { percentForDisplay, moneyForDisplay, roundForDisplay, dscrTwoForDisplay } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
 
@@ -56,7 +56,7 @@ export function AppraisalSection(props: {
           <dt>NPV of collections at WACC (discounted)</dt><dd data-stat="npvCollectionsAtWacc">{money(result.npvCollectionsAtWacc)}</dd>
           <dt>NPV of costs at WACC (discounted)</dt><dd data-stat="npvCostsAtWacc">{money(result.npvCostsAtWacc)}</dd>
           <dt>Profitability index (NPV collections at WACC / NPV costs at WACC)</dt>
-          <dd data-stat="profitabilityIndex">{result.profitabilityIndex === null ? "—" : money(result.profitabilityIndex)}</dd>
+          <dd data-stat="profitabilityIndex">{result.profitabilityIndex === null ? "—" : dscrTwoForDisplay(result.profitabilityIndex)}</dd>
           <dt>Payback, nominal (years)</dt><dd data-stat="paybackYears">{result.paybackYears === null ? "—" : roundForDisplay(result.paybackYears, 5)}</dd>
           <dt>Payback, discounted at WACC (years)</dt>
           <dd data-stat="discountedPaybackYears">{result.discountedPaybackYears === null ? "—" : roundForDisplay(result.discountedPaybackYears, 5)}</dd>

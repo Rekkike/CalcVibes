@@ -29,7 +29,8 @@ describe("chunk 6: appraisal section, residual, engine goalMet", () => {
     fireEvent.click(byNav("appraisal"));
     expect(byStat("npvAtTarget").textContent).toBe("-€0,00 k");
     expect(byStat("npvAtWacc").textContent).toBe("€52 409,25 k"); // npvAtWacc 52409252.63203347, scratch-verified
-    expect(byStat("profitabilityIndex").textContent).toBe("€0,00 k");
+    // v0.6.13 Task C (AUD-11) re-anchor: the profitability index is a dimensionless ratio (the deck dscr form), 1.1010015272787173
+    expect(byStat("profitabilityIndex").textContent).toBe("1.10");
     expect(byStat("discountedPaybackYears").textContent).toBe("18.23938"); // 18.23938311386264
     expect(byStat("mirr").textContent).toBe("4.42677%"); // 0.044267690561307305
     expect(byStat("goalMet").textContent).toBe("Target achieved");
