@@ -182,6 +182,43 @@ export interface FundingView {
   allocation: FundingAllocation[];
 }
 
+// v0.6.13: the timeline block — a planning and presentation layer. The engine never reads it:
+// computeModel is inert to the block (the byte-identity lock). Years are program years (1-based).
+export type TimelinePhase = "prestudy" | "detail-design" | "production";
+export type TimelineOutcome = "continue" | "change" | "terminate";
+export type TimelineEngineEvent = "construction-complete" | "first-collection-year" | "funding-received";
+
+export interface TimelineActivity {
+  id: string;
+  label: string;
+  startYear: number;
+  endYear: number;
+  phase: TimelinePhase;
+}
+
+export interface TimelineDecisionPoint {
+  id: string;
+  title: string;
+  year: number;
+  outcome?: TimelineOutcome;
+}
+
+export type TimelineTie = { kind: "activity"; activityId: string } | { kind: "engine-event"; event: TimelineEngineEvent };
+
+export interface TimelineMilestone {
+  id: string;
+  label: string;
+  year: number;
+  tie?: TimelineTie;
+}
+
+export interface TimelineBlock {
+  projectScale?: "mini" | "full";
+  activities: TimelineActivity[];
+  decisionPoints: TimelineDecisionPoint[];
+  milestones: TimelineMilestone[];
+}
+
 export interface ModelInputs {
   projectName: string;
   currency: string;
@@ -201,6 +238,7 @@ export interface ModelInputs {
   // no-drift pin).
   funding?: FundingConfig | null;
   projectLengthYears?: number | null;
+  timeline?: TimelineBlock;
 }
 
 export interface MonthlyRow {
