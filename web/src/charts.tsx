@@ -360,17 +360,28 @@ export function HurdlePlot(props: {
 // are bars within their lane; decision points are full-height vertical gate lines labeled with
 // their BP codes; milestones are diamonds; the axis is the shared yearHeader labels. It renders
 // the deck model's gantt, never recomputing it.
+export const GANTT_SVG = { labelW: 150, plotW: 840, top: 34, rowPad: 6, barH: 18, lineH: 13, barInset: 1.5 };
+// The height of one sub-row: the padding, the reserved above-label lines and the bar.
+const svgRowH = (lines: number) => GANTT_SVG.rowPad + (lines > 0 ? lines * GANTT_SVG.lineH + 3 : 0) + GANTT_SVG.barH;
+// The height of a lane: its stacked sub-rows, never less than its own wrapped label needs.
+export const ganttLaneHeight = (lane: DeckGantt["lanes"][number]): number =>
+  Math.max(lane.rowLines.reduce((a, l) => a + svgRowH(l), 0) + GANTT_SVG.rowPad, lane.labelLines.length * 15 + 14);
+
 export function GanttChart(props: { gantt: DeckGantt }) {
   const { gantt } = props;
-  const labelW = 150;
-  const plotW = 840;
-  const laneH = 46;
-  const top = 34;
-  const n = Math.max(1, gantt.spanYears);
+  const { labelW, plotW, top, rowPad, barH, lineH, barInset } = GANTT_SVG;
+  const first = gantt.window.firstYear;
+  const n = Math.max(1, gantt.window.lastYear - first + 1);
   const colW = plotW / n;
-  const xStart = (y: number) => labelW + (y - 1) * colW;
-  const xMid = (y: number) => labelW + (y - 0.5) * colW;
-  const lanesBottom = top + laneH * gantt.lanes.length;
+  const xStart = (y: number) => labelW + (y - first) * colW;
+  const xMid = (y: number) => labelW + (y - first + 0.5) * colW;
+  const laneTops: number[] = [];
+  let cursor = top;
+  for (const lane of gantt.lanes) {
+    laneTops.push(cursor);
+    cursor += ganttLaneHeight(lane);
+  }
+  const lanesBottom = cursor;
   const height = lanesBottom + 44;
   const step = Math.max(1, Math.ceil(n / 12));
   return (
@@ -379,29 +390,46 @@ export function GanttChart(props: { gantt: DeckGantt }) {
         {gantt.axis.map((a) => (
           <g key={a.year}>
             <line x1={xStart(a.year)} x2={xStart(a.year)} y1={top} y2={lanesBottom} stroke={STAGE_CHART_COLORS.gridline} />
-            {(a.year - 1) % step === 0 && (
+            {(a.year - first) % step === 0 && (
               <text data-gantt-axis={a.year} x={xMid(a.year)} y={top - 10} textAnchor="middle" fontSize={12} fill={STAGE_CHART_COLORS.axisText}>{a.label}</text>
             )}
           </g>
         ))}
-        <line x1={xStart(n + 1)} x2={xStart(n + 1)} y1={top} y2={lanesBottom} stroke={STAGE_CHART_COLORS.gridline} />
-        {gantt.lanes.map((lane, i) => (
-          <g key={lane.phase} data-gantt-lane={lane.phase}>
-            <line x1={labelW} x2={labelW + plotW} y1={top + i * laneH} y2={top + i * laneH} stroke={STAGE_CHART_COLORS.zeroLine} />
-            <text x={labelW - 10} y={top + i * laneH + laneH / 2 + 4} textAnchor="end" fontSize={13} fill={STAGE_CHART_COLORS.axisText}>{lane.label}</text>
-            {lane.bars.map((b, j) => {
-              const bx = xStart(b.startYear);
-              const bw = Math.max(colW * 0.5, xStart(b.endYear + 1) - bx);
-              const by = top + i * laneH + 8 + (j % 2) * 2;
-              return (
-                <g key={b.id} data-gantt-bar={b.id}>
-                  <rect x={bx} y={by} width={bw} height={laneH - 18} rx={3} fill={STAGE_CHART_COLORS.accent} />
-                  <text x={bx + 5} y={by + (laneH - 18) / 2 + 4} fontSize={11} fill="#081c33">{b.label}</text>
-                </g>
-              );
-            })}
-          </g>
-        ))}
+        <line x1={xStart(first + n)} x2={xStart(first + n)} y1={top} y2={lanesBottom} stroke={STAGE_CHART_COLORS.gridline} />
+        {gantt.lanes.map((lane, i) => {
+          const laneTop = laneTops[i];
+          const laneH = ganttLaneHeight(lane);
+          const rowTops: number[] = [];
+          let rc = laneTop + rowPad;
+          lane.rowLines.forEach((l) => { rowTops.push(rc); rc += svgRowH(l); });
+          return (
+            <g key={lane.phase} data-gantt-lane={lane.phase} data-lane-rows={lane.rowCount}>
+              <line x1={labelW} x2={labelW + plotW} y1={laneTop} y2={laneTop} stroke={STAGE_CHART_COLORS.zeroLine} />
+              {lane.labelLines.map((line, k) => (
+                <text key={k} data-gantt-lane-label={lane.phase} x={labelW - 10} y={laneTop + laneH / 2 - ((lane.labelLines.length - 1) * 15) / 2 + 4 + k * 15} textAnchor="end" fontSize={13} fill={STAGE_CHART_COLORS.axisText}>{line}</text>
+              ))}
+              {lane.bars.map((b) => {
+                const rowTop = rowTops[b.row];
+                const band = lane.rowLines[b.row] > 0 ? lane.rowLines[b.row] * lineH + 3 : 0;
+                const bx = xStart(b.startYear) + barInset;
+                const bw = (b.endYear - b.startYear + 1) * colW - 2 * barInset;
+                const by = rowTop + band;
+                return (
+                  <g key={b.id} data-gantt-bar={b.id} data-row={b.row} data-label-mode={b.labelMode}>
+                    <rect x={bx} y={by} width={bw} height={barH} rx={3} fill={STAGE_CHART_COLORS.accent} />
+                    {b.labelMode === "inside" ? (
+                      <text data-gantt-label={b.id} x={bx + 5} y={by + barH / 2 + 4} fontSize={11} fill="#081c33">{b.label}</text>
+                    ) : (
+                      b.lines.map((line, k) => (
+                        <text key={k} data-gantt-label={b.id} x={labelW + b.labelLeft * colW} y={rowTop + 11 + k * lineH} fontSize={11} fill={STAGE_CHART_COLORS.axisText}>{line}</text>
+                      ))
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
         <line x1={labelW} x2={labelW + plotW} y1={lanesBottom} y2={lanesBottom} stroke={STAGE_CHART_COLORS.zeroLine} />
         {gantt.gates.map((g) => (
           <g key={g.id} data-gantt-gate={g.id} data-gate-code={g.code ?? ""}>
@@ -420,6 +448,7 @@ export function GanttChart(props: { gantt: DeckGantt }) {
           );
         })}
       </svg>
+      {gantt.caption !== null && <p data-testid="gantt-caption" className="muted">{gantt.caption}</p>}
     </div>
   );
 }
