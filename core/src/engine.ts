@@ -434,19 +434,29 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const maintenanceCfg = inp.maintenance ?? { mode: "off" };
   const tariffCfg = tariffCfg0;
   const tariffCollectionMode = tariffCollectionMode0;
-  const capexTotal = inp.costs
-    .filter((c) => c.category === "capex")
-    .reduce((acc, c) => acc + c.amount, 0);
+  const capexTotal = capexIncurredTotal(inp.costs);
+  // v0.6.12.2 (AUD-4): the operating and maintenance window is the full actual collection span
+  // of the solved model, both ends. The profile and contracts modes read their own span; the
+  // dormant repayment block governs only the plain and tariff paths.
+  let windowFirstMonth = firstCollectionMonth;
+  let windowLastMonth = lastInflowMonth;
+  if (profileMode) {
+    windowFirstMonth = profileFirstMonth;
+    windowLastMonth = Math.max(profileEndMonth, residualAmountUsed > 0 ? residualMonth : 0);
+  } else if (contractsMode) {
+    windowFirstMonth = Math.min(...contracts.map(contractFirstCollectionMonth));
+    windowLastMonth = Math.max(Math.max(...contracts.map(contractLastCollectionMonth)), residualAmountUsed > 0 ? residualMonth : 0);
+  }
   const operatingInfos: import("./types.js").OperatingLineInfo[] = [];
   let operatingNpv = 0;
-  const addOperating = (line: { id: string; label: string; amount: number; startYear: number; yearCount: number; escalation: number }) => {
+  const addOperating = (line: { id: string; label: string; amount: number; startYear: number; yearCount: number; escalation: number }, basis?: number) => {
     const nominalFirst = line.startYear * 12 - 11;
     const nominalLast = (line.startYear + line.yearCount - 1) * 12;
-    const effFirst = Math.max(nominalFirst, firstCollectionMonth);
-    const effLast = Math.min(nominalLast, lastInflowMonth);
+    const effFirst = Math.max(nominalFirst, windowFirstMonth);
+    const effLast = Math.min(nominalLast, windowLastMonth);
     if (effFirst > effLast) {
       throw new EngineInputError([
-        `Operating line ${line.id} (${line.label}) falls entirely outside the collection window [${firstCollectionMonth}, ${lastInflowMonth}].`,
+        `Operating line ${line.id} (${line.label}) falls entirely outside the collection window [${windowFirstMonth}, ${windowLastMonth}].`,
       ]);
     }
     let total = 0;
@@ -458,14 +468,16 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       total += monthly;
       operatingNpv += monthly / Math.pow(1 + rM, m);
     }
-    operatingInfos.push({ id: line.id, label: line.label, nominalSpan: [nominalFirst, nominalLast], effectiveWindow: [effFirst, effLast], total: total });
+    operatingInfos.push(basis === undefined
+      ? { id: line.id, label: line.label, nominalSpan: [nominalFirst, nominalLast], effectiveWindow: [effFirst, effLast], total: total }
+      : { id: line.id, label: line.label, nominalSpan: [nominalFirst, nominalLast], effectiveWindow: [effFirst, effLast], total: total, basis });
   };
   for (const line of operatingLinesIn) addOperating(line);
   if (maintenanceCfg.mode !== "off") {
     const annual = maintenanceCfg.mode === "percent"
       ? ((maintenanceCfg.percentPerYear ?? 0) / 100) * capexTotal
       : (maintenanceCfg.fixedAnnualAmount ?? 0);
-    addOperating({ id: "maintenance", label: "Maintenance (derived)", amount: annual, startYear: Math.floor((firstCollectionMonth - 1) / 12) + 1, yearCount: Math.ceil(totalMonths / 12), escalation: 0 });
+    addOperating({ id: "maintenance", label: "Maintenance (derived)", amount: annual, startYear: Math.floor((windowFirstMonth - 1) / 12) + 1, yearCount: Math.ceil(totalMonths / 12), escalation: 0 }, capexTotal);
   }
   const operatingTotal = operatingInfos.reduce((acc, o) => acc + o.total, 0);
   const costNpvWithOperating = costNpv + operatingNpv;
@@ -1154,11 +1166,37 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
 
 import { EngineInputError, validateInputs } from "./validate.js";
 import { normalizeContracts, allReinvestments, contractLastCollectionMonth } from "./contracts.js";
+import type { NormalizedContract } from "./contracts.js";
 import { computeBookSchedule, lineIncurred } from "./depreciation.js";
 import type { PaymentSlot } from "./slots.js";
 import { computeFinancingOverlay, fundableDraws, validateFinancing } from "./financing.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;
+type CostLine = import("./types.js").CostLine;
+
+// v0.6.12.2 (AUD-3): the maintenance basis — the profile-honoring capex incurred total (the
+// lineIncurred basis the book view uses), gross of grants; recurring lines and rent stay out.
+function capexIncurredTotal(costs: CostLine[]): number {
+  let total = 0;
+  for (const c of costs) {
+    if (c.category !== "capex") continue;
+    let line = 0;
+    for (const [, amt] of lineIncurred(c)) line += amt;
+    total += line;
+  }
+  return total;
+}
+
+// v0.6.12.2 (AUD-4): the first month a contract collects (a profile year opens at its month 1;
+// slots start at the first payment month; a slot-less contract starts at its start month).
+function contractFirstCollectionMonth(c: NormalizedContract): number {
+  let first = c.slots.length > 0 ? c.slots[0].monthIndex : c.startMonth;
+  if (c.evaluatedProfile !== null) {
+    const years = Object.keys(c.evaluatedProfile).map(Number).sort((a, b) => a - b);
+    if (years.length > 0) first = c.slots.length > 0 ? Math.min(first, (years[0] - 1) * 12 + 1) : (years[0] - 1) * 12 + 1;
+  }
+  return first;
+}
 
 function lastCostYearOf(inp: ModelInputsLike): number {
   let last = 0;
@@ -1207,9 +1245,7 @@ function costNpvOf(inp: ModelInputsLike, rM: number, operatingWindowEnd: number 
   for (let i = 0; i < totalMonths; i++) costNpv += costM[i] / Math.pow(1 + rM, i + 1);
   if (operatingWindowEnd !== null) {
     const startMonth = (inp.repayment.firstCollectionYear ?? lastCostYear + inp.repayment.graceYears) * 12;
-    const capexTotal = inp.costs
-      .filter((c) => c.category === "capex")
-      .reduce((acc, c) => acc + c.amount, 0);
+    const capexTotal = capexIncurredTotal(inp.costs);
     const addLine = (line: { amount: number; startYear: number; yearCount: number; escalation: number }) => {
       const nominalFirst = line.startYear * 12 - 11;
       const nominalLast = (line.startYear + line.yearCount - 1) * 12;

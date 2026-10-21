@@ -134,6 +134,8 @@ export interface OperatingLineInfo {
   nominalSpan: [number, number];
   effectiveWindow: [number, number];
   total: number;
+  // v0.6.12.2 (AUD-3): the maintenance entry carries the capex basis it used.
+  basis?: number;
 }
 
 export interface AppraisalParams {
