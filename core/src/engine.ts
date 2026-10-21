@@ -292,6 +292,10 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     });
     fundingAllocation.push({ grantId: fr.id, label: fr.label, year: fr.year, amount: fr.amount, shares });
   }
+  // v0.6.12.2 (AUD-7): a calculated residual dated beyond the horizon keeps a sale-year
+  // schedule of the remaining book value, computed through the residual year. A positive
+  // sale-year value extends the horizon and enters the vector; a zero value appears nowhere.
+  let saleYearSchedule: ReturnType<typeof computeBookSchedule> | null = null;
   if (residualMode === "calculated" && residualYear * 12 > totalMonths) {
     const provisional = computeBookSchedule(
       inp.costs,
@@ -301,6 +305,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       lineTotalsMap,
       nettingByLine,
     );
+    saleYearSchedule = provisional;
     if (provisional.remainingBookValueAt(residualYear) > 0) {
       horizonConstituents.push({ label: "book-value residual horizon extension", month: residualYear * 12 });
     }
@@ -332,9 +337,12 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
     lineTotalsMap,
     nettingByLine,
   );
+  const residualBookValue = saleYearSchedule !== null
+    ? saleYearSchedule.remainingBookValueAt(residualYear)
+    : bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears));
   let residualAmountUsed = residualSetAmount;
   if (residualMode === "calculated") {
-    residualAmountUsed = bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears));
+    residualAmountUsed = residualBookValue;
   }
   const costM = new Array<number>(totalMonths).fill(0);
   costs.forEach((c) => {
@@ -1059,7 +1067,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       return { year, beginning: row.beginning, charge: row.charge, ending: row.ending, collections, operating, bookResult: collections - operating - row.charge };
     }),
     totalCharge: bookSchedule.totalCharge,
-    remainingBookValueAtResidualYear: bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears)),
+    remainingBookValueAtResidualYear: residualBookValue,
     gainOrLossOnSale: residualMode === "amount" ? residualSetAmount - bookSchedule.remainingBookValueAt(Math.min(residualYear, horizonYears)) : 0,
     residualMode: residualMode,
     setAmount: residualSetAmount,
