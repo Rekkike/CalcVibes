@@ -122,11 +122,16 @@ export function parseProject(text: string): { inputs: ModelInputs; settings: Pro
     if (!isPlainObject(project.timeline)) {
       throw new ProjectFileError("FILE-PROJECT: the project's timeline entry is not an object and cannot be opened.");
     }
-    for (const key of ["activities", "decisionPoints", "milestones"] as const) {
+    // v0.6.13.2: the carried phase vocabulary is a list and the lane visibility an object (container type only).
+    for (const key of ["activities", "decisionPoints", "milestones", "phases"] as const) {
       const entry = (project.timeline as Record<string, unknown>)[key];
       if (entry !== undefined && !Array.isArray(entry)) {
         throw new ProjectFileError(`FILE-PROJECT: the project's timeline ${key} entry is not a list and cannot be opened.`);
       }
+    }
+    const visibility = (project.timeline as Record<string, unknown>).laneVisibility;
+    if (visibility !== undefined && !isPlainObject(visibility)) {
+      throw new ProjectFileError("FILE-PROJECT: the project's timeline laneVisibility entry is not an object and cannot be opened.");
     }
   }
   const settings = readSettings(record.settings);

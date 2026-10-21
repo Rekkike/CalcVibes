@@ -1,6 +1,6 @@
 import type {
   ContractParams, CostLine, MaintenanceConfig, ModelInputs, ModelResult, OperatingLine,
-  TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelinePhase,
+  TariffRow, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelinePhase, TimelineSource,
 } from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
 
@@ -367,10 +367,16 @@ export function blankCostLine(id: string): CostLine {
 // the block. Years are program years (1-based, the engine's indexing).
 // ---------------------------------------------------------------------------------------------
 
+// v0.6.13.2: the curated default phase vocabulary of record, seven phases in definition order. A
+// block without its own phases list reads these (timelineOf); the block may carry additions.
 export const TIMELINE_PHASES: { id: TimelinePhase; label: string }[] = [
   { id: "prestudy", label: "Prestudy" },
   { id: "detail-design", label: "Detail design" },
   { id: "production", label: "Production" },
+  { id: "revenue", label: "Revenue" },
+  { id: "funding", label: "Funding" },
+  { id: "financing", label: "Financing" },
+  { id: "operations", label: "Operations" },
 ];
 
 // The PPS-aligned decision-point vocabulary of record (Praktisk Projektstyrning BP set). The
@@ -406,14 +412,49 @@ export function emptyTimeline(): TimelineBlock {
 
 // A normalized view of the (possibly partial) block: absent collections read as empty and the
 // scale defaults to "full".
+// v0.6.13.2: an absent phases list reads as the curated defaults; the lane visibility rides through
+// untouched (an absent map stays absent: every lane is automatic).
 export function timelineOf(inputs: ModelInputs): TimelineBlock {
   const t = inputs.timeline;
   return {
     projectScale: t?.projectScale ?? "full",
+    phases: t?.phases ?? TIMELINE_PHASES.map((p) => ({ ...p })),
+    ...(t?.laneVisibility !== undefined ? { laneVisibility: t.laneVisibility } : {}),
     activities: t?.activities ?? [],
     decisionPoints: t?.decisionPoints ?? [],
     milestones: t?.milestones ?? [],
   };
+}
+
+// The phase vocabulary the block reads (always populated by timelineOf).
+export const phasesOf = (tl: TimelineBlock): { id: string; label: string }[] => tl.phases ?? TIMELINE_PHASES;
+
+// The vocabulary issues, section-level (not timeline refusal codes): a duplicate id in a
+// hand-edited file is named here and refused at the add-phase affordance.
+export function phaseVocabularyIssues(tl: TimelineBlock): string[] {
+  const seen = new Set<string>();
+  const dup = new Set<string>();
+  for (const p of phasesOf(tl)) {
+    if (seen.has(p.id)) dup.add(p.id);
+    seen.add(p.id);
+  }
+  return [...dup].map((id) => `The phase id "${id}" appears more than once in the phase vocabulary: rename or delete the duplicate so every phase id is unique.`);
+}
+
+// The activities that reference a phase (the delete guard names them).
+export const activitiesInPhase = (tl: TimelineBlock, phaseId: string): TimelineActivity[] => tl.activities.filter((a) => a.phase === phaseId);
+
+// The lanes the Gantt composes, in vocabulary order: an explicit true renders the lane even when
+// empty, an explicit false hides it, an absent entry renders it when it carries at least one
+// activity (presentation-only; the block is never altered).
+export function visibleLanes(tl: TimelineBlock): { id: string; label: string; activities: TimelineActivity[] }[] {
+  return phasesOf(tl)
+    .filter((p, i, all) => all.findIndex((q) => q.id === p.id) === i)
+    .map((p) => ({ id: p.id, label: p.label, activities: activitiesInPhase(tl, p.id) }))
+    .filter((l) => {
+      const v = tl.laneVisibility?.[l.id];
+      return v === undefined ? l.activities.length > 0 : v;
+    });
 }
 
 // A timeline is authored when the block carries at least one object; an empty block is the
@@ -433,8 +474,12 @@ export function timelineAuthored(inputs: ModelInputs): boolean {
 // span and never extend it (the engine refuses an override outside the span). The phase is not
 // derivable from a cost line, so every entry enters as production; no gates and no milestones
 // are derived.
-export function suggestActivitiesFromCosts(inputs: ModelInputs): TimelineActivity[] {
+// v0.6.13.2: every suggestion helper is pure and takes the ids already taken by the activities that
+// stay (the hand-authored and the other sources' entries), so the shared nextId never collides; the
+// entries carry their source marker.
+export function suggestActivitiesFromCosts(inputs: ModelInputs, takenIds: string[] = []): TimelineActivity[] {
   const out: TimelineActivity[] = [];
+  const nid = () => nextId("a", [...takenIds, ...out.map((a) => a.id)]);
   for (const c of inputs.costs) {
     let startYear: number;
     let endYear: number;
@@ -451,9 +496,105 @@ export function suggestActivitiesFromCosts(inputs: ModelInputs): TimelineActivit
       startYear = c.startYear;
       endYear = c.startYear + Math.max(1, Math.ceil(c.durationYears)) - 1;
     }
-    out.push({ id: nextId("a", out.map((a) => a.id)), label: c.name, startYear, endYear, phase: "production" });
+    out.push({ id: nid(), label: c.name, startYear, endYear, phase: "production", derivedFrom: "cost-program" });
   }
   return out;
+}
+
+const wholeYears = (n: number): number => Math.max(1, Math.ceil(n));
+
+// v0.6.13.2 Task B.2: one activity per contract (startYear..startYear + termYears - 1) plus one
+// short activity per reinvestment (year..year, "<contract label> — reinvestment"); phase revenue.
+export function suggestActivitiesFromContracts(inputs: ModelInputs, takenIds: string[] = []): TimelineActivity[] {
+  const out: TimelineActivity[] = [];
+  const nid = () => nextId("a", [...takenIds, ...out.map((a) => a.id)]);
+  for (const k of inputs.contracts ?? []) {
+    out.push({ id: nid(), label: k.label, startYear: k.startYear, endYear: k.startYear + wholeYears(k.termYears) - 1, phase: "revenue", derivedFrom: "contracts" });
+    for (const r of k.reinvestments ?? []) {
+      out.push({ id: nid(), label: `${k.label} — reinvestment`, startYear: r.year, endYear: r.year, phase: "revenue", derivedFrom: "contracts" });
+    }
+  }
+  return out;
+}
+
+// v0.6.13.2 Task B.3: one activity per funding row — a grant is its lump year; an interest-free
+// note spans the draw to the final repayment, year..(repaymentStartYear ?? year) + (termYears ?? 1)
+// - 1 (the end never falls before the draw year); phase funding.
+export function suggestActivitiesFromFunding(inputs: ModelInputs, takenIds: string[] = []): TimelineActivity[] {
+  const out: TimelineActivity[] = [];
+  const nid = () => nextId("a", [...takenIds, ...out.map((a) => a.id)]);
+  for (const r of inputs.funding?.rows ?? []) {
+    const endYear = r.kind === "grant" ? r.year : Math.max(r.year, (r.repaymentStartYear ?? r.year) + wholeYears(r.termYears ?? 1) - 1);
+    out.push({ id: nid(), label: r.label, startYear: r.year, endYear, phase: "funding", derivedFrom: "funding" });
+  }
+  return out;
+}
+
+// v0.6.13.2 Task B.4: one activity "Debt facility". A declared serviceStartYear spans
+// serviceStartYear..serviceStartYear + termYears - 1; an undeclared one reads the solved model's
+// service start, ceil(serviceStartMonth / 12). Returns null while the facility is off or the start
+// needs a solved model that is not available (the caller disables the button with the reason).
+export function financingSuggestionBlock(inputs: ModelInputs, result: ModelResult | null): string | null {
+  const f = inputs.financing;
+  if (f === undefined || !f.enabled) return "The debt facility is off: enable financing to derive its activity.";
+  if (f.serviceStartYear === null && (result === null || result.financing === null)) {
+    return "The service start is derived from the solved model: resolve the model's input issues first, or set a service start year.";
+  }
+  return null;
+}
+export function suggestActivitiesFromFinancing(inputs: ModelInputs, result: ModelResult | null, takenIds: string[] = []): TimelineActivity[] {
+  if (financingSuggestionBlock(inputs, result) !== null) return [];
+  const f = inputs.financing!;
+  const start = f.serviceStartYear !== null ? f.serviceStartYear : Math.ceil(result!.financing!.serviceStartMonth / 12);
+  return [{ id: nextId("a", takenIds), label: "Debt facility", startYear: start, endYear: start + wholeYears(f.termYears) - 1, phase: "financing", derivedFrom: "financing" }];
+}
+
+// v0.6.13.2 Task B.5: one activity per operating line (startYear..startYear + yearCount - 1);
+// phase operations.
+export function suggestActivitiesFromOperating(inputs: ModelInputs, takenIds: string[] = []): TimelineActivity[] {
+  const out: TimelineActivity[] = [];
+  const nid = () => nextId("a", [...takenIds, ...out.map((a) => a.id)]);
+  for (const l of inputs.operatingLines ?? []) {
+    out.push({ id: nid(), label: l.label, startYear: l.startYear, endYear: l.startYear + wholeYears(l.yearCount) - 1, phase: "operations", derivedFrom: "operating" });
+  }
+  return out;
+}
+
+// v0.6.13.2 Task B.6: one activity per tariff row carrying an explicit span (row.span, else the
+// common tariff.span), startYear..startYear + termYears - 1; phase revenue. With no span declared
+// anywhere the grid is repayment-shaped, not year-pinned at the input level, so nothing derives.
+const tariffRowSpan = (inputs: ModelInputs, row: TariffRow) => row.span ?? inputs.tariff?.span ?? null;
+export function tariffSuggestionBlock(inputs: ModelInputs): string | null {
+  const t = inputs.tariff;
+  if (t === undefined || t.rows.length === 0 || !t.rows.some((r) => tariffRowSpan(inputs, r) !== null)) {
+    return "No tariff span is declared: the tariff grid is repayment-shaped rather than year-pinned, so declare a tariff span (or a row span) to derive activities.";
+  }
+  return null;
+}
+export function suggestActivitiesFromTariff(inputs: ModelInputs, takenIds: string[] = []): TimelineActivity[] {
+  const out: TimelineActivity[] = [];
+  const nid = () => nextId("a", [...takenIds, ...out.map((a) => a.id)]);
+  for (const row of inputs.tariff?.rows ?? []) {
+    const s = tariffRowSpan(inputs, row);
+    if (s === null) continue;
+    out.push({ id: nid(), label: row.label, startYear: s.startYear, endYear: s.startYear + wholeYears(s.termYears) - 1, phase: "revenue", derivedFrom: "tariff" });
+  }
+  return out;
+}
+
+// The per-source replace: exactly the activities carrying the source marker are replaced by the
+// derived entries; hand-authored activities and the other sources' entries are preserved in place.
+export function replaceSourceActivities(existing: TimelineActivity[], source: TimelineSource, derived: TimelineActivity[]): TimelineActivity[] {
+  return [...existing.filter((a) => a.derivedFrom !== source), ...derived];
+}
+export const sourceHasActivities = (tl: TimelineBlock, source: TimelineSource): boolean => tl.activities.some((a) => a.derivedFrom === source);
+
+// A suggestion may reference a default phase the user deleted from the vocabulary: the commit
+// re-adds the curated phase so the entries never go stale.
+export function ensurePhases(tl: TimelineBlock, derived: TimelineActivity[]): { id: string; label: string }[] {
+  const have = phasesOf(tl);
+  const add = TIMELINE_PHASES.filter((p) => derived.some((a) => a.phase === p.id) && !have.some((h) => h.id === p.id));
+  return [...have, ...add];
 }
 
 // The next unused BP of the scale's set (the default for an added gate), or null when the set
@@ -501,7 +642,7 @@ export function availableEngineEvents(inputs: ModelInputs, result: ModelResult |
 }
 
 export interface TimelineRefusal {
-  code: "TIMELINE-ACTIVITY-SPAN" | "TIMELINE-ACTIVITY-ORDER" | "TIMELINE-GATE-SPAN" | "TIMELINE-MILESTONE-SPAN" | "TIMELINE-MILESTONE-TIE";
+  code: "TIMELINE-ACTIVITY-SPAN" | "TIMELINE-ACTIVITY-ORDER" | "TIMELINE-GATE-SPAN" | "TIMELINE-MILESTONE-SPAN" | "TIMELINE-MILESTONE-TIE" | "TIMELINE-PHASE-UNKNOWN";
   message: string;
 }
 
@@ -513,6 +654,14 @@ export function validateTimeline(inputs: ModelInputs, result: ModelResult | null
   if (span === null) return [];
   const tl = timelineOf(inputs);
   const out: TimelineRefusal[] = [];
+  // v0.6.13.2: the stale-phase guard — an activity whose phase is not in the block's vocabulary (a
+  // hand-edited project file) is refused by name, regardless of source.
+  const vocabulary = new Set(phasesOf(tl).map((p) => p.id));
+  for (const a of tl.activities) {
+    if (!vocabulary.has(a.phase)) {
+      out.push({ code: "TIMELINE-PHASE-UNKNOWN", message: `Activity ${a.id} (${a.label}) carries the phase "${a.phase}", which is not in the block's phase vocabulary (${phasesOf(tl).map((p) => p.id).join(", ") || "none"}): choose one of those phases or add the phase to the vocabulary (TIMELINE-PHASE-UNKNOWN).` });
+    }
+  }
   const inSpan = (y: number) => Number.isInteger(y) && y >= 1 && y <= span;
   const spanText = `the program span of years 1–${span}`;
   for (const a of tl.activities) {

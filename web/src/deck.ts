@@ -2,7 +2,7 @@ import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../c
 import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { PPS_DISCLOSURE, TIMELINE_PHASES, programSpanYears, timelineAuthored, timelineOf, validateTimeline, yearHeader } from "./state.js";
+import { PPS_DISCLOSURE, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -643,10 +643,10 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   const gantt: DeckGantt = {
     spanYears,
     axis: Array.from({ length: spanYears }, (_, k) => ({ year: k + 1, label: yearHeader(k + 1, startYear) })),
-    lanes: TIMELINE_PHASES.map((p) => ({
-      phase: p.id,
-      label: p.label,
-      bars: tl.activities.filter((a) => a.phase === p.id).sort((a, b) => a.startYear - b.startYear).map((a) => ({ id: a.id, label: a.label, startYear: a.startYear, endYear: a.endYear })),
+    lanes: visibleLanes(tl).map((l) => ({
+      phase: l.id,
+      label: l.label,
+      bars: [...l.activities].sort((a, b) => a.startYear - b.startYear).map((a) => ({ id: a.id, label: a.label, startYear: a.startYear, endYear: a.endYear })),
     })),
     gates,
     milestones: [...tl.milestones].sort((a, b) => a.year - b.year).map((m) => ({

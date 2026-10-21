@@ -42,3 +42,31 @@ describe("v0.6.13 timeline: the file seam and the engine lock", () => {
     expect(() => parseProject(wrap(undefined))).not.toThrow();
   });
 });
+
+// v0.6.13.2 Task A: the carried phase vocabulary, lane visibility and source markers.
+describe("v0.6.13.2 timeline: the carried fields", () => {
+  const carried = (): ModelInputs => {
+    const tl = timeline();
+    tl.phases = [{ id: "prestudy", label: "Prestudy" }, { id: "custom", label: "Custom lane" }];
+    tl.laneVisibility = { custom: true, prestudy: false };
+    tl.activities[0].derivedFrom = "cost-program";
+    return { ...templateLike(), appraisal: appraisal(), timeline: tl };
+  };
+
+  it("TIMELINE-CARRIED-ROUNDTRIP-INERT: phases, laneVisibility and derivedFrom round-trip byte-identically and the engine is inert to them", () => {
+    const text = serializeProject(carried(), settings);
+    const back = parseProject(text);
+    expect(back.inputs.timeline).toEqual(carried().timeline);
+    expect(serializeProject(back.inputs, back.settings)).toBe(text);
+    const absent = JSON.stringify(computeModel({ ...templateLike(), appraisal: appraisal() }));
+    expect(JSON.stringify(computeModel(carried()))).toBe(absent);
+  });
+
+  it("FILE-PROJECT-CARRIED: the carried container types are refused by name; their content is never judged", () => {
+    const wrap = (tl: unknown) => JSON.stringify({ fileKind: "calcvibes-project", fileVersion: 1, project: { ...templateLike(), timeline: tl }, settings });
+    expect(() => parseProject(wrap({ phases: {} }))).toThrowError(new ProjectFileError("FILE-PROJECT: the project's timeline phases entry is not a list and cannot be opened."));
+    expect(() => parseProject(wrap({ laneVisibility: [] }))).toThrowError(new ProjectFileError("FILE-PROJECT: the project's timeline laneVisibility entry is not an object and cannot be opened."));
+    expect(() => parseProject(wrap({ laneVisibility: "x" }))).toThrowError(new ProjectFileError("FILE-PROJECT: the project's timeline laneVisibility entry is not an object and cannot be opened."));
+    expect(() => parseProject(wrap({ phases: [{ id: "a" }, { id: "a" }], laneVisibility: { nowhere: "maybe" } }))).not.toThrow();
+  });
+});
