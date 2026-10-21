@@ -4,7 +4,7 @@ import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { PPS_DISCLOSURE, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader } from "./state.js";
+import { DECISION_DISCLOSURE, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -87,7 +87,7 @@ export interface DeckFundingBlock {
 
 // v0.6.13: the program Gantt — composed once by the deck model (variant-invariant): the three
 // phases as lanes, the activities as bars, the decision points as full-height gate lines labeled
-// with their BP codes, the milestones as diamond markers, the time axis in program years through
+// with their DP codes, the milestones as diamond markers, the time axis in program years through
 // the shared yearHeader labels. The Presentation and the PDF render it; neither recomputes.
 // v0.6.13.2: the stacked sub-row layout, the label placement and the adaptive year window are composed
 // here once (web/src/ganttLayout.ts); the renderers consume them and never recompute.
@@ -695,7 +695,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     name: "timeline",
     title: ganttTitle(spanYears, gates.length, startYear),
     body,
-    disclosures: [PPS_DISCLOSURE],
+    disclosures: [DECISION_DISCLOSURE],
     gantt,
   };
 }

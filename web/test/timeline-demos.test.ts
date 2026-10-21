@@ -1,10 +1,10 @@
-// v0.6.13.1 Task B: the demo-authored timelines. Both demo fixtures carry a full-scale (BP1-BP8)
+// v0.6.13.1 Task B: the demo-authored timelines. Both demo fixtures carry a full-scale (DP1-DP8)
 // authored timeline that is refusal-free against the fixture's own solved model, whose milestone
 // ties agree with the engine events, and which composes the Gantt slide into the deck.
 import { describe, expect, it } from "vitest";
 import { computeModel } from "../src/engine.js";
 import { deckSlides } from "../src/deck.js";
-import { PPS_BP_SET, availableEngineEvents, demoProject, landNewbuildProject, shorePowerProgram, timelineAuthored, validateTimeline } from "../src/state.js";
+import { DECISION_POINT_SET, availableEngineEvents, demoProject, landNewbuildProject, shorePowerProgram, timelineAuthored, validateTimeline } from "../src/state.js";
 import type { ModelInputs } from "../../core/src/types.js";
 
 const demos: [string, () => ModelInputs][] = [
@@ -14,13 +14,13 @@ const demos: [string, () => ModelInputs][] = [
 
 describe("v0.6.13.1 Task B: the demo-authored timelines", () => {
   for (const [name, make] of demos) {
-    it(`${name}: full scale, BP1-BP8 once each in order, refusal-free, ties agree with the engine events`, () => {
+    it(`${name}: full scale, DP1-DP8 once each in order, refusal-free, ties agree with the engine events`, () => {
       const inputs = make();
       const result = computeModel(inputs);
       const tl = inputs.timeline!;
       expect(timelineAuthored(inputs)).toBe(true);
       expect(tl.projectScale).toBe("full");
-      expect(tl.decisionPoints.map((d) => d.code)).toEqual(PPS_BP_SET.map((b) => b.code));
+      expect(tl.decisionPoints.map((d) => d.code)).toEqual(DECISION_POINT_SET.map((b) => b.code));
       const years = tl.decisionPoints.map((d) => d.year);
       expect([...years].sort((a, b) => a - b)).toEqual(years);
       expect(new Set(tl.activities.map((a) => a.phase)).size).toBeGreaterThanOrEqual(2);

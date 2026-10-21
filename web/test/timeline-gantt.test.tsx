@@ -23,7 +23,7 @@ const project = (tl: TimelineBlock, years = 12): ModelInputs => ({ ...demoProjec
 const ganttOf = (inp: ModelInputs, startYear: number | null = null): DeckGantt => deckSlides(inp, computeModel(inp), { startYear }).slides.find((s) => s.name === "timeline")!.gantt!;
 
 describe("v0.6.13.2 Task C: the lean-or-big lane visibility (presentation-only)", () => {
-  const tl = () => block({ activities: [act("a1", "prestudy", 1, 2), act("a2", "production", 3, 5)], decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "BP1" }] });
+  const tl = () => block({ activities: [act("a1", "prestudy", 1, 2), act("a2", "production", 3, 5)], decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "DP1" }] });
 
   it("VISIBILITY-AUTOMATIC: a lane with activities shows, an empty lane hides, lanes follow the vocabulary order", () => {
     expect(visibleLanes(timelineOf(project(tl()))).map((l) => l.id)).toEqual(["prestudy", "production"]);
@@ -224,7 +224,7 @@ describe("v0.6.13.2 Addendum 1: the stacked sub-row layout and the label rule", 
 describe("v0.6.13.2 Addendum 2: the adaptive year window", () => {
   const wide = () => block({
     activities: [act("a1", "prestudy", 2, 3), act("a2", "production", 4, 6)],
-    decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "BP1" }, { id: "d2", title: "Mid", year: 4, code: "BP4" }, { id: "d3", title: "End", year: 10, code: "BP8" }],
+    decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "DP1" }, { id: "d2", title: "Mid", year: 4, code: "DP4" }, { id: "d3", title: "End", year: 10, code: "DP8" }],
     milestones: [{ id: "m1", label: "Late", year: 11 }, { id: "m2", label: "In", year: 5 }],
   });
 
@@ -241,18 +241,18 @@ describe("v0.6.13.2 Addendum 2: the adaptive year window", () => {
     const g = ganttOf(project(wide()));
     expect(g.caption).toBe("The axis shows Year 2–Year 6 of the program span Year 1–Year 12. 3 markers fall outside this window and are not drawn; the gates and milestones listed on this slide name them.");
     expect(g.omittedMarkers).toBe(3);
-    expect(g.gates.map((x) => x.code)).toEqual(["BP4"]);
+    expect(g.gates.map((x) => x.code)).toEqual(["DP4"]);
     expect(g.milestones.map((m) => m.id)).toEqual(["m2"]);
     expect(ganttOf(project(wide()), 2026).caption!.startsWith("The axis shows 2027–2031 of the program span 2026–2037.")).toBe(true);
   });
 
   it("WINDOW-OMISSION-SINGULAR: one omitted marker reads in the singular", () => {
-    const tl = block({ activities: [act("a1", "prestudy", 1, 5)], decisionPoints: [{ id: "d1", title: "End", year: 9, code: "BP8" }] });
+    const tl = block({ activities: [act("a1", "prestudy", 1, 5)], decisionPoints: [{ id: "d1", title: "End", year: 9, code: "DP8" }] });
     expect(ganttOf(project(tl)).caption).toBe("The axis shows Year 1–Year 5 of the program span Year 1–Year 12. 1 marker falls outside this window and is not drawn; the gates and milestones listed on this slide name it.");
   });
 
   it("WINDOW-FULL-SPAN: when the window equals the program span there is no caption", () => {
-    const tl = block({ activities: [act("a1", "prestudy", 1, 3), act("a2", "production", 4, 12)], decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "BP1" }] });
+    const tl = block({ activities: [act("a1", "prestudy", 1, 3), act("a2", "production", 4, 12)], decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "DP1" }] });
     const g = ganttOf(project(tl));
     expect(g.window).toEqual({ firstYear: 1, lastYear: 12 });
     expect(g.caption).toBeNull();
@@ -302,15 +302,15 @@ describe("v0.6.13.2 Addendum 2: the adaptive year window", () => {
     const slide = document.querySelector('[data-slide-name="timeline"]') as HTMLElement;
     expect(Array.from(slide.querySelectorAll("[data-gantt-axis]")).map((t) => t.textContent)).toEqual(["Year 2", "Year 3", "Year 4", "Year 5", "Year 6"]);
     expect(slide.querySelector('[data-testid="gantt-caption"]')!.textContent).toContain("3 markers fall outside this window");
-    expect(Array.from(slide.querySelectorAll("[data-gantt-gate]")).map((g) => g.getAttribute("data-gate-code"))).toEqual(["BP4"]);
+    expect(Array.from(slide.querySelectorAll("[data-gantt-gate]")).map((g) => g.getAttribute("data-gate-code"))).toEqual(["DP4"]);
     for (const line of Array.from(slide.querySelectorAll("[data-gantt-gate] line"))) {
       const x = +line.getAttribute("x1")!;
       expect(x).toBeGreaterThan(GANTT_SVG.labelW);
       expect(x).toBeLessThan(GANTT_SVG.labelW + GANTT_SVG.plotW);
     }
     // the gates list on the slide body still names every gate, the omitted ones included
-    expect(slide.textContent).toContain("BP8");
-    expect(slide.textContent).toContain("BP1");
+    expect(slide.textContent).toContain("DP8");
+    expect(slide.textContent).toContain("DP1");
   });
 
   it("WINDOW-PDF: the print route draws the window's axis labels, the caption and the lane labels once, from the same model", () => {
@@ -319,10 +319,10 @@ describe("v0.6.13.2 Addendum 2: the adaptive year window", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(d, "P", trace);
     const drawn = trace.drawnFigures[d.slides.findIndex((s) => s.name === "timeline")];
-    for (const needle of ["Year 2", "Year 6", "Prestudy", "Production", "BP4", d.slides.find((s) => s.name === "timeline")!.gantt!.caption!]) expect(drawn).toContain(needle);
+    for (const needle of ["Year 2", "Year 6", "Prestudy", "Production", "DP4", d.slides.find((s) => s.name === "timeline")!.gantt!.caption!]) expect(drawn).toContain(needle);
     expect(drawn).not.toContain("Year 7");
     expect(drawn).not.toContain("Year 12");
-    expect(drawn).not.toContain("BP8");
+    expect(drawn).not.toContain("DP8");
   });
 
   it("PDF-FLOWS: a tall stacked layout flows its lanes across pages instead of clipping", () => {

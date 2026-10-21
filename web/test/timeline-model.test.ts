@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeModel } from "../../core/src/engine.js";
 import type { ModelInputs, TimelineBlock } from "../../core/src/types.js";
 import {
-  PPS_BP_SET, PPS_DISCLOSURE, PPS_SCALE_CODES, availableEngineEvents, demoProject, emptyTimeline, nextUnusedBp,
+  DECISION_POINT_SET, DECISION_DISCLOSURE, DECISION_SCALE_CODES, availableEngineEvents, demoProject, emptyTimeline, nextUnusedDecisionPoint,
   programSpanYears, shorePowerProgram, timelineAuthored, timelineOf, validateTimeline,
 } from "../src/state.js";
 
@@ -10,23 +10,23 @@ import {
 const alpha = (tl?: TimelineBlock, projectLengthYears?: number): ModelInputs => ({ ...demoProject(), ...(tl !== undefined ? { timeline: tl } : {}), ...(projectLengthYears !== undefined ? { projectLengthYears } : {}) });
 const block = (over: Partial<TimelineBlock> = {}): TimelineBlock => ({ ...emptyTimeline(), ...over });
 
-describe("the PPS-aligned vocabulary of record", () => {
-  it("BP1 through BP8 carry the sourced titles; the scales select the sets", () => {
-    expect(PPS_BP_SET.map((b) => b.code)).toEqual(["BP1", "BP2", "BP3", "BP4", "BP5", "BP6", "BP7", "BP8"]);
-    expect(PPS_BP_SET[0].title).toBe("Beslut om att starta projektet och initiera förberedelserna");
-    expect(PPS_BP_SET[3].title).toBe("Beslut att starta genomförandet");
-    expect(PPS_BP_SET[7].title).toBe("Beslut om att avsluta projektet");
-    expect(PPS_SCALE_CODES.full).toHaveLength(8);
-    expect(PPS_SCALE_CODES.mini).toEqual(["BP1", "BP3", "BP4", "BP8"]);
-    expect(PPS_DISCLOSURE).toBe("The decision-point vocabulary is aligned with PPS (Praktisk Projektstyrning); this application does not implement or certify PPS.");
+describe("the decision-point vocabulary of record", () => {
+  it("DP1 through DP8 carry the English titles; the scales select the sets", () => {
+    expect(DECISION_POINT_SET.map((b) => b.code)).toEqual(["DP1", "DP2", "DP3", "DP4", "DP5", "DP6", "DP7", "DP8"]);
+    expect(DECISION_POINT_SET[0].title).toBe("Decision to start the project and initiate preparations");
+    expect(DECISION_POINT_SET[3].title).toBe("Decision to start execution");
+    expect(DECISION_POINT_SET[7].title).toBe("Decision to close the project");
+    expect(DECISION_SCALE_CODES.full).toHaveLength(8);
+    expect(DECISION_SCALE_CODES.mini).toEqual(["DP1", "DP3", "DP4", "DP8"]);
+    expect(DECISION_DISCLOSURE).toBe("The decision points follow the DP1–DP8 decision-point scale; this application does not implement or certify any external project-management methodology.");
   });
 
-  it("an added gate takes the next unused BP of the scale; the set exhausts to null", () => {
-    expect(nextUnusedBp(block())?.code).toBe("BP1");
-    expect(nextUnusedBp(block({ decisionPoints: [{ id: "d1", title: "x", year: 1, code: "BP1" }] }))?.code).toBe("BP2");
-    expect(nextUnusedBp(block({ projectScale: "mini", decisionPoints: [{ id: "d1", title: "x", year: 1, code: "BP1" }] }))?.code).toBe("BP3");
-    const all = PPS_SCALE_CODES.mini.map((code, i) => ({ id: "d" + i, title: "t", year: 1, code }));
-    expect(nextUnusedBp(block({ projectScale: "mini", decisionPoints: all }))).toBeNull();
+  it("an added gate takes the next unused decision point of the scale; the set exhausts to null", () => {
+    expect(nextUnusedDecisionPoint(block())?.code).toBe("DP1");
+    expect(nextUnusedDecisionPoint(block({ decisionPoints: [{ id: "d1", title: "x", year: 1, code: "DP1" }] }))?.code).toBe("DP2");
+    expect(nextUnusedDecisionPoint(block({ projectScale: "mini", decisionPoints: [{ id: "d1", title: "x", year: 1, code: "DP1" }] }))?.code).toBe("DP3");
+    const all = DECISION_SCALE_CODES.mini.map((code, i) => ({ id: "d" + i, title: "t", year: 1, code }));
+    expect(nextUnusedDecisionPoint(block({ projectScale: "mini", decisionPoints: all }))).toBeNull();
   });
 
   it("the empty block is not authored; the scale defaults to full", () => {
@@ -63,7 +63,7 @@ describe("the section-local refusals (never compute-blocking)", () => {
   const refuse = (tl: TimelineBlock) => validateTimeline(inp(tl), computeModel(inp(tl)));
 
   it("a clean timeline is refusal-free", () => {
-    expect(refuse(block({ activities: [{ id: "a1", label: "Study", startYear: 1, endYear: 3, phase: "prestudy" }], decisionPoints: [{ id: "d1", title: "BP1", year: 1 }], milestones: [{ id: "m1", label: "Go", year: 12 }] }))).toEqual([]);
+    expect(refuse(block({ activities: [{ id: "a1", label: "Study", startYear: 1, endYear: 3, phase: "prestudy" }], decisionPoints: [{ id: "d1", title: "DP1", year: 1 }], milestones: [{ id: "m1", label: "Go", year: 12 }] }))).toEqual([]);
   });
 
   it("TIMELINE-ACTIVITY-SPAN names the activity and carries the true span", () => {
@@ -79,9 +79,9 @@ describe("the section-local refusals (never compute-blocking)", () => {
   });
 
   it("TIMELINE-GATE-SPAN and TIMELINE-MILESTONE-SPAN", () => {
-    const r = refuse(block({ decisionPoints: [{ id: "d9", title: "BP4", year: 40 }], milestones: [{ id: "m9", label: "Done", year: -1 }] }));
+    const r = refuse(block({ decisionPoints: [{ id: "d9", title: "DP4", year: 40 }], milestones: [{ id: "m9", label: "Done", year: -1 }] }));
     expect(r.map((x) => x.code)).toEqual(["TIMELINE-GATE-SPAN", "TIMELINE-MILESTONE-SPAN"]);
-    expect(r[0].message).toBe("Decision point d9 (BP4) falls in year 40, outside the program span of years 1–12: set a whole year inside the span or widen the project length (TIMELINE-GATE-SPAN).");
+    expect(r[0].message).toBe("Decision point d9 (DP4) falls in year 40, outside the program span of years 1–12: set a whole year inside the span or widen the project length (TIMELINE-GATE-SPAN).");
     expect(r[1].message).toBe("Milestone m9 (Done) falls in year -1, outside the program span of years 1–12: set a whole year inside the span or widen the project length (TIMELINE-MILESTONE-SPAN).");
   });
 
@@ -101,7 +101,7 @@ describe("the section-local refusals (never compute-blocking)", () => {
   });
 
   it("the mini scale validates as strictly as the full scale", () => {
-    const tl = block({ projectScale: "mini", decisionPoints: [{ id: "d1", title: "BP8", year: 99, code: "BP8" }] });
+    const tl = block({ projectScale: "mini", decisionPoints: [{ id: "d1", title: "DP8", year: 99, code: "DP8" }] });
     expect(refuse(tl).map((x) => x.code)).toEqual(["TIMELINE-GATE-SPAN"]);
   });
 

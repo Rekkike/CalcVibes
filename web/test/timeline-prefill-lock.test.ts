@@ -17,7 +17,7 @@ const synthetic = (): TimelineBlock => ({
     { id: "a1", label: "Study", startYear: 1, endYear: 2, phase: "prestudy" },
     { id: "a2", label: "Build", startYear: 2, endYear: 4, phase: "production", derivedFrom: "cost-program" },
   ],
-  decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "BP1", outcome: "continue" }],
+  decisionPoints: [{ id: "d1", title: "Start", year: 1, code: "DP1", outcome: "continue" }],
   milestones: [{ id: "m1", label: "Done", year: 4, tie: { kind: "engine-event", event: "construction-complete" } }],
 });
 const without = (inp: ModelInputs): ModelInputs => {
