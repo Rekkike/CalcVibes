@@ -13,6 +13,17 @@ export function AppraisalSection(props: {
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
   const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
   const a = inputs.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } };
+  // v0.6.13 Task D (AUD-12): the engine reads the residual posture before the mode, so the
+  // section reads the effective mode through the same derivation, and the select writes the
+  // full dual-seam state: the chosen mode with the shadowing posture dropped (the engine then
+  // derives the posture from the mode and the amount, on this edit and on every later one).
+  const effectiveMode: "calculated" | "amount" = a.residual.posture !== undefined
+    ? (a.residual.posture === "book-value" ? "calculated" : "amount")
+    : (a.residual.mode ?? "amount");
+  const setResidualMode = (mode: "calculated" | "amount") => {
+    const { posture: _shadow, ...rest } = a.residual;
+    setAppraisal({ residual: { ...rest, mode } });
+  };
   const num = (key: "wacc" | "financeRate" | "reinvestmentRate") => (e: { target: { value: string } }) =>
     setAppraisal({ [key]: parseFloat(e.target.value) || 0 } as Partial<AppraisalParams>);
   return (
@@ -23,19 +34,19 @@ export function AppraisalSection(props: {
       <label>Reinvestment rate (%) <input data-field="reinvestmentRate" type="number" value={a.reinvestmentRate} onChange={num("reinvestmentRate")} /></label>
       <h3>Residual value (terminal inflow on the collections side)</h3>
       <label>Residual mode{" "}
-        <select data-field="residualMode" value={a.residual.mode ?? "amount"} onChange={(e) => setAppraisal({ residual: { ...a.residual, mode: e.target.value as "calculated" | "amount" } })}>
+        <select data-field="residualMode" value={effectiveMode} onChange={(e) => setResidualMode(e.target.value as "calculated" | "amount")}>
           <option value="calculated">Calculated (the remaining book value at the residual year)</option>
           <option value="amount">Set amount (a known sale value)</option>
         </select>
       </label>
-      {(a.residual.mode ?? "amount") !== "calculated" && (
+      {effectiveMode !== "calculated" && (
         <label>Residual amount <MoneyEditor dataField="residualAmount" value={a.residual.amount} entryUnit={entryUnit} onChange={(v) => setAppraisal({ residual: { ...a.residual, amount: v } })} /></label>
       )}
       <label>Residual year <input data-field="residualYear" type="number" value={a.residual.year} onChange={(e) => setAppraisal({ residual: { ...a.residual, year: parseFloat(e.target.value) || 0 } })} /></label>
-      {result !== null && (a.residual.mode ?? "amount") === "calculated" && result.bookView !== undefined && (
+      {result !== null && effectiveMode === "calculated" && result.bookView !== undefined && (
         <p data-testid="residual-derivation" className="muted">The calculated residual is the remaining book value at the residual year: {money(result.bookView.remainingBookValueAtResidualYear)}.</p>
       )}
-      {result !== null && a.residual.mode === "amount" && result.bookView !== undefined && result.bookView.gainOrLossOnSale !== 0 && (
+      {result !== null && effectiveMode === "amount" && result.bookView !== undefined && result.bookView.gainOrLossOnSale !== 0 && (
         <p data-testid="residual-gain-loss" className="muted">The set amount differs from the remaining book value; the gain or loss on sale is {money(result.bookView.gainOrLossOnSale)}.</p>
       )}
       {result !== null && (
