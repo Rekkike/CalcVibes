@@ -1,5 +1,5 @@
 import type { GridRow, LineTotal, YearlyRow } from "../../core/src/types.js";
-import type { DeckGantt } from "./deck.js";
+import type { DeckGantt, DeckWaterfall } from "./deck.js";
 
 export const CHART_COLORS = {
   costBar: "#fb7185",
@@ -294,43 +294,82 @@ export interface WaterfallSegment {
 // the capital lines, then the operating segment, then the reinvestments segment when present — and
 // the build closes exactly at the cap (totalCost). The operating and reinvestments segments carry a
 // visually distinct class so the investment basis and the operating basis are never conflated.
-// v0.6.9 Task A (finding W26): the classical stepped waterfall — with n segments the slot is
-// 100/n percent; segment i renders left = i*slot, width = 0.6*slot (a floating step), gaining
-// data-waterfall-step; the vertical extents are unchanged (bottom = cumulative-before, height =
-// segment share of the cap) so the closure pins survive verbatim; the cap spans the full track.
-export function CostWaterfall(props: { segments: WaterfallSegment[]; total: number; valueFor: (v: number) => string; }) {
-  const { segments, total, valueFor } = props;
-  const cap = Math.max(1e-12, total);
-  const n = Math.max(1, segments.length);
-  const slot = 100 / n;
-  let acc = 0;
+// v0.6.15: the investment waterfall, repaired. The lower section is the classical stepped columns
+// at GROUP level (the named groups, the operating segment, the reinvestments when present): with n
+// steps the slot is 100/(n+1) percent; step i renders left = i*slot, width = 0.6*slot, bottom =
+// cumulative-before, height = its share of the total (the vertical closure geometry of the delivered
+// steps). The total is the (n+1)th column: ground-standing (bottom 0, height 100), the same width, in
+// the neutral ink; dotted 1 px connectors carry each step top to the next base and the last top to the
+// total; the value labels sit directly above the bar tops; the group names sit under the ground line
+// (a wrap is permitted, the full name rides in the title attribute, no ellipsis, no key). Rendered
+// from the deck model; nothing is recomputed here.
+export function CostWaterfall(props: { waterfall: DeckWaterfall }) {
+  const { columns } = props.waterfall;
+  const n = columns.length;
+  const slot = 100 / Math.max(1, n);
+  const steps = columns.filter((c) => c.kind !== "total");
+  const total = columns[n - 1];
   return (
     <div data-testid="cost-waterfall" className="chart-block">
       <div className="waterfall-track">
-        {segments.map((s, i) => {
-          const frac = s.total / cap;
-          const seg = (
-            <div key={s.id} data-waterfall-segment={s.id} data-waterfall-kind={s.kind} data-waterfall-step={i} className={"waterfall-segment" + (s.kind === "capital" ? "" : " waterfall-segment-" + s.kind)} style={{ bottom: `${(acc / cap) * 100}%`, height: `${frac * 100}%`, left: `${i * slot}%`, width: `${0.6 * slot}%` }}>
-            </div>
-          );
-          acc += s.total;
-          return seg;
-        })}
-        {/* v0.6.10 Task E.4 (W31): the closing total bar — the cap renders as a labeled total
-            element carrying data-waterfall-total; the label list gains the closing entry with
-            the totalCost value. The closure identity and the 100.0 percent fill pins stand
-            verbatim; the geometry is unchanged. */}
-        <div data-testid="waterfall-cap" data-waterfall-total="true" className="waterfall-cap" style={{ bottom: "100%", width: "100%", height: "4px" }} />
-      </div>
-      <ul className="waterfall-label-list">
-        {segments.map((s) => (
-          <li key={s.id} data-testid="waterfall-label" data-waterfall-kind={s.kind} className="waterfall-label">{s.name} {valueFor(s.total)}</li>
+        {steps.map((c, i) => (
+          <div key={c.id} data-waterfall-segment={c.id} data-waterfall-kind={c.kind} data-waterfall-step={i} className={"waterfall-segment" + (c.kind === "capital" ? "" : " waterfall-segment-" + c.kind)} style={{ bottom: `${c.bottomPct}%`, height: `${c.heightPct}%`, left: `${i * slot}%`, width: `${0.6 * slot}%` }} />
         ))}
-        <li data-testid="waterfall-total-label" data-waterfall-kind="total" className="waterfall-label">Total program cost {valueFor(total)}</li>
-      </ul>
+        <div data-waterfall-total="true" data-waterfall-kind="total" data-waterfall-step={steps.length} className="waterfall-total-column" style={{ bottom: "0%", height: "100%", left: `${steps.length * slot}%`, width: `${0.6 * slot}%` }} />
+        {steps.map((c, i) => (
+          <span key={"conn-" + c.id} data-waterfall-connector={c.id} className="waterfall-connector" style={{ bottom: `${c.bottomPct + c.heightPct}%`, left: `${i * slot + 0.6 * slot}%`, width: `${0.4 * slot}%` }} />
+        ))}
+        {steps.map((c, i) => (
+          <span key={"val-" + c.id} data-testid="waterfall-label" data-waterfall-kind={c.kind} className="waterfall-label waterfall-value" style={{ bottom: `calc(${c.bottomPct + c.heightPct}% + 4px)`, left: `${i * slot}%`, width: `${0.6 * slot}%` }}>{c.value}</span>
+        ))}
+        <span data-testid="waterfall-total-label" data-waterfall-kind="total" className="waterfall-label waterfall-value" style={{ bottom: "calc(100% + 4px)", left: `${steps.length * slot}%`, width: `${slot}%` }}>Total program cost {total.value}</span>
+      </div>
+      <div data-waterfall-ground="true" className="waterfall-ground" />
+      <div className="waterfall-names">
+        {columns.map((c) => (
+          <span key={c.id} data-waterfall-name={c.id} title={c.name} className="waterfall-name" style={{ width: `${slot}%` }}>{c.name}</span>
+        ))}
+      </div>
     </div>
   );
 }
+
+// v0.6.15: the ledger waterfall (the upper section) at the individual-line level. Each capital cost
+// line is a row: its FULL name (no truncation, no key), a bar floating on the shared left-baseline
+// scale at its cumulative position (percent left and width), the value at the bar's end (never
+// inside a bar), and the line's share of the TOTAL program cost, muted, at the row end (the one
+// full-outflow basis of the slide). The capital subtotal is a hairline row with a tick at the capital
+// position; the operating row is the hatched segment; the total is a full-width neutral bar at
+// heavier weight; a thin hairline connector carries each bar's end to the next row, and the closure
+// edge (the 100 percent line) runs through every row. HTML rows: real text at every width.
+export function LedgerWaterfall(props: { waterfall: DeckWaterfall; kicker?: string }) {
+  const { rows } = props.waterfall;
+  return (
+    <div data-testid="ledger-waterfall" className="chart-block ledger">
+      {props.kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{props.kicker}</p>}
+      {rows.map((r) => (
+        <div key={r.id} data-ledger-row={r.id} data-ledger-kind={r.kind} className={"ledger-row ledger-row-" + r.kind}>
+          <span data-ledger-label="name" className="ledger-name">{r.name}</span>
+          <div className="ledger-track">
+            <div data-ledger-edge="true" className="ledger-scale">
+              {r.kind === "subtotal" ? (
+                <span data-ledger-tick="true" className="ledger-tick" style={{ left: `${r.startPct}%` }} />
+              ) : (
+                <span data-ledger-bar={r.id} data-ledger-kind={r.kind} className={"ledger-bar ledger-bar-" + r.kind} style={{ left: `${r.startPct}%`, width: `${r.widthPct}%` }} />
+              )}
+              <span data-ledger-value="true" className="ledger-value" style={{ left: `calc(${r.kind === "subtotal" ? r.startPct : r.startPct + r.widthPct}% + 6px)` }}>{r.value}</span>
+              {r.kind !== "subtotal" && r.kind !== "total" && (
+                <span data-ledger-connector={r.id} className="ledger-connector" style={{ left: `${r.startPct + r.widthPct}%` }} />
+              )}
+            </div>
+          </div>
+          <span data-ledger-share="true" className="ledger-share">{r.share}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function HurdlePlot(props: {
   target: number;
   achieved: number;

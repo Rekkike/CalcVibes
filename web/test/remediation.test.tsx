@@ -162,13 +162,16 @@ describe("Task R1: TILE-GRID / TONE-RENDER / STAGE-CHART-LEGIBILITY / RESPONSIVE
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
-    const name = rows.querySelector('[data-row-label="name"]') as HTMLElement;
-    expect(name.className).toContain("row-name");
-    const share = rows.querySelector('[data-row-label="share"]') as HTMLElement;
+    // v0.6.15 re-anchor: the ledger rows carry the near-white names and the muted (WCAG-checked #94a3b8,
+    // 6.6:1 on the stage) full-outflow shares.
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]') as HTMLElement;
+    const name = rows.querySelector('[data-ledger-label="name"]') as HTMLElement;
+    expect(name.className).toContain("ledger-name");
+    const share = rows.querySelector("[data-ledger-share]") as HTMLElement;
     expect(share.textContent).toMatch(/%$/);
     const css = fs.readFileSync("src/index.css", "utf8");
-    expect(css).toMatch(/\[data-testid="presentation"\] \.composition-row \.row-name\s*\{[^}]*color:\s*#e2e8f0/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.ledger-name\s*\{[^}]*color:\s*#e2e8f0/);
+    expect(css).toMatch(/\[data-testid="presentation"\] \.ledger-share\s*\{[^}]*color:\s*#94a3b8/);
   });
 
   it("RESPONSIVE: the charts are width-constrained and the donut labels sit inside the SVG bounds", () => {
@@ -184,8 +187,8 @@ describe("Task R1: TILE-GRID / TONE-RENDER / STAGE-CHART-LEGIBILITY / RESPONSIVE
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
-    expect(rows.querySelectorAll("[data-composition-row]").length).toBeGreaterThan(0);
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]') as HTMLElement;
+    expect(rows.querySelectorAll("[data-ledger-row]").length).toBeGreaterThan(0); // v0.6.15: the ledger replaces the composition rows
     for (const svg of Array.from(document.querySelectorAll('[data-testid="presentation"] svg'))) {
       expect(svg.getAttribute("width")).toBeNull();
       if (svg.closest('[data-testid="gantt-chart"]') !== null) continue; // v0.6.13.1 re-anchor: the Gantt SVG labels with direct text
@@ -254,12 +257,13 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const investmentRows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
+    // v0.6.15 re-anchor: the ledger waterfall carries the kicker, the six capital rows and the values.
+    const investmentRows = document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]');
     expect(investmentRows?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Market pillar — bulk & liquid berths dominates the cost base");
-    expect(investmentRows?.querySelectorAll("[data-composition-row]").length).toBe(6);
-    const firstRow = investmentRows?.querySelector("[data-composition-row]");
-    expect(firstRow?.querySelector('[data-row-label="name"]')?.textContent).toBe(result.lineTotals[0].name);
-    expect(firstRow?.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(result.lineTotals[0].total, "EUR", unit));
+    expect(investmentRows?.querySelectorAll('[data-ledger-row][data-ledger-kind="capital"]').length).toBe(6);
+    const firstRow = investmentRows?.querySelector('[data-ledger-row][data-ledger-kind="capital"]');
+    expect(firstRow?.querySelector('[data-ledger-label="name"]')?.textContent).toBe(result.lineTotals[0].name);
+    expect(firstRow?.querySelector("[data-ledger-value]")?.textContent).toBe(deckMoneyForDisplay(result.lineTotals[0].total, "EUR", unit));
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const recoveryBars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]');

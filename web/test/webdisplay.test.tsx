@@ -131,14 +131,15 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
-    for (const rowEl of Array.from(rows.querySelectorAll("[data-composition-row]"))) {
-      const value = rowEl.querySelector('[data-row-label="value"]')?.textContent ?? "";
+    // v0.6.15 re-anchor: the ledger waterfall replaces the composition rows (the values are the money strings).
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]') as HTMLElement;
+    for (const rowEl of Array.from(rows.querySelectorAll("[data-ledger-row]"))) {
+      const value = rowEl.querySelector("[data-ledger-value]")?.textContent ?? "";
       expect(value).not.toMatch(/,\d/);
       expect(value).not.toBe("");
     }
     const firstTotal = result.lineTotals[0].total;
-    expect(rows.querySelector('[data-composition-row]')?.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(firstTotal, "EUR", "thousands"));
+    expect(rows.querySelector("[data-ledger-row]")?.querySelector("[data-ledger-value]")?.textContent).toBe(deckMoneyForDisplay(firstTotal, "EUR", "thousands"));
   });
 
   it("APP-CHART-READING-CLASS: every app chart label renders through the reading class; the tables keep the standing format (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {

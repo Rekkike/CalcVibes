@@ -181,7 +181,7 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     fireEvent.click(byAction("present"));
     const investmentSlot = document.querySelector('[data-slide-chart="investment"]') as HTMLElement;
     const recoverySlot = document.querySelector('[data-slide-chart="recovery"]') as HTMLElement;
-    expect(investmentSlot.querySelector('[data-testid="composition-rows"]')).toBeTruthy();
+    expect(investmentSlot.querySelector('[data-testid="ledger-waterfall"]')).toBeTruthy(); // v0.6.15: the composition rows retired from the investment slide
     expect(recoverySlot.querySelector('[data-testid="recovery-bars"]')).toBeTruthy();
     const bars = recoverySlot.querySelectorAll('[data-recovery-column]');
     // v0.6.7 re-anchor: 23 inflow years bucket at width 2 under the cap of 15 — 12 columns.

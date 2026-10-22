@@ -5,8 +5,7 @@ import { deckSlides } from "../deck.js";
 import type { ScenarioTargetChart } from "../deck.js";
 import { deckMoneyForDisplay, feeForDisplay, percentTwoForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionRows, CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, HurdlePlot, ScenarioComparisonBars, GanttChart } from "../charts.js";
-import { STAGE_CHART_COLORS } from "../charts.js";
+import { CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, LedgerWaterfall, HurdlePlot, ScenarioComparisonBars, GanttChart } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 
@@ -222,25 +221,12 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.name === "investment" && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="investment">
-                {/* v0.6.9 Task H (finding W30): the deck's composition accent bars consume the
-                    stage accent (8.01:1 on the always-dark stage); the app keeps #0074ba on its
-                    card surfaces (4.99:1 against white) — no app accent change. */}
-                <CompositionRows lineTotals={result.lineTotals} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} kicker={investmentKicker} accent={STAGE_CHART_COLORS.accent} />
-                {/* v0.6.8 Task A (finding W18): the honest cost waterfall — the capital lines, then the
-                    operating segment, then the reinvestments segment when present, closing at the cap
-                    (totalCost). The reinvestments derivation is the one deck.ts established (no new
-                    engine field); the build is pinned to close exactly at the cap on every fixture. */}
-                <CostWaterfall
-                  segments={[
-                    ...result.lineTotals.map((l) => ({ id: l.id, name: l.name, total: l.total, kind: "capital" as const })),
-                    ...(result.operatingTotal > 0 ? [{ id: "operating", name: "Operating lines", total: result.operatingTotal, kind: "operating" as const }] : []),
-                    ...((result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0) > 0
-                      ? [{ id: "reinvestments", name: "Reinvestments", total: (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0), kind: "reinvestments" as const }]
-                      : []),
-                  ]}
-                  total={result.totalCost}
-                  valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)}
-                />
+                {/* v0.6.15: the combined investment waterfall — the ledger at the individual-line level
+                    over the stepped columns at group level; both render the deck model's waterfall
+                    (composed once in deck.ts; nothing is recomputed here). The shares are on the
+                    full-outflow basis (the share of the total program cost) throughout. */}
+                {sl.waterfall !== undefined && <LedgerWaterfall waterfall={sl.waterfall} kicker={investmentKicker} />}
+                {sl.waterfall !== undefined && <CostWaterfall waterfall={sl.waterfall} />}
                 {/* v0.6.10 Task G.1: the funding breakdown block — beneath the waterfall:
                     gross capital program, grants, net private capital, the grant intensity,
                     and the funding rows with their kinds and years. Every figure is composed

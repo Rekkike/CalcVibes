@@ -21,25 +21,26 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
-    const rowEls = rows.querySelectorAll("[data-composition-row]");
+    // v0.6.15 re-anchor: the composition rows retired from the investment slide; the ledger waterfall
+    // carries one row per capital cost line (the full name, the value at the bar end) and the shares
+    // move to the ONE full-outflow basis (the share of the total program cost, comma one-decimal).
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]') as HTMLElement;
+    const rowEls = rows.querySelectorAll('[data-ledger-row][data-ledger-kind="capital"]');
     expect(rowEls.length).toBe(result.lineTotals.length);
     expect(rowEls.length).toBe(6);
-    let shareSum = 0;
     result.lineTotals.forEach((lt, i) => {
       const row = rowEls[i] as HTMLElement;
-      expect(row.querySelector('[data-row-label="name"]')?.textContent).toBe(lt.name);
-      expect(row.querySelector('[data-row-label="value"]')?.textContent).toBe(deckMoneyForDisplay(lt.total, "EUR", unit));
-      const shareText = row.querySelector('[data-row-label="share"]')?.textContent ?? "0%";
-      shareSum += Number(shareText.replace("%", ""));
+      expect(row.querySelector('[data-ledger-label="name"]')?.textContent).toBe(lt.name);
+      expect(row.querySelector("[data-ledger-value]")?.textContent).toBe(deckMoneyForDisplay(lt.total, "EUR", unit));
     });
-    // v0.6.10: the program shares render at one decimal — 16.5% / 24.5% / 22.3% / 27.8% / 4.5% / 4.5%,
-    // summing to 100.1: the honest rounding residue of six per-row one-decimal shares
-    // (ratified in the v0.6.10 design pass; disclosed in charts.tsx and deck.ts).
-    expect(shareSum).toBe(100.1);
-    const shares = Array.from(rowEls).map((r) => r.querySelector('[data-row-label="share"]')?.textContent);
-    expect(shares).toEqual(["16.5%", "24.5%", "22.3%", "27.8%", "4.5%", "4.5%"]);
-    expect(rowEls[0]?.querySelector(".row-bar-svg rect")?.getAttribute("fill")).toBe("#38bdf8");
+    const shares = Array.from(rowEls).map((r) => r.querySelector("[data-ledger-share]")?.textContent);
+    expect(shares).toEqual(["11,8%", "17,5%", "15,9%", "19,9%", "3,2%", "3,2%"]);
+    // the six capital shares plus the operating share close the full-outflow basis at 100.0
+    const opShare = rows.querySelector('[data-ledger-kind="operating"] [data-ledger-share]')?.textContent;
+    expect(opShare).toBe("28,5%");
+    const sum = [...shares, opShare].reduce((a, s) => a + Number((s as string).replace(",", ".").replace("%", "")), 0);
+    expect(sum).toBeCloseTo(100, 6);
+    expect(fs.readFileSync("src/index.css", "utf8")).toMatch(/\.ledger-bar\s*\{[^}]*background:\s*#38bdf8/);
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     const deckDonuts = document.querySelectorAll('[data-testid="presentation"] [data-testid="composition-donut"]');
     expect(deckDonuts.length).toBe(2);
@@ -131,11 +132,14 @@ describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
       const h = Number(vb.split(" ")[3]);
       expect(h).toBeGreaterThanOrEqual(1);
     }
-    const rowSvgs = document.querySelectorAll('[data-slide-name="investment"] .row-bar-svg');
-    expect(rowSvgs.length).toBe(6);
-    for (const svg of Array.from(rowSvgs)) {
-      const rect = svg.querySelector("rect");
-      expect(rect?.getAttribute("y")).toBe("0");
+    // v0.6.15 re-anchor: the ledger bars float on the shared left-baseline scale (the first bar and the
+    // total start at zero; no bar leaves the 0 to 100 percent scale).
+    const ledgerBars = Array.from(document.querySelectorAll('[data-slide-name="investment"] [data-ledger-bar]')) as HTMLElement[];
+    expect(ledgerBars.filter((b) => b.getAttribute("data-ledger-kind") === "capital")).toHaveLength(6);
+    expect(parseFloat(ledgerBars[0].style.left)).toBe(0);
+    for (const b of ledgerBars) {
+      expect(parseFloat(b.style.left)).toBeGreaterThanOrEqual(0);
+      expect(parseFloat(b.style.left) + parseFloat(b.style.width)).toBeLessThanOrEqual(100 + 1e-9);
     }
   });
 });

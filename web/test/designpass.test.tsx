@@ -186,21 +186,22 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(caption?.textContent).not.toMatch(/\d/);
   });
 
-  it("WATERFALL-BUILD: one segment per cost line plus the operating and reinvestment kinds; the labels flow through the deck money variant; the closing total bar carries the total (W31)", async () => {
-    // v0.6.10 re-anchor: the demo button loads the program fixture — six capital lines plus
-    // the operating-lines segment, seven segments in all, no reinvestments. The build is
-    // derived from the engine fields and closes exactly at the cap; the cap renders as the
-    // labeled closing total bar (data-waterfall-total) with the totalCost in the label list.
+  it("WATERFALL-BUILD: the stepped columns at group level plus the operating kind, closing at a ground-standing total column; the labels flow through the deck money variant (v0.6.15 re-anchor)", async () => {
+    // v0.6.15 re-anchor: the lower section aggregates the capital lines by their authored group (the program
+    // fixture: Container shore power, Market pillar, Cruise terminal, Inland & public berths), then the operating
+    // segment, then the total as the (n+1)th ground-standing column (bottom 0, height 100) replacing the 4 px cap
+    // rule. The cumulative geometry (bottom and height percent) and the closure identity are the delivered ones.
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const result = computeModel(shorePowerProgram());
-    const reinvestments = (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0);
+    const group = (ids: string[]) => ids.reduce((a, id) => a + (result.lineTotals.find((l) => l.id === id)?.total ?? 0), 0);
     const expectedSegments = [
-      ...result.lineTotals.map((l) => ({ id: l.id, name: l.name, total: l.total, kind: "capital" as const })),
-      ...(result.operatingTotal > 0 ? [{ id: "operating", name: "Operating lines", total: result.operatingTotal, kind: "operating" as const }] : []),
-      ...(reinvestments > 0 ? [{ id: "reinvestments", name: "Reinvestments", total: reinvestments, kind: "reinvestments" as const }] : []),
+      { name: "Container shore power", total: group(["p1", "p2", "p3"]), kind: "capital" as const },
+      { name: "Market pillar", total: group(["p4"]), kind: "capital" as const },
+      { name: "Cruise terminal", total: group(["p5"]), kind: "capital" as const },
+      { name: "Inland & public berths", total: group(["p6"]), kind: "capital" as const },
+      { name: "Operating lines", total: result.operatingTotal, kind: "operating" as const },
     ];
-    expect(expectedSegments.length).toBe(7);
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -220,43 +221,36 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
       accShare += frac;
     }
     expect(accShare).toBeCloseTo(1, 6);
-    const capEl = waterfall.querySelector('[data-testid="waterfall-cap"]') as HTMLElement;
-    expect(parseFloat(capEl.style.bottom)).toBeCloseTo(100, 0);
-    // W31: the closing total bar carries data-waterfall-total and its label names the total
-    // program cost at the deck money variant (entry thousands on the loaded demo).
-    expect(capEl.getAttribute("data-waterfall-total")).toBe("true");
+    const totalEl = waterfall.querySelector('[data-waterfall-total="true"]') as HTMLElement;
+    expect(parseFloat(totalEl.style.bottom)).toBe(0);
+    expect(parseFloat(totalEl.style.height)).toBe(100);
     const totalLabel = waterfall.querySelector('[data-testid="waterfall-total-label"]') as HTMLElement;
     expect(totalLabel.getAttribute("data-waterfall-kind")).toBe("total");
     expect(totalLabel.textContent).toBe(`Total program cost ${deckMoneyForDisplay(result.totalCost, "EUR", "thousands")}`);
     expect(totalLabel.textContent).toBe("Total program cost €628 250 k");
-    // v0.6.9 Task A: the stepped geometry — each segment owns an equal slot, fills 60 percent
-    // of it, and the cap spans the full width; adjacent steps never overlap.
+    // the stepped geometry on n+1 slots: each column owns an equal slot, fills 60 percent of it; adjacent never overlap
     const stepEls = waterfall.querySelectorAll("[data-waterfall-step]");
-    expect(stepEls.length).toBe(7);
-    const slot = 100 / expectedSegments.length;
+    expect(stepEls.length).toBe(6);
+    const slot = 100 / (expectedSegments.length + 1);
     for (let i = 0; i < stepEls.length; i++) {
       const seg = stepEls[i] as HTMLElement;
       expect(seg.getAttribute("data-waterfall-step")).toBe(String(i));
       expect(parseFloat(seg.style.left)).toBeCloseTo(i * slot, 6);
       expect(parseFloat(seg.style.width)).toBeCloseTo(0.6 * slot, 6);
-      if (i < stepEls.length - 1) {
-        expect(parseFloat(seg.style.left) + parseFloat(seg.style.width)).toBeLessThanOrEqual((i + 1) * slot + 1e-9);
-      }
     }
-    const lastSeg = stepEls[stepEls.length - 1] as HTMLElement;
+    const lastSeg = segments[segments.length - 1] as HTMLElement;
     expect(parseFloat(lastSeg.style.bottom) + parseFloat(lastSeg.style.height)).toBeCloseTo(100, 0);
-    expect(capEl.style.width).toBe("100%");
+    // direct value labels above the bars (none inside a segment)
     for (const seg of Array.from(segments)) {
       expect((seg as HTMLElement).querySelector('[data-testid="waterfall-label"]')).toBe(null);
     }
-    // The label list: one label per segment plus the closing total entry (W31).
     const labels = waterfall.querySelectorAll('[data-testid="waterfall-label"]');
     expect(labels.length).toBe(expectedSegments.length);
     for (let i = 0; i < labels.length; i++) {
-      expect(labels[i].textContent).toContain(expectedSegments[i].name);
-      expect(labels[i].textContent).toContain(deckMoneyForDisplay(expectedSegments[i].total, "EUR", "thousands"));
+      expect(labels[i].textContent).toBe(deckMoneyForDisplay(expectedSegments[i].total, "EUR", "thousands"));
     }
-    expect(slide.querySelectorAll('[data-testid="composition-rows"]').length).toBe(1);
+    expect(slide.querySelectorAll('[data-testid="ledger-waterfall"]').length).toBe(1);
+    expect(slide.querySelectorAll('[data-testid="composition-rows"]').length).toBe(0);
   });
 
   it("WATERFALL-CLOSURE: the segment program closes at the cap on all five fixtures (v0.6.9 Task A.4 re-pin)", async () => {
