@@ -124,6 +124,20 @@ export function validateInputs(inp: ModelInputs): string[] {
       }
     }
   }
+  // v0.6.16: the authored facility list. A list that is not a list refuses; a document carrying the
+  // authored facilities together with the enabled legacy financing overlay or a funding-block note
+  // refuses with one exact string (no silent precedence, no silent dropping). Grants coexist.
+  if (inp.facilities !== undefined && inp.facilities !== null) {
+    if (!Array.isArray(inp.facilities)) {
+      issues.push("The facilities field must be a list (FAC-LIST).");
+    } else if (inp.facilities.length > 0) {
+      const legacyOverlay = !!inp.financing && inp.financing.enabled;
+      const legacyNote = (inp.funding?.rows ?? []).some((r) => r.kind === "interest-free-loan");
+      if (legacyOverlay || legacyNote) {
+        issues.push("The document carries the authored facilities together with the legacy financing overlay or a funding-block note; migrate the legacy entries into the facility list or remove them (FAC-MIXED).");
+      }
+    }
+  }
   if (inp.repayment.firstCollectionYear !== null && inp.repayment.firstCollectionYear !== undefined) {
     if (!Number.isInteger(inp.repayment.firstCollectionYear) || (inp.repayment.firstCollectionYear as number) < 1) {
       issues.push("First collection year must be an integer of at least 1.");

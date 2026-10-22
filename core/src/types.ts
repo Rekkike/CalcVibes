@@ -116,6 +116,18 @@ export interface Facility {
   // Where the facility came from: the financing layer, or the funding-block note (an interest-free
   // loan reclassified as a zero-rate facility).
   origin?: "financing" | "funding-note";
+  // v0.6.16: an authored facility may stay declared but be switched off (default on); a disabled
+  // facility is excluded from every computation. The migration keeps a disabled legacy overlay so.
+  enabled?: boolean;
+  // v0.6.16: a migrated note keeps its original index in the funding-block rows, so the engine
+  // reconstructs the funding rows (and their summation order) exactly as the legacy document had them.
+  fundingOrder?: number;
+}
+
+// v0.6.16: the authored-mode options (the leveraged solve rides here once the legacy financing
+// block is retired by the migration).
+export interface FacilityOptions {
+  leveragedSolve: boolean;
 }
 
 export interface TariffSpan {
@@ -285,6 +297,9 @@ export interface ModelInputs {
   maintenance?: MaintenanceConfig;
   tariff?: TariffConfig;
   financing?: FinancingConfig;
+  // v0.6.16: the authored facility list (absent or empty = the legacy composition, byte-identical).
+  facilities?: Facility[];
+  facilityOptions?: FacilityOptions;
   // v0.6.10 Task A: the funding block — grants and the interest-free public note.
   // Absent or null = the engine is byte-identical to the pre-funding behavior (the golden
   // no-drift pin).

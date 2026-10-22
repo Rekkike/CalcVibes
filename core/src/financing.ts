@@ -1,6 +1,6 @@
 import { composeAmbiguityNote, countSignChanges, npvMonthly } from "./engine.js";
 import { lineIncurred } from "./depreciation.js";
-import type { CostLine, DscrRow, EquityMetrics, Facility, FacilityResult, FinancingConfig, FinancingResult, FinancingYearlyRow, FundingRow } from "./types.js";
+import type { CostLine, DscrRow, EquityMetrics, Facility, FacilityResult, FinancingConfig, FinancingResult, FinancingYearlyRow, FundingRow, ModelInputs } from "./types.js";
 
 // v0.6.12.1 (AUD-2): the fundable-cost draw schedule on the profile-honoring incurred basis —
 // the same lineIncurred amounts the book view consumes. A CAPEX year lands as a lump at that
@@ -159,6 +159,23 @@ export function resolveFacilityLedger(costs: CostLine[], facilities: Facility[],
 // receipt year, equal annual installments from its repayment start). The notes join the facility
 // set only when the financing layer is enabled (the overlay exists only then); a disabled layer
 // leaves the funding block exactly as before.
+function noteFacility(fr: FundingRow): Facility {
+  return {
+    id: fr.id,
+    label: fr.label,
+    amount: fr.amount,
+    ratePct: 0,
+    termYears: fr.termYears ?? 1,
+    graceYears: 0,
+    amortization: "equal-principal",
+    serviceStartYear: (fr.repaymentStartYear ?? 1) - 1,
+    scope: { kind: "general" },
+    paymentsPerYear: 1,
+    datedDraw: { year: fr.year },
+    origin: "funding-note",
+  };
+}
+
 export function legacyFacilities(config: FinancingConfig | null | undefined, fundingRows: FundingRow[]): Facility[] {
   if (!config || !config.enabled) return [];
   const list: Facility[] = [{
@@ -177,20 +194,7 @@ export function legacyFacilities(config: FinancingConfig | null | undefined, fun
   }];
   for (const fr of fundingRows) {
     if (fr.kind !== "interest-free-loan") continue;
-    list.push({
-      id: fr.id,
-      label: fr.label,
-      amount: fr.amount,
-      ratePct: 0,
-      termYears: fr.termYears ?? 1,
-      graceYears: 0,
-      amortization: "equal-principal",
-      serviceStartYear: (fr.repaymentStartYear ?? 1) - 1,
-      scope: { kind: "general" },
-      paymentsPerYear: 1,
-      datedDraw: { year: fr.year },
-      origin: "funding-note",
-    });
+    list.push(noteFacility(fr));
   }
   return list;
 }
@@ -226,6 +230,15 @@ export function validateFacilities(
     if (f.termYears > 0 && f.graceYears >= f.termYears) {
       issues.push(`${tag} must carry a grace period strictly less than its term; got grace ${f.graceYears} against term ${f.termYears} (FAC-GRACE).`);
     }
+    if (f.datedDraw !== undefined) {
+      if (f.ratePct !== 0) issues.push(`${tag} lands as a dated lump and must be interest-free, a rate of 0 (FAC-DATED-RATE).`);
+      if (!Number.isInteger(f.datedDraw.year) || f.datedDraw.year < 1) {
+        issues.push(`${tag} lands as a dated lump in a model year of at least 1 (FAC-DATED-YEAR).`);
+      }
+      if (!Number.isInteger(f.termYears) || (f.serviceStartYear !== null && !Number.isInteger(f.serviceStartYear))) {
+        issues.push(`${tag} lands as a dated lump and must carry a whole-year term and service start (FAC-DATED-TERM).`);
+      }
+    }
     const startYear = f.serviceStartYear ?? span.firstCollectionYear;
     if (startYear * 12 >= span.horizon) {
       issues.push(`${tag} has a service start year ${startYear} whose month ${startYear * 12} is not below the model horizon ${span.horizon} (FAC-SERVICE-START).`);
@@ -239,6 +252,115 @@ export function validateFacilities(
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// v0.6.16 — the authored facility input. The facilities field is the authored list; absent or empty
+// leaves every legacy composition untouched (the absence lock). The migration helper composes the
+// authored twin of a legacy document ONCE here, and the web load path consumes it.
+// ---------------------------------------------------------------------------------------------
+
+export interface AuthoredContext {
+  // the funding rows the engine sees: the document's rows with the dated-lump facilities (the retired
+  // notes) restored at their original index, so the net-flow composition is the legacy composition
+  fundingRows: FundingRow[];
+  debt: Facility[];
+  notes: Facility[];
+  all: Facility[];
+  leveraged: boolean;
+}
+
+const asNote = (f: Facility): boolean => f.datedDraw !== undefined;
+
+export function authoredContext(inp: Pick<ModelInputs, "facilities" | "facilityOptions" | "funding">): AuthoredContext | null {
+  const list = inp.facilities;
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const active = list.filter((f) => f.enabled !== false);
+  const debt = active.filter((f) => !asNote(f)).map((f) => (f.origin === "financing" ? f : { ...f, origin: "financing" as const }));
+  const notes = active.filter(asNote).map((f) => (f.origin === "funding-note" ? f : { ...f, origin: "funding-note" as const }));
+  return {
+    fundingRows: fundingRowsFrom(inp.funding?.rows ?? [], notes),
+    debt,
+    notes,
+    all: [...debt, ...notes],
+    leveraged: inp.facilityOptions?.leveragedSolve === true,
+  };
+}
+
+function fundingRowsFrom(base: FundingRow[], notes: Facility[]): FundingRow[] {
+  if (notes.length === 0) return base;
+  const rows = base.slice();
+  const ordered = notes.map((f, i) => ({ f, i })).sort((a, b) => (a.f.fundingOrder ?? Infinity) - (b.f.fundingOrder ?? Infinity) || a.i - b.i);
+  for (const { f } of ordered) {
+    const row: FundingRow = {
+      id: f.id,
+      label: f.label,
+      kind: "interest-free-loan",
+      amount: f.amount ?? 0,
+      year: (f.datedDraw as { year: number }).year,
+      termYears: f.termYears,
+      repaymentStartYear: (f.serviceStartYear ?? 0) + 1,
+    };
+    rows.splice(Math.min(f.fundingOrder ?? rows.length, rows.length), 0, row);
+  }
+  return rows;
+}
+
+// The funding rows of a document: the funding block's rows, with the authored dated-lump facilities
+// (the notes) composed back in. With no authored facilities this is the funding block's own rows.
+export function fundingRowsOf(inp: Pick<ModelInputs, "facilities" | "facilityOptions" | "funding">): FundingRow[] {
+  const ctx = authoredContext(inp);
+  return ctx ? ctx.fundingRows : (inp.funding?.rows ?? []);
+}
+
+// The saved-project migration (composed once, here). A legacy document's financing overlay becomes
+// ONE facility in the authored-shares mode (GENERAL scope; kept declared but disabled when the legacy
+// overlay was off), and each funding-block note becomes ONE zero-rate facility carrying its dated
+// receipt, its installment schedule and its original funding-row index. The funding block keeps the
+// grants. A document that already carries facilities, or has nothing to migrate, is returned as is.
+export function migrateLegacyFinancing(inp: ModelInputs): ModelInputs {
+  if (Array.isArray(inp.facilities) && inp.facilities.length > 0) return inp;
+  const rows = inp.funding?.rows ?? [];
+  const hasNote = rows.some((r) => r.kind === "interest-free-loan");
+  if (!inp.financing && !hasNote) return inp;
+  const facilities: Facility[] = [];
+  if (inp.financing) {
+    const f = legacyFacilities({ ...inp.financing, enabled: true }, [])[0];
+    facilities.push(inp.financing.enabled ? f : { ...f, enabled: false });
+  }
+  rows.forEach((fr, i) => {
+    if (fr.kind === "interest-free-loan") facilities.push({ ...noteFacility(fr), fundingOrder: i });
+  });
+  const { financing, ...rest } = inp;
+  const twin: ModelInputs = { ...rest, facilities };
+  if (financing) twin.facilityOptions = { leveragedSolve: financing.leveragedSolve };
+  if (inp.funding) twin.funding = { ...inp.funding, rows: rows.filter((r) => r.kind !== "interest-free-loan") };
+  return twin;
+}
+
+// The inverse of the migration (the other direction of the twin pin): the authored twin of a migrated
+// document back to the legacy shape. A facility list that is not a migration product restores what it can.
+export function restoreLegacyFinancing(twin: ModelInputs): ModelInputs {
+  if (!Array.isArray(twin.facilities) || twin.facilities.length === 0) return twin;
+  const { facilities, facilityOptions, ...rest } = twin;
+  const out: ModelInputs = { ...rest };
+  const eib = facilities.find((f) => f.datedDraw === undefined && f.sharePct !== undefined);
+  if (eib) {
+    out.financing = {
+      enabled: eib.enabled !== false,
+      sharePct: eib.sharePct as number,
+      debtRatePct: eib.ratePct,
+      termYears: eib.termYears,
+      graceYears: eib.graceYears,
+      serviceStartYear: eib.serviceStartYear,
+      amortization: eib.amortization,
+      leveragedSolve: facilityOptions?.leveragedSolve === true,
+      perLineSharePct: eib.perLineSharePct ?? {},
+    };
+  }
+  const notes = facilities.filter(asNote);
+  if (twin.funding || notes.length > 0) out.funding = { ...(twin.funding ?? {}), rows: fundingRowsFrom(twin.funding?.rows ?? [], notes) };
+  return out;
 }
 
 interface FacilitySchedule {
