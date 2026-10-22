@@ -15,6 +15,11 @@ export interface CostLine {
   escalation: number;
   yearOverrides?: Record<number, number>;
   depreciation?: DepreciationConfig;
+  // v0.6.15: an optional free-text group label grouping the cost lines beyond the category. The
+  // engine never reads it (engine-blind: every output is byte-identical with and without it); the
+  // investment slide groups its stepped columns by it. Empty or whitespace-only counts as absent,
+  // and an ungrouped line falls back to its category label as its group.
+  group?: string;
 }
 
 export interface RepaymentParams {
