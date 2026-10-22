@@ -133,25 +133,31 @@ describe("v0.6.10 Task F — the program fixture's solved figures (reproduction 
   });
 
   it("reproduces the financing overlay pins (gross of the funding block, the scope wall)", () => {
+    // v0.6.14 re-pin (the note unification, the delta map of record): the municipal note
+    // (10 000 000, year 1, ten annual installments from year 4) is a zero-rate facility. Its
+    // receipt joins drawnTotal and its installments join totalService, yearly service and the
+    // combined DSCR; the minimum DSCR moves from year 23 to year 7. The EIB facility's own
+    // figures (idc, service-start balance, annuity, interest) and every equity metric stand.
     const r = computeModel(programFixture0610());
     const f = r.financing!;
-    expect(f.drawnTotal).toBe(89999600.00000003);
+    expect(f.drawnTotal).toBe(99999600.00000001);
     expect(f.idc).toBe(3081167.5096770525);
     expect(f.serviceStartBalance).toBe(93080767.50967708);
     expect(f.annuityPayment).toBe(603495.341204519);
     expect(f.totalInterest).toBe(39652398.51975607);
-    expect(f.totalService).toBe(132733166.02943361);
-    expect(f.minDscr).toEqual({ year: 23, value: 4.31887090724161 });
-    expect(f.yearly.find((y) => y.year === 4)!.service).toBe(3206705.4745704313);
+    expect(f.totalService).toBe(142733166.0294336);
+    expect(f.minDscr).toEqual({ year: 7, value: 4.13984696765291 });
+    expect(f.yearly.find((y) => y.year === 4)!.service).toBe(4206705.474570431);
     expect(f.yearly.find((y) => y.year === 23)!.interest).toBe(133349.5345103564);
     expect(f.yearly.find((y) => y.year === 23)!.principal).toBe(7108594.559943871);
-    expect(f.dscr.find((d) => d.year === 4)!.dscr).toBe(10.328478099919028);
-    expect(f.dscr.find((d) => d.year === 8)!.dscr).toBe(4.573411066836907);
+    expect(f.dscr.find((d) => d.year === 4)!.dscr).toBe(8.110952257829595);
+    expect(f.dscr.find((d) => d.year === 8)!.dscr).toBe(4.13984696765291);
     expect(f.equity.outlay).toBe(359000400);
     expect(f.equity.npvAtWacc).toBe(56332110.592094585);
     expect(f.equity.payback).toBe(12.48356167807797);
     expect(f.equity.irr).toBe(0.07136243190763225);
     expect(f.equity.signChanges).toBe(4);
+    expect(f.facilities!.map((x) => x.id)).toEqual(["financing", "l1"]);
   });
 });
 

@@ -31,7 +31,9 @@ const recurringYears = (): CostLine[] => [
   { id: "a", name: "Year one", category: "recurring", amount: 300000, startYear: 1, durationYears: 1, escalation: 0 },
   { id: "b", name: "Year two", category: "recurring", amount: 700000, startYear: 2, durationYears: 1, escalation: 0 },
 ];
-const fz = (r: ReturnType<typeof computeModel>) => JSON.stringify(r.financing);
+// v0.6.14: the comparator is the legacy overlay fields; the per-facility positions carry line-keyed
+// shares (a profile line and its two-lump twin differ in line ids by construction).
+const fz = (r: ReturnType<typeof computeModel>) => JSON.stringify({ ...r.financing, facilities: undefined });
 
 describe("v0.6.12.1 Task B: the financing overlay honors per-year profiles", () => {
   it("PROFILE-CAPEX-DRAWS: a CAPEX profile {1:400000, 2:600000} at the inert amount 1 draws and funds from the profile (the audit's case 1)", () => {

@@ -1,6 +1,6 @@
 import { composeAmbiguityNote, countSignChanges, npvMonthly } from "./engine.js";
 import { lineIncurred } from "./depreciation.js";
-import type { CostLine, DscrRow, EquityMetrics, FinancingConfig, FinancingResult, FinancingYearlyRow, FundingRow } from "./types.js";
+import type { CostLine, DscrRow, EquityMetrics, Facility, FacilityResult, FinancingConfig, FinancingResult, FinancingYearlyRow, FundingRow } from "./types.js";
 
 // v0.6.12.1 (AUD-2): the fundable-cost draw schedule on the profile-honoring incurred basis —
 // the same lineIncurred amounts the book view consumes. A CAPEX year lands as a lump at that
@@ -12,10 +12,17 @@ export function fundableDraws(
   config: { sharePct: number; perLineSharePct?: Record<string, number> },
   horizon: number,
 ): number[] {
+  return drawsFromShares(costs, (c) => (config.perLineSharePct?.[c.id] ?? config.sharePct) / 100, horizon);
+}
+
+// v0.6.14: the draw schedule for an arbitrary per-line share (a fraction). fundableDraws is this with
+// the legacy shares, term for term: the arithmetic below is the pre-existing arithmetic (the legacy
+// path of record stays byte-identical).
+export function drawsFromShares(costs: CostLine[], shareOf: (c: CostLine) => number, horizon: number): number[] {
   const draws = new Array<number>(horizon).fill(0);
   for (const c of costs) {
     if (c.category !== "recurring" && c.category !== "capex") continue;
-    const share = (config.perLineSharePct?.[c.id] ?? config.sharePct) / 100;
+    const share = shareOf(c);
     for (const [y, amount] of lineIncurred(c)) {
       if (c.category === "capex") {
         const m = Math.min(horizon, y * 12);
@@ -72,51 +79,362 @@ export function validateFinancing(inp: { financing?: FinancingConfig; horizon: n
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// v0.6.14 — the multi-facility core. The financing layer is a facility list; the legacy
+// FinancingConfig and the funding-block note map to it through legacyFacilities.
+// ---------------------------------------------------------------------------------------------
+
+const isFundable = (c: CostLine): boolean => c.category === "recurring" || c.category === "capex";
+
+export interface FacilityLedger {
+  // facility id -> line id -> the effective draw share (a fraction of the line's incurred cost)
+  shares: Record<string, Record<string, number>>;
+  draws: Record<string, number[]>;
+  drawn: Record<string, number>;
+  // the stated amount less the drawn total (positive = an undrawn commitment); null when the
+  // facility is sized by explicit shares (the amount is then the drawn total)
+  drift: Record<string, number | null>;
+}
+
+// The draw ledger. The amount is the commitment; the draws never exceed the scoped lines' incurred
+// costs (the share caps at 1); when facilities draw against the same line the draws compose pari
+// passu (the shares on a line that sum beyond 1 scale proportionally, so no line is drawn beyond its
+// cost); the facility list order governs the (deterministic) summation order.
+export function resolveFacilityLedger(costs: CostLine[], facilities: Facility[], horizon: number): FacilityLedger {
+  const fundable = costs.filter(isFundable);
+  const incurredTotal: Record<string, number> = {};
+  for (const c of fundable) {
+    let t = 0;
+    for (const [, amount] of lineIncurred(c)) t += amount;
+    incurredTotal[c.id] = t;
+  }
+  const shares: Record<string, Record<string, number>> = {};
+  for (const f of facilities) {
+    const sh: Record<string, number> = {};
+    if (f.datedDraw !== undefined) {
+      // a dated lump is not tied to the cost calendar: no line shares
+    } else if (f.sharePct !== undefined) {
+      for (const c of fundable) sh[c.id] = (f.perLineSharePct?.[c.id] ?? f.sharePct) / 100;
+    } else {
+      const scoped = f.scope.kind === "general" ? fundable : fundable.filter((c) => (f.scope as { lineIds: string[] }).lineIds.includes(c.id));
+      let scopedTotal = 0;
+      for (const c of scoped) scopedTotal += incurredTotal[c.id];
+      const share = scopedTotal > 0 ? Math.min(1, (f.amount ?? 0) / scopedTotal) : 0;
+      for (const c of scoped) sh[c.id] = share;
+    }
+    shares[f.id] = sh;
+  }
+  for (const c of fundable) {
+    let total = 0;
+    for (const f of facilities) total += shares[f.id][c.id] ?? 0;
+    if (total > 1) {
+      for (const f of facilities) {
+        if (shares[f.id][c.id] !== undefined) shares[f.id][c.id] = shares[f.id][c.id] / total;
+      }
+    }
+  }
+  const draws: Record<string, number[]> = {};
+  const drawn: Record<string, number> = {};
+  const drift: Record<string, number | null> = {};
+  for (const f of facilities) {
+    let arr: number[];
+    if (f.datedDraw !== undefined) {
+      arr = new Array<number>(horizon).fill(0);
+      const m = Math.min(horizon, f.datedDraw.year * 12);
+      if (m >= 1) arr[m - 1] += f.amount ?? 0;
+    } else {
+      arr = drawsFromShares(costs, (c) => shares[f.id][c.id] ?? 0, horizon);
+    }
+    let total = 0;
+    for (let m = 1; m <= horizon; m++) total += arr[m - 1];
+    draws[f.id] = arr;
+    drawn[f.id] = total;
+    drift[f.id] = f.amount !== null && f.sharePct === undefined ? f.amount - total : null;
+  }
+  return { shares, draws, drawn, drift };
+}
+
+// The legacy adapter of record: the per-line shares map to ONE derived general facility; each
+// interest-free note in the funding block maps to ONE zero-rate facility (a dated lump draw at its
+// receipt year, equal annual installments from its repayment start). The notes join the facility
+// set only when the financing layer is enabled (the overlay exists only then); a disabled layer
+// leaves the funding block exactly as before.
+export function legacyFacilities(config: FinancingConfig | null | undefined, fundingRows: FundingRow[]): Facility[] {
+  if (!config || !config.enabled) return [];
+  const list: Facility[] = [{
+    id: "financing",
+    label: "Financing facility",
+    amount: null,
+    ratePct: config.debtRatePct,
+    termYears: config.termYears,
+    graceYears: config.graceYears,
+    amortization: config.amortization,
+    serviceStartYear: config.serviceStartYear,
+    scope: { kind: "general" },
+    sharePct: config.sharePct,
+    perLineSharePct: config.perLineSharePct,
+    origin: "financing",
+  }];
+  for (const fr of fundingRows) {
+    if (fr.kind !== "interest-free-loan") continue;
+    list.push({
+      id: fr.id,
+      label: fr.label,
+      amount: fr.amount,
+      ratePct: 0,
+      termYears: fr.termYears ?? 1,
+      graceYears: 0,
+      amortization: "equal-principal",
+      serviceStartYear: (fr.repaymentStartYear ?? 1) - 1,
+      scope: { kind: "general" },
+      paymentsPerYear: 1,
+      datedDraw: { year: fr.year },
+      origin: "funding-note",
+    });
+  }
+  return list;
+}
+
+// The facility-list validation under the collect-all contract: every defect surfaces with its exact
+// message; nothing is suppressed, clamped or silently dropped.
+export function validateFacilities(
+  facilities: Facility[],
+  span: { costs: CostLine[]; horizon: number; firstCollectionYear: number },
+  issues: string[],
+): void {
+  const seen = new Set<string>();
+  const dup = new Set<string>();
+  const lineIds = new Set(span.costs.map((c) => c.id));
+  for (const f of facilities) {
+    if (seen.has(f.id) && !dup.has(f.id)) {
+      dup.add(f.id);
+      issues.push(`Facility ${f.id} appears more than once in the facility list (FAC-ID).`);
+    }
+    seen.add(f.id);
+    const tag = `Facility ${f.id} (${f.label})`;
+    if (f.sharePct === undefined && !(f.amount !== null && f.amount > 0 && Number.isFinite(f.amount))) {
+      issues.push(`${tag} must carry a positive amount (FAC-AMOUNT).`);
+    }
+    if (f.sharePct !== undefined) {
+      if (f.sharePct < 0 || f.sharePct > 100) issues.push(`${tag} must carry a share within [0, 100]; got ${f.sharePct} (FAC-SHARE).`);
+      for (const [id, share] of Object.entries(f.perLineSharePct ?? {})) {
+        if (share < 0 || share > 100) issues.push(`${tag} must carry a per-line share within [0, 100] for line ${id}; got ${share} (FAC-SHARE).`);
+      }
+    }
+    if (!(f.termYears > 0)) issues.push(`${tag} must carry a positive term (FAC-TERM).`);
+    if (!(f.ratePct > -100)) issues.push(`${tag} must carry a rate above -100 percent (FAC-RATE).`);
+    if (f.termYears > 0 && f.graceYears >= f.termYears) {
+      issues.push(`${tag} must carry a grace period strictly less than its term; got grace ${f.graceYears} against term ${f.termYears} (FAC-GRACE).`);
+    }
+    const startYear = f.serviceStartYear ?? span.firstCollectionYear;
+    if (startYear * 12 >= span.horizon) {
+      issues.push(`${tag} has a service start year ${startYear} whose month ${startYear * 12} is not below the model horizon ${span.horizon} (FAC-SERVICE-START).`);
+    }
+    if (f.scope.kind === "attached") {
+      if (f.scope.lineIds.length === 0) {
+        issues.push(`${tag} is attached but names no cost line (FAC-SCOPE-EMPTY).`);
+      }
+      for (const id of f.scope.lineIds) {
+        if (!lineIds.has(id)) issues.push(`${tag} is attached to cost line ${id}, which does not exist (FAC-SCOPE-LINE).`);
+      }
+    }
+  }
+}
+
+interface FacilitySchedule {
+  S: number;
+  N: number;
+  G: number;
+  ppy: number;
+  balance: number;
+  annuityPayment: number | null;
+  principalPayment: number | null;
+  interest: number[];
+  principal: number[];
+  service: number[];
+  balanceArr: number[];
+}
+
+// One facility's monthly schedule: the balance accrued at the service start, then the service over
+// the term. A monthly facility (the legacy shape) runs the pre-existing arithmetic term for term; a
+// facility that pays less often accrues its interest monthly and settles it at its payment months.
+function facilitySchedule(f: Facility, draws: number[], horizon: number, firstCollectionYear: number): FacilitySchedule {
+  const rD = Math.pow(1 + f.ratePct / 100, 1 / 12) - 1;
+  const S = (f.serviceStartYear ?? firstCollectionYear) * 12;
+  const N = f.termYears * 12;
+  const G = f.graceYears * 12;
+  const ppy = f.paymentsPerYear ?? 12;
+  const spacing = 12 / ppy;
+  let balance = 0;
+  if (f.datedDraw !== undefined) {
+    balance = f.amount ?? 0;
+  } else {
+    for (let m = 1; m <= S; m++) balance = (balance + draws[m - 1]) * (1 + rD);
+  }
+  const interest = new Array<number>(horizon).fill(0);
+  const principal = new Array<number>(horizon).fill(0);
+  const service = new Array<number>(horizon).fill(0);
+  const balanceArr = new Array<number>(horizon).fill(0);
+  let annuityPayment: number | null = null;
+  let principalPayment: number | null = null;
+  let running = balance;
+  if (spacing === 1) {
+    const amortMonths = N - G;
+    annuityPayment = f.amortization === "annuity" ? (rD === 0 ? balance / amortMonths : (balance * rD) / (1 - Math.pow(1 + rD, -amortMonths))) : null;
+    principalPayment = f.amortization === "equal-principal" ? balance / amortMonths : null;
+    for (let m = S + 1; m <= S + N; m++) {
+      const idx = m - 1;
+      const int = running * rD;
+      let prin = 0;
+      let pay = 0;
+      if (m <= S + G) {
+        pay = int;
+      } else {
+        prin = f.amortization === "annuity" ? (annuityPayment as number) - int : (principalPayment as number);
+        pay = prin + int;
+      }
+      interest[idx] = int;
+      principal[idx] = prin;
+      service[idx] = pay;
+      running -= prin;
+      balanceArr[idx] = running;
+    }
+  } else {
+    const rp = Math.pow(1 + rD, spacing) - 1;
+    const nPay = N / spacing;
+    const gracePay = G / spacing;
+    const amortPay = nPay - gracePay;
+    annuityPayment = f.amortization === "annuity" ? (rp === 0 ? balance / amortPay : (balance * rp) / (1 - Math.pow(1 + rp, -amortPay))) : null;
+    principalPayment = f.amortization === "equal-principal" ? balance / amortPay : null;
+    for (let j = 1; j <= nPay; j++) {
+      const m = S + j * spacing;
+      const idx = m - 1;
+      const int = running * rp;
+      let prin = 0;
+      let pay = 0;
+      if (j <= gracePay) {
+        pay = int;
+      } else {
+        prin = f.amortization === "annuity" ? (annuityPayment as number) - int : (principalPayment as number);
+        pay = prin + int;
+      }
+      interest[idx] = int;
+      principal[idx] = prin;
+      service[idx] = pay;
+      running -= prin;
+      balanceArr[idx] = running;
+    }
+  }
+  return { S, N, G, ppy, balance, annuityPayment, principalPayment, interest, principal, service, balanceArr };
+}
+
+// The leveraged solve over the facility set: the present value of the draws up to each facility's
+// service start and of its service, summed across the cost-following (financing) facilities in
+// facility-list order. The funding-block note stays out: its subsidy is already in the funding NPV.
+export function leveragedStreams(
+  costs: CostLine[],
+  facilities: Facility[],
+  rM: number,
+  horizon: number,
+  firstCollectionYear: number,
+): { pvDraws: number; pvService: number } {
+  const debt = facilities.filter((f) => f.origin !== "funding-note");
+  let pvDraws = 0;
+  let pvService = 0;
+  for (const f of debt) {
+    const S = (f.serviceStartYear ?? firstCollectionYear) * 12;
+    const N = f.termYears * 12;
+    const h = Math.max(horizon, S + N);
+    const ledger = resolveFacilityLedger(costs, [f], h);
+    const sch = facilitySchedule(f, ledger.draws[f.id], h, firstCollectionYear);
+    let draws = 0;
+    for (let m = 1; m <= S; m++) draws += ledger.draws[f.id][m - 1] / Math.pow(1 + rM, m);
+    let service = 0;
+    for (let m = S + 1; m <= S + N; m++) service += sch.service[m - 1] / Math.pow(1 + rM, m);
+    pvDraws += draws;
+    pvService += service;
+  }
+  return { pvDraws, pvService };
+}
+
 export function computeFinancingOverlay(ctx: FinancingContext, config: FinancingConfig): FinancingResult {
-  const rD = Math.pow(1 + config.debtRatePct / 100, 1 / 12) - 1;
-  const serviceStartYear = config.serviceStartYear ?? ctx.firstCollectionYear;
-  const S = serviceStartYear * 12;
-  const N = config.termYears * 12;
-  const G = config.graceYears * 12;
-  const horizon = Math.max(ctx.horizon, S + N);
-  const draws = fundableDraws(ctx.costs, config, horizon);
+  return computeFacilityOverlay(ctx, legacyFacilities(config, ctx.fundingRows));
+}
+
+export function computeFacilityOverlay(ctx: FinancingContext, facilities: Facility[]): FinancingResult {
+  let horizon = ctx.horizon;
+  for (const f of facilities) {
+    const S = (f.serviceStartYear ?? ctx.firstCollectionYear) * 12;
+    horizon = Math.max(horizon, S + f.termYears * 12);
+  }
+  const ledger = resolveFacilityLedger(ctx.costs, facilities, horizon);
+  const schedules = facilities.map((f) => facilitySchedule(f, ledger.draws[f.id], horizon, ctx.firstCollectionYear));
+  const isNote = (f: Facility) => f.origin === "funding-note";
+  const sumArrays = (pick: (i: number) => number[], filter: (f: Facility) => boolean): number[] => {
+    const out = new Array<number>(horizon).fill(0);
+    facilities.forEach((f, i) => {
+      if (!filter(f)) return;
+      const a = pick(i);
+      for (let m = 0; m < horizon; m++) out[m] += a[m];
+    });
+    return out;
+  };
+  const all = () => true;
+  const draws = sumArrays((i) => ledger.draws[facilities[i].id], all);
+  const interest = sumArrays((i) => schedules[i].interest, all);
+  const principal = sumArrays((i) => schedules[i].principal, all);
+  const service = sumArrays((i) => schedules[i].service, all);
+  const balanceArr = sumArrays((i) => schedules[i].balanceArr, all);
+  // the financing-layer facilities alone (the funding-block note's cash is already in the project
+  // net flow, as its dated receipt and installments)
+  const finDraws = sumArrays((i) => ledger.draws[facilities[i].id], (f) => !isNote(f));
+  const finService = sumArrays((i) => schedules[i].service, (f) => !isNote(f));
+  const noteDraws = sumArrays((i) => ledger.draws[facilities[i].id], isNote);
+  const noteService = sumArrays((i) => schedules[i].service, isNote);
+  const hasNote = facilities.some(isNote);
   let drawnTotal = 0;
   for (let m = 1; m <= horizon; m++) drawnTotal += draws[m - 1];
-  let balance = 0;
-  for (let m = 1; m <= S; m++) {
-    balance = (balance + draws[m - 1]) * (1 + rD);
-  }
-  const idc = balance - drawnTotal;
-  const amortMonths = N - G;
-  const annuityPayment = config.amortization === "annuity" ? (rD === 0 ? balance / amortMonths : (balance * rD) / (1 - Math.pow(1 + rD, -amortMonths))) : null;
-  const principalPayment = config.amortization === "equal-principal" ? balance / amortMonths : null;
-  const interest: number[] = new Array(horizon).fill(0);
-  const principal: number[] = new Array(horizon).fill(0);
-  const service: number[] = new Array(horizon).fill(0);
-  const balanceArr: number[] = new Array(horizon).fill(0);
-  let running = balance;
-  for (let m = S + 1; m <= S + N; m++) {
-    const idx = m - 1;
-    const int = running * rD;
-    let prin = 0;
-    let pay = 0;
-    if (m <= S + G) {
-      pay = int;
-    } else {
-      prin = config.amortization === "annuity" ? (annuityPayment as number) - int : (principalPayment as number);
-      pay = prin + int;
+  const facilityResults: FacilityResult[] = facilities.map((f, i) => {
+    const sch = schedules[i];
+    let drawnF = ledger.drawn[f.id];
+    let totalInterestF = 0;
+    let totalServiceF = 0;
+    for (let m = sch.S + 1; m <= sch.S + sch.N; m++) {
+      totalInterestF += sch.interest[m - 1];
+      totalServiceF += sch.service[m - 1];
     }
-    interest[idx] = int;
-    principal[idx] = prin;
-    service[idx] = pay;
-    running -= prin;
-    balanceArr[idx] = running;
-  }
+    return {
+      id: f.id,
+      label: f.label,
+      origin: f.origin ?? "financing",
+      scope: f.scope,
+      amount: f.amount ?? drawnF,
+      drawnTotal: drawnF,
+      drift: ledger.drift[f.id],
+      shares: ledger.shares[f.id],
+      idc: f.datedDraw !== undefined ? 0 : sch.balance - drawnF,
+      serviceStartBalance: sch.balance,
+      serviceStartMonth: sch.S,
+      termMonths: sch.N,
+      graceMonths: sch.G,
+      paymentsPerYear: sch.ppy,
+      amortizationType: f.amortization,
+      annuityPayment: sch.annuityPayment,
+      principalPayment: sch.principalPayment,
+      totalInterest: totalInterestF,
+      totalService: totalServiceF,
+      monthly: { draws: ledger.draws[f.id], interest: sch.interest, principal: sch.principal, service: sch.service, balance: sch.balanceArr },
+    };
+  });
+  const primaryIdx = Math.max(0, facilities.findIndex((f) => !isNote(f)));
+  const primary = facilityResults[primaryIdx];
+  let idc = 0;
   let totalInterest = 0;
   let totalService = 0;
-  for (let m = S + 1; m <= S + N; m++) {
-    totalInterest += interest[m - 1];
-    totalService += service[m - 1];
+  for (const fr of facilityResults) {
+    idc += fr.idc;
+    totalInterest += fr.totalInterest;
+    totalService += fr.totalService;
   }
   const totalYears = Math.ceil(horizon / 12);
   const yearly: FinancingYearlyRow[] = [];
@@ -130,13 +448,16 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
     if (yi === 0 && yp === 0 && ys === 0) continue;
     yearly.push({ year: y, interest: yi, principal: yp, service: ys });
   }
+  // The DSCR computes on the COMBINED service stream. The note's receipt and installments leave the
+  // collections-side inflows (they are debt cash) and enter the service.
   const dscr: DscrRow[] = [];
   let minDscr: { year: number; value: number } | null = null;
   for (let y = 1; y <= totalYears; y++) {
     let inflows = 0;
     let ys = 0;
     for (let m = (y - 1) * 12 + 1; m <= y * 12 && m <= horizon; m++) {
-      inflows += ctx.inflowsByMonth[m - 1] ?? 0;
+      const raw = ctx.inflowsByMonth[m - 1] ?? 0;
+      inflows += hasNote ? raw - noteDraws[m - 1] + noteService[m - 1] : raw;
       ys += service[m - 1];
     }
     const value = ys > 0 ? inflows / ys : null;
@@ -150,26 +471,38 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
   const equityVec: number[] = new Array(horizon).fill(0);
   for (let m = 1; m <= horizon; m++) {
     const net = m <= ctx.netM.length ? ctx.netM[m - 1] : 0;
-    equityVec[m - 1] = net + draws[m - 1] - service[m - 1];
+    equityVec[m - 1] = net + finDraws[m - 1] - finService[m - 1];
   }
   let outlay = 0;
-  ctx.costs.forEach((c) => {
-    if (c.category !== "recurring" && c.category !== "capex") return;
-    const share = (config.perLineSharePct?.[c.id] ?? config.sharePct) / 100;
-    // v0.6.12.1 (AUD-2): the equity outlay follows the same incurred basis as the draws for a
-    // line carrying per-year profiles. A profile-free line keeps its pre-existing association
-    // order, ((1 - share) * amount) * growth, term for term: the multiplication order is part of
-    // the byte-identity lock (the incurred form (1 - share) * (amount * growth) differs in the
-    // last digit on some inputs).
-    if (c.yearOverrides !== undefined && Object.keys(c.yearOverrides).length > 0) {
-      for (const [, amount] of lineIncurred(c)) outlay += (1 - share) * amount;
-    } else if (c.category === "capex") {
-      outlay += (1 - share) * c.amount;
-    } else {
-      const dur = Math.max(1, c.durationYears);
-      for (let j = 0; j < dur; j++) outlay += (1 - share) * c.amount * Math.pow(1 + c.escalation / 100, j);
-    }
-  });
+  const costFollowing = facilities.filter((f) => f.datedDraw === undefined);
+  if (costFollowing.length === 1 && costFollowing[0].sharePct !== undefined) {
+    const config = { sharePct: costFollowing[0].sharePct as number, perLineSharePct: costFollowing[0].perLineSharePct };
+    ctx.costs.forEach((c) => {
+      if (c.category !== "recurring" && c.category !== "capex") return;
+      const share = (config.perLineSharePct?.[c.id] ?? config.sharePct) / 100;
+      // v0.6.12.1 (AUD-2): the equity outlay follows the same incurred basis as the draws for a
+      // line carrying per-year profiles. A profile-free line keeps its pre-existing association
+      // order, ((1 - share) * amount) * growth, term for term: the multiplication order is part of
+      // the byte-identity lock (the incurred form (1 - share) * (amount * growth) differs in the
+      // last digit on some inputs).
+      if (c.yearOverrides !== undefined && Object.keys(c.yearOverrides).length > 0) {
+        for (const [, amount] of lineIncurred(c)) outlay += (1 - share) * amount;
+      } else if (c.category === "capex") {
+        outlay += (1 - share) * c.amount;
+      } else {
+        const dur = Math.max(1, c.durationYears);
+        for (let j = 0; j < dur; j++) outlay += (1 - share) * c.amount * Math.pow(1 + c.escalation / 100, j);
+      }
+    });
+  } else {
+    // the facility-list outlay: each line's incurred cost less the combined effective share
+    ctx.costs.forEach((c) => {
+      if (!isFundable(c)) return;
+      let covered = 0;
+      for (const f of costFollowing) covered += ledger.shares[f.id][c.id] ?? 0;
+      for (const [, amount] of lineIncurred(c)) outlay += (1 - covered) * amount;
+    });
+  }
   const equityNpvAtWacc = npvMonthly(ctx.waccMonthlyRate, equityVec);
   const equityNpvAtTarget = npvMonthly(ctx.targetMonthlyRate, equityVec);
   let cum = 0;
@@ -203,7 +536,7 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
         }
       }
     }
-    const withoutFinancing = equityVec.map((v, i) => v - fundingCash[i] - draws[i] + service[i]);
+    const withoutFinancing = equityVec.map((v, i) => v - fundingCash[i] - finDraws[i] + finService[i]);
     ambiguityCause = countSignChanges(withoutFinancing) <= 1 ? "financing" : "operational";
     ambiguityNote = composeAmbiguityNote(ambiguityCause, "equity", signChanges, null);
   }
@@ -227,13 +560,13 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
   return {
     drawnTotal,
     idc,
-    serviceStartBalance: balance,
-    serviceStartMonth: S,
-    termMonths: N,
-    graceMonths: G,
-    amortizationType: config.amortization,
-    annuityPayment,
-    principalPayment,
+    serviceStartBalance: primary.serviceStartBalance,
+    serviceStartMonth: primary.serviceStartMonth,
+    termMonths: primary.termMonths,
+    graceMonths: primary.graceMonths,
+    amortizationType: primary.amortizationType,
+    annuityPayment: primary.annuityPayment,
+    principalPayment: primary.principalPayment,
     totalInterest,
     totalService,
     monthly: { interest, principal, service, balance: balanceArr },
@@ -242,6 +575,7 @@ export function computeFinancingOverlay(ctx: FinancingContext, config: Financing
     minDscr,
     equity,
     draws,
+    facilities: facilityResults,
   };
 }
 
