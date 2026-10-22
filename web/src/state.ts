@@ -193,6 +193,11 @@ function decisionGate(id: string, code: string, year: number): TimelineDecisionP
   return { id, title: dp?.title ?? "", year, code };
 }
 
+// v0.6.18 Task E.3: the same gate with its month (the month-level demo project).
+function monthGate(id: string, code: string, year: number, month: number): TimelineDecisionPoint {
+  return { ...decisionGate(id, code, year), month };
+}
+
 export function shorePowerProgram(): ModelInputs {
   const liftsR1 = [200, 320, 380, ...new Array(18).fill(400)];
   const liftsR2 = [0, 0, 60, 90, 110, ...new Array(16).fill(120)];
@@ -305,35 +310,40 @@ export function landNewbuildProject(): ModelInputs {
     ],
     appraisal: { wacc: 5, financeRate: 4, reinvestmentRate: 4, residual: { mode: "calculated", amount: 0, year: 23 } },
     maintenance: { mode: "off" },
-    // v0.6.13.1 Task B: the authored timeline of the demo (the full DP scale). Program years are
-    // 1-based and the turnkey cost starts in year 1, so the prestudy-and-design lanes open in
-    // year 1 alongside the construction (they cannot precede it): the site acquisition is the
-    // prestudy (its cost line, year 1), the design sits inside the total-enterprise contract (the
-    // fixture's own contract form), and the turnkey construction and the fit-out follow their cost
-    // spans. The preparation gates fall in year 1, execution starts in year 1 (the turnkey cost),
-    // the mid-construction review and the delivery approval in year 2 (construction complete),
-    // handover and closure in year 3 (the leases and operations begin). No gate outcome is
-    // recorded; the engine-event milestones tie to construction complete and the first collection
-    // year (the project has no funding block).
+    // v0.6.13.1 Task B / v0.6.18 Task E.3: the authored timeline of the demo (the full DP scale), now at MONTH
+    // granularity — the one demo project that exercises the v0.6.17 month features (the shore-power program keeps
+    // its year-level timeline). Program years are 1-based and the turnkey cost starts in year 1, so the
+    // prestudy-and-design lanes open in year 1 alongside the construction (they cannot precede it): the site
+    // acquisition is the prestudy (its cost line, year 1, months 1-3), the design sits inside the total-enterprise
+    // contract (months 2-8 of year 1), and the turnkey construction (year 1 month 6 to year 2 month 10) and the
+    // fit-out (year 2 months 6-12) follow their cost spans; the handover and lease commencement (year 2 month 11
+    // to year 3 month 3, the operations lane) carries the window into year 3, where the operating lines begin.
+    // The preparation gates fall in year 1 (months 1, 3 and
+    // 5), execution starts in month 6 of year 1 (the turnkey cost), the mid-construction review is in month 3 of
+    // year 2 and the delivery approval in month 11 of year 2, handover and closure in year 3 (months 1 and 12).
+    // No gate outcome is recorded. The milestones are listed in chronological order: construction complete
+    // (year 2 month 10, tied to the engine event of that year), the hotel fit-out (year 2 month 12, tied to its
+    // activity) and the first collection year (year 3 month 1, the leases begin; the engine's computed first
+    // payment month is month 12 of that year and shows as the read-only computed ring beside it).
     timeline: {
       projectScale: "full",
       activities: [
-        { id: "a1", label: "Site acquisition and prestudy (lakeside plot)", startYear: 1, endYear: 1, phase: "prestudy" },
-        { id: "a2", label: "Design within the total-enterprise contract", startYear: 1, endYear: 1, phase: "detail-design" },
-        { id: "a3", label: "Turnkey construction (18-storey timber tower)", startYear: 1, endYear: 2, phase: "production" },
-        { id: "a4", label: "Interior & hotel fit-out", startYear: 2, endYear: 2, phase: "production" },
+        { id: "a1", label: "Site acquisition and prestudy (lakeside plot)", startYear: 1, endYear: 1, startMonth: 1, endMonth: 3, phase: "prestudy" },
+        { id: "a2", label: "Design within the total-enterprise contract", startYear: 1, endYear: 1, startMonth: 2, endMonth: 8, phase: "detail-design" },
+        { id: "a3", label: "Turnkey construction (18-storey timber tower)", startYear: 1, endYear: 2, startMonth: 6, endMonth: 10, phase: "production" },
+        { id: "a4", label: "Interior & hotel fit-out", startYear: 2, endYear: 2, startMonth: 6, endMonth: 12, phase: "production" },
+        { id: "a5", label: "Handover, lease commencement and operations start", startYear: 2, endYear: 3, startMonth: 11, endMonth: 3, phase: "operations" },
       ],
       decisionPoints: [
-        decisionGate("d1", "DP1", 1), decisionGate("d2", "DP2", 1), decisionGate("d3", "DP3", 1), decisionGate("d4", "DP4", 1),
-        decisionGate("d5", "DP5", 2), decisionGate("d6", "DP6", 2), decisionGate("d7", "DP7", 3), decisionGate("d8", "DP8", 3),
+        monthGate("d1", "DP1", 1, 1), monthGate("d2", "DP2", 1, 3), monthGate("d3", "DP3", 1, 5), monthGate("d4", "DP4", 1, 6),
+        monthGate("d5", "DP5", 2, 3), monthGate("d6", "DP6", 2, 11), monthGate("d7", "DP7", 3, 1), monthGate("d8", "DP8", 3, 12),
       ],
       milestones: [
-        { id: "m1", label: "Hotel fit-out complete", year: 2, tie: { kind: "activity", activityId: "a4" } },
-        { id: "m2", label: "Construction complete", year: 2, tie: { kind: "engine-event", event: "construction-complete" } },
-        { id: "m3", label: "First collection year: the leases begin", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } },
+        { id: "m1", label: "Construction complete", year: 2, month: 10, tie: { kind: "engine-event", event: "construction-complete" } },
+        { id: "m2", label: "Hotel fit-out complete", year: 2, month: 12, tie: { kind: "activity", activityId: "a4" } },
+        { id: "m3", label: "First collection year: the leases begin", year: 3, month: 1, tie: { kind: "engine-event", event: "first-collection-year" } },
       ],
-    },
-  };
+    },  };
 }
 
 export function nextCostId(costs: CostLine[]): string {
@@ -409,7 +419,8 @@ export const TIMELINE_EVENT_LABELS: Record<TimelineEngineEvent, string> = {
 };
 
 export function emptyTimeline(): TimelineBlock {
-  return { projectScale: "full", activities: [], decisionPoints: [], milestones: [] };
+  // v0.6.18 Task E: the project scale starts EMPTY (the field absent): no gate is populated automatically.
+  return { activities: [], decisionPoints: [], milestones: [] };
 }
 
 // A normalized view of the (possibly partial) block: absent collections read as empty and the
@@ -419,7 +430,9 @@ export function emptyTimeline(): TimelineBlock {
 export function timelineOf(inputs: ModelInputs): TimelineBlock {
   const t = inputs.timeline;
   return {
-    projectScale: t?.projectScale ?? "full",
+    // v0.6.18 Task E: an absent scale reads as EMPTY (no automatic population); "mini" and "full" populate the
+    // decision-point gates of their set. The document contract is the existing one: the optional projectScale field.
+    ...(t?.projectScale !== undefined ? { projectScale: t.projectScale } : {}),
     phases: t?.phases ?? TIMELINE_PHASES.map((p) => ({ ...p })),
     ...(t?.laneVisibility !== undefined ? { laneVisibility: t.laneVisibility } : {}),
     activities: t?.activities ?? [],
@@ -622,6 +635,21 @@ export function nextUnusedDecisionPoint(tl: TimelineBlock): { code: string; titl
     }
   }
   return null;
+}
+
+// v0.6.18 Task E: choosing the Full or Mini scale populates the decision-point gates of its set — only the
+// MISSING codes are added (at program year 1, the added-gate default; the user then places them); an authored
+// gate is never moved, renamed or removed, so nothing disappears silently. The Empty scale (the default)
+// populates nothing.
+export function withScalePreset(tl: TimelineBlock, scale: "mini" | "full"): TimelineDecisionPoint[] {
+  const have = new Set(tl.decisionPoints.map((d) => d.code).filter((c): c is string => c !== undefined));
+  const out = [...tl.decisionPoints];
+  for (const code of DECISION_SCALE_CODES[scale]) {
+    if (have.has(code)) continue;
+    const dp = DECISION_POINT_SET.find((d) => d.code === code);
+    out.push({ id: nextId("d", out.map((d) => d.id)), title: dp?.title ?? "", year: 1, code });
+  }
+  return out;
 }
 
 // The program span in years: the declared project length when declared, else the derived

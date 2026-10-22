@@ -4,7 +4,7 @@ import {
   DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
   phaseVocabularyIssues, phasesOf, programSpanYears, replaceSourceActivities, sourceHasActivities, suggestActivitiesFromContracts,
   suggestActivitiesFromCosts, suggestActivitiesFromFinancing, suggestActivitiesFromFunding, suggestActivitiesFromOperating,
-  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, yearMonthHeader,
+  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, withScalePreset, yearMonthHeader,
 } from "../state.js";
 
 // v0.6.13.2 Task B: the per-source suggestion buttons. Each derives one source of the project into
@@ -181,7 +181,15 @@ export function TimelineSection(props: {
         </label>
       )}
       <label>Project scale{" "}
-        <select data-field="projectScale" value={tl.projectScale ?? "full"} onChange={(e) => commit({ projectScale: e.target.value as "mini" | "full" })}>
+        {/* v0.6.18 Task E: Empty (the default; no automatic population), Full (the gates DP1-DP8) and Mini (the gates
+            DP1, DP3, DP4, DP8). Choosing Full or Mini adds the missing gates of the set; an authored gate is never
+            moved or removed. */}
+        <select data-field="projectScale" value={tl.projectScale ?? "empty"} onChange={(e) => {
+          const v = e.target.value;
+          if (v === "empty") commit({ projectScale: undefined });
+          else commit({ projectScale: v as "mini" | "full", decisionPoints: withScalePreset(tl, v as "mini" | "full") });
+        }}>
+          <option value="empty">Empty (no automatic gates)</option>
           <option value="full">Full (DP1–DP8)</option>
           <option value="mini">Mini (DP1, DP3, DP4, DP8)</option>
         </select>

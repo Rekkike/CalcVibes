@@ -25,7 +25,7 @@ describe("v0.6.13.3 Task B: the Timeline section", () => {
     render(<App />);
     fireEvent.click(byNav("timeline"));
     const select = document.querySelector('[data-field="projectScale"]') as HTMLSelectElement;
-    expect(Array.from(select.options).map((o) => [o.value, o.textContent])).toEqual([["full", "Full (DP1–DP8)"], ["mini", "Mini (DP1, DP3, DP4, DP8)"]]);
+    expect(Array.from(select.options).map((o) => [o.value, o.textContent])).toEqual([["empty", "Empty (no automatic gates)"], ["full", "Full (DP1–DP8)"], ["mini", "Mini (DP1, DP3, DP4, DP8)"]]); // v0.6.18 Task E: the Empty option leads and is the default
   });
 
   it("DISCLOSURE-RENDER: the disclosure paragraph is the decision-disclosure test id and carries the new text", () => {
