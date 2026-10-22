@@ -130,6 +130,16 @@ describe("Task B: the service aggregation over the combined facility set", () =>
     expect(only.minDscr!.value).toBeGreaterThan(r.minDscr!.value);
   });
 
+  it("a facility whose term outruns the model horizon extends the combined horizon", () => {
+    const long = fac({ id: "L", amount: 4000000, termYears: 15, serviceStartYear: 2 });
+    const r = computeFacilityOverlay(ctxOf(), [a, long]);
+    // service start 24 + term 180 = month 204 > the model horizon 120
+    expect(r.monthly.service.length).toBe(204);
+    near(r.facilities![1].monthly.service[203], 4000000 / 180);
+    expect(r.facilities![0].monthly.service[203]).toBe(0);
+    near(r.totalService, 6200000 + 4000000);
+  });
+
   it("annual-payment facilities service at year ends", () => {
     const n = fac({ id: "N", amount: 1200000, termYears: 3, serviceStartYear: 2, paymentsPerYear: 1 });
     const r = computeFacilityOverlay(ctxOf(), [n]);

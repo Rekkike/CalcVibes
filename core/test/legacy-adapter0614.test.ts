@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+// the core workspace carries no Node type declarations; the test runner is Node
+// @ts-ignore
 import { createHash } from "node:crypto";
 import { computeModel } from "../src/engine.js";
 import { appraisal, templateLike } from "./_shared.js";
@@ -11,9 +13,10 @@ import type { FinancingConfig } from "../src/types.js";
 const fin = (over: Partial<FinancingConfig>): FinancingConfig => ({
   enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity", leveragedSolve: false, perLineSharePct: {}, ...over,
 });
+type Hasher = { update(s: string): { digest(enc: string): string } };
 const hashOf = (over: Partial<FinancingConfig>): string => {
   const r = computeModel({ ...templateLike(), appraisal: appraisal(), financing: fin(over) });
-  return createHash("sha256").update(JSON.stringify({ ...r.financing, facilities: undefined })).digest("hex");
+  return (createHash as unknown as (a: string) => Hasher)("sha256").update(JSON.stringify({ ...r.financing, facilities: undefined })).digest("hex");
 };
 
 describe("the legacy adapter reproduces the pre-unification overlay byte for byte", () => {
