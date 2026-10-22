@@ -60,9 +60,10 @@ describe("Task G: the deck design system (structural pins)", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
-    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]') as HTMLElement;
-    // v0.6.10 re-anchor: the program fixture carries six cost lines.
-    expect(rows.querySelectorAll("[data-composition-row]").length).toBe(6);
+    // v0.6.15 re-anchor: the composition rows retired; the ledger waterfall is the investment slide's one
+    // composition figure (six capital cost lines on the program fixture).
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]') as HTMLElement;
+    expect(rows.querySelectorAll('[data-ledger-row][data-ledger-kind="capital"]').length).toBe(6);
     expect(rows.querySelectorAll('[data-testid="donut-segment-label"]').length).toBe(0);
   });
 

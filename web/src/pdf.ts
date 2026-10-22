@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import { deckMoneyForDisplay, percentTwoForDisplay } from "./engine.js";
 import type { CurrencyCode, EntryUnit } from "./engine.js";
-import type { DeckModel, DeckDonut, DeckGantt, ScenarioTargetChart } from "./deck.js";
+import type { DeckModel, DeckDonut, DeckGantt, DeckLedgerRow, DeckStepColumn, ScenarioTargetChart } from "./deck.js";
 
 export interface DeckPdfTrace {
   drawnTitles: string[];
@@ -315,6 +315,151 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
   doc.setFontSize(12);
   return endY;
 }
+// v0.6.15 Task D: the investment waterfall on the print route. The ledger draws the deck model's rows
+// (the full line names wrapped, never truncated; a bar floating on the shared left-baseline scale; the
+// value at the bar end; the muted full-outflow share at the row end; the subtotal hairline with its
+// tick; the heavier total bar), and the stepped columns draw the group steps with the ground-standing
+// total. Both consume the same composed model as the Presentation (the group aggregation is never
+// recomputed here); the operating segment prints and the rows reconcile to the total.
+const PRINT_CAPITAL: [number, number, number] = [0, 116, 186]; // #0074ba
+const PRINT_TOTAL: [number, number, number] = [16, 53, 88]; // the deck navy
+
+function printBarColor(kind: DeckLedgerRow["kind"] | DeckStepColumn["kind"]): [number, number, number] {
+  return kind === "operating" ? PRINT_OK : kind === "reinvestments" ? PRINT_GOLD : kind === "total" ? PRINT_TOTAL : PRINT_CAPITAL;
+}
+
+// diagonal hatch over a bar so the operating and reinvestments segments differ in grayscale too:
+// 45 degree strokes from the bottom edge, clipped to the bar rectangle
+function hatchBar(doc: jsPDF, x: number, y: number, w: number, h: number): void {
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.25);
+  for (let t = -h; t < w; t += 1.6) {
+    let sx = x + t;
+    let sy = y + h;
+    let ex = sx + h;
+    let ey = y;
+    if (sx < x) { sy -= x - sx; sx = x; }
+    if (ex > x + w) { ey += ex - (x + w); ex = x + w; }
+    if (ex > sx) doc.line(sx, sy, ex, ey);
+  }
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
+}
+
+function ledgerNameLines(doc: jsPDF, name: string): string[] {
+  doc.setFontSize(7);
+  return doc.splitTextToSize(name, 84) as string[];
+}
+
+function ledgerRowHeight(doc: jsPDF, r: DeckLedgerRow): number {
+  return Math.max(5.2, ledgerNameLines(doc, r.name).length * 3 + 2.2);
+}
+
+function drawPrintLedgerRow(doc: jsPDF, r: DeckLedgerRow, y: number, trace?: DeckPdfTrace): number {
+  const x0 = 110;
+  const plotW = 100;
+  const lines = ledgerNameLines(doc, r.name);
+  const h = Math.max(5.2, lines.length * 3 + 2.2);
+  const mid = y + h / 2;
+  doc.setFontSize(7);
+  doc.setTextColor(0, 0, 0);
+  if (r.kind === "total" || r.kind === "subtotal") doc.setFont("helvetica", "bold");
+  doc.text(lines, 20, y + 3.4);
+  doc.setFont("helvetica", "normal");
+  if (r.kind === "subtotal") {
+    doc.setDrawColor(150, 150, 150);
+    doc.line(20, y, 277, y);
+    doc.setDrawColor(0, 0, 0);
+    doc.setFillColor(PRINT_TOTAL[0], PRINT_TOTAL[1], PRINT_TOTAL[2]);
+    doc.rect(x0 + (r.startPct / 100) * plotW - 0.4, y + 0.6, 0.8, h - 1.2, "F");
+  } else {
+    const bx = x0 + (r.startPct / 100) * plotW;
+    const bw = Math.max(0.35, (r.widthPct / 100) * plotW);
+    const bh = r.kind === "total" ? 4.4 : 3.2;
+    const c = printBarColor(r.kind);
+    doc.setFillColor(c[0], c[1], c[2]);
+    doc.rect(bx, mid - bh / 2, bw, bh, "F");
+    if (r.kind === "operating" || r.kind === "reinvestments") hatchBar(doc, bx, mid - bh / 2, bw, bh);
+  }
+  const endPct = r.kind === "subtotal" ? r.startPct : r.startPct + r.widthPct;
+  if (r.kind === "capital" || r.kind === "operating" || r.kind === "reinvestments") {
+    // the hairline connector from this bar's end to the next row's start
+    doc.setDrawColor(170, 170, 170);
+    doc.line(x0 + (endPct / 100) * plotW, mid + 1.6, x0 + (endPct / 100) * plotW, y + h + 1.6);
+    doc.setDrawColor(0, 0, 0);
+  }
+  doc.setTextColor(0, 0, 0);
+  doc.text(r.value, x0 + (endPct / 100) * plotW + 2, mid + 0.9);
+  doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+  doc.text(r.share, 277, mid + 0.9, { align: "right" });
+  doc.setTextColor(0, 0, 0);
+  if (trace) {
+    const f = trace.drawnFigures[trace.drawnFigures.length - 1];
+    f?.push(r.name);
+    f?.push(r.value);
+    f?.push(r.share);
+  }
+  return h;
+}
+
+function drawPrintColumns(doc: jsPDF, columns: DeckStepColumn[], y: number, trace?: DeckPdfTrace): number {
+  const left = 20;
+  const width = 257;
+  const trackH = 26;
+  const labelRoom = 8;
+  const n = columns.length;
+  const slot = width / Math.max(1, n);
+  const top = y + labelRoom;
+  const ground = top + trackH;
+  doc.setLineWidth(0.2);
+  const yOf = (pct: number) => ground - (pct / 100) * trackH;
+  columns.forEach((c, i) => {
+    const bx = left + i * slot;
+    const bw = 0.6 * slot;
+    const by = yOf(c.bottomPct + c.heightPct);
+    const bh = Math.max(0.35, (c.heightPct / 100) * trackH);
+    if (c.kind === "total") {
+      doc.setDrawColor(PRINT_TOTAL[0], PRINT_TOTAL[1], PRINT_TOTAL[2]);
+      doc.setFillColor(231, 236, 242);
+      doc.rect(bx, by, bw, bh, "FD");
+      doc.setDrawColor(0, 0, 0);
+    } else {
+      const col = printBarColor(c.kind);
+      doc.setFillColor(col[0], col[1], col[2]);
+      doc.rect(bx, by, bw, bh, "F");
+      if (c.kind === "operating" || c.kind === "reinvestments") hatchBar(doc, bx, by, bw, bh);
+      // the dotted connector from this step's top to the next base (or the total's top)
+      doc.setDrawColor(120, 120, 120);
+      doc.setLineDashPattern([0.6, 0.8], 0);
+      doc.line(bx + bw, by, bx + slot, by);
+      doc.setLineDashPattern([], 0);
+      doc.setDrawColor(0, 0, 0);
+    }
+    doc.setFontSize(7);
+    doc.setTextColor(0, 0, 0);
+    const label = c.kind === "total" ? `Total program cost ${c.value}` : c.value;
+    doc.text(doc.splitTextToSize(label, slot * 0.95) as string[], bx + bw / 2, by - 1.6 - (c.kind === "total" ? 3 : 0), { align: "center" });
+    if (trace) {
+      const f = trace.drawnFigures[trace.drawnFigures.length - 1];
+      f?.push(c.value);
+    }
+  });
+  doc.setDrawColor(60, 60, 60);
+  doc.setLineWidth(0.5);
+  doc.line(left, ground, left + width, ground);
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
+  doc.setFontSize(7);
+  let namesH = 0;
+  columns.forEach((c, i) => {
+    const wrapped = doc.splitTextToSize(c.name, slot * 0.95) as string[];
+    doc.text(wrapped, left + i * slot + 0.3 * slot, ground + 4, { align: "center" });
+    namesH = Math.max(namesH, wrapped.length * 3.2);
+    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(c.name);
+  });
+  return labelRoom + trackH + 4 + namesH + 3;
+}
+
 export function buildDeckPdf(model: DeckModel, projectName: string): jsPDF;
 export function buildDeckPdf(model: DeckModel, projectName: string, trace: DeckPdfTrace): jsPDF;
 export function buildDeckPdf(model: DeckModel, projectName: string, trace?: DeckPdfTrace): jsPDF {
@@ -605,7 +750,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       doc.text("The cumulative line crosses the axis where the outlay is covered.", 120, y + 42, { align: "center", maxWidth: 180 });
       doc.setTextColor(0, 0, 0);
       y += 50;
-    } else if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0) {
+    } else if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0 && slide.waterfall === undefined) {
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
       // v0.6.9 Task G: on the scenarios slide the row height scales to the reserved space
       // (sceChartScale is 1 everywhere else, including the investment slide's rows chart).
@@ -654,6 +799,29 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         doc.rect(20 + di * (barW + 3), y + 44 - h, barW, h, "F");
       });
       y += 50;
+    }
+    // v0.6.15 Task D: the investment waterfall — the ledger rows, then the stepped columns.
+    if (slide.waterfall !== undefined) {
+      let edgeTop = y;
+      const drawEdge = (to: number) => {
+        // the closure edge: the 100 percent line runs through every ledger row
+        doc.setDrawColor(150, 150, 150);
+        doc.setLineDashPattern([0.8, 0.8], 0);
+        doc.line(110 + 100, edgeTop, 110 + 100, to);
+        doc.setLineDashPattern([], 0);
+        doc.setDrawColor(0, 0, 0);
+      };
+      for (const r of slide.waterfall.rows) {
+        const h = ledgerRowHeight(doc, r);
+        if (allowBreak && y + h > CONTENT_BOTTOM) { drawEdge(y); doc.addPage(); footerPage += 1; y = CONTENT_TOP; edgeTop = y; }
+        y += drawPrintLedgerRow(doc, r, y, trace);
+      }
+      drawEdge(y);
+      y += 3;
+      const colH = 8 + 26 + 4 + 7 + 3;
+      if (allowBreak && y + colH > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+      y += drawPrintColumns(doc, slide.waterfall.columns, y, trace);
+      doc.setFontSize(10);
     }
     // v0.6.10 Task G.5: the funding breakdown renders through the deck's PDF pipeline — after
     // the rows chart on the investment slide; the headline figures plus the rows list,

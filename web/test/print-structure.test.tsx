@@ -39,8 +39,9 @@ describe("Task E: composition, one figure (re-anchored to the composition rows p
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
-    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]');
+    // v0.6.15 re-anchor: the ledger waterfall replaces the composition rows (six capital lines).
+    const rows = document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]');
     expect(rows).toBeTruthy();
-    expect((rows as HTMLElement).querySelectorAll("[data-composition-row]").length).toBe(6);
+    expect((rows as HTMLElement).querySelectorAll('[data-ledger-row][data-ledger-kind="capital"]').length).toBe(6);
   });
 });

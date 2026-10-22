@@ -192,10 +192,10 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.14");
+    expect(VERSION).toBe("v0.6.15");
   });
 
-  it("WATERFALL-FORM: the build-up is vertical floats to a solid cap with the labels outside the geometry", () => {
+  it("WATERFALL-FORM: the build-up is vertical floats to a ground-standing total column with the labels directly above the bars (v0.6.15 re-anchor)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -208,10 +208,14 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
       expect(seg.style.height).not.toBe("");
       expect(seg.querySelector('[data-testid="waterfall-label"]')).toBe(null);
     }
+    // direct value labels: one per step, outside the bar geometry; the ground-standing total is the standing column
     const labels = waterfall.querySelectorAll('[data-testid="waterfall-label"]');
     expect(labels.length).toBe(segments.length);
+    const total = waterfall.querySelector('[data-waterfall-total="true"]') as HTMLElement;
+    expect(total.style.bottom).toBe("0%");
+    expect(total.style.height).toBe("100%");
     const css = fs.readFileSync("src/index.css", "utf8");
-    // v0.6.9 Task A: the track widens to 240px and spans the full slide width.
+    // v0.6.9 Task A: the track is 240px and spans the full slide width (held by the repaired lower section).
     expect(css).toMatch(/\[data-testid="presentation"\] \.waterfall-track\s*\{[^}]*height:\s*240px/);
     expect(css).toMatch(/\[data-testid="presentation"\] \.waterfall-track\s*\{[^}]*width:\s*100%/);
   });

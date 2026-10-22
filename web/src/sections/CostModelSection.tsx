@@ -42,7 +42,7 @@ export function CostModelSection(props: {
       <table data-testid="cost-lines">
         <thead>
           <tr>
-            <th>Name</th><th>Category</th><th>Amount / year</th><th>Start year</th><th>Duration (years)</th><th>Escalation %</th><th>Depreciation</th><th>Line total</th><th></th>
+            <th>Name</th><th>Category</th><th>Group</th><th>Amount / year</th><th>Start year</th><th>Duration (years)</th><th>Escalation %</th><th>Depreciation</th><th>Line total</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -58,6 +58,9 @@ export function CostModelSection(props: {
                     <option value="recurring">Recurring</option>
                     <option value="capex">CAPEX</option>
                   </select>
+                </td>
+                <td>
+                  <input data-field="group" placeholder="optional" value={c.group ?? ""} onChange={(e) => updateCost(c.id, { group: e.target.value === "" ? undefined : e.target.value })} />
                 </td>
                 <td>
                   <MoneyEditor dataField="amount" value={c.amount} entryUnit={entryUnit} disabled={c.category === "capex" && c.yearOverrides !== undefined && Object.keys(c.yearOverrides ?? {}).length > 0} onChange={(v) => updateCost(c.id, { amount: v })} title={c.category === "recurring" ? "Annual amount" : "The lump amount"} />

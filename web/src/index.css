@@ -631,16 +631,39 @@
 
 
 /* ===== v0.5.8 Task C: the deck charts (waterfall, coverage, hurdle); the waterfall re-formed to the B4 vertical build-up at v0.6; the classical stepped waterfall at v0.6.9 (Task A, finding W26 — the fluid track, the offset floating steps, the labels below) ===== */
-[data-testid="presentation"] .waterfall-track {  position: relative;  height: 240px;  width: 100%;  margin: var(--space-2) 0;}
+[data-testid="presentation"] .waterfall-track {  position: relative;  height: 240px;  width: 100%;  margin: 2.6rem 0 0;}
 [data-testid="presentation"] .waterfall-segment {  position: absolute;  background: rgba(0, 116, 186, 0.75);}
-/* v0.6.9 Task A: the label list is the labels of record, wrapping to full width below the track. */
-[data-testid="presentation"] .waterfall-label-list {  list-style: none;  display: flex;  flex-wrap: wrap;  gap: var(--space-1) var(--space-2);  margin: var(--space-2) 0 0;  padding: 0;}
+/* v0.6.15: the label list retired with the composition rows; the value labels sit above the bars. */
 /* v0.6.8 Task A (finding W18): the operating and reinvestments segments carry visually distinct
    fills (hatched / lighter) so the investment basis and the operating basis are never conflated. */
 [data-testid="presentation"] .waterfall-segment-operating {  background: repeating-linear-gradient(45deg, rgba(52, 211, 153, 0.35), rgba(52, 211, 153, 0.35) 4px, rgba(0, 116, 186, 0.28) 4px, rgba(0, 116, 186, 0.28) 8px);}
 [data-testid="presentation"] .waterfall-segment-reinvestments {  background: repeating-linear-gradient(-45deg, rgba(232, 184, 75, 0.4), rgba(232, 184, 75, 0.4) 4px, rgba(251, 113, 133, 0.3) 4px, rgba(251, 113, 133, 0.3) 8px);}
-[data-testid="presentation"] .waterfall-cap {  position: absolute;  background: #e2e8f0;  border-radius: 2px;}
-[data-testid="presentation"] .waterfall-label {  font-size: 10px;  color: #e2e8f0;  white-space: nowrap;}
+/* v0.6.15: the repaired stepped columns (group level): a ground-standing total column in the neutral ink
+   (the e2e8f0 outline, 12.9:1 on the stage), dotted 1 px connectors, direct value labels above the bars,
+   the ground line, and the group names under it (a wrap, never an ellipsis). */
+[data-testid="presentation"] [data-testid="cost-waterfall"] {  margin-top: var(--space-3);}
+[data-testid="presentation"] .waterfall-total-column {  position: absolute;  box-sizing: border-box;  border: 2px solid #e2e8f0;  background: rgba(226, 232, 240, 0.12);  border-radius: 2px 2px 0 0;}
+[data-testid="presentation"] .waterfall-connector {  position: absolute;  height: 0;  border-top: 1px dotted rgba(226, 232, 240, 0.75);}
+[data-testid="presentation"] .waterfall-value {  position: absolute;  font-size: 12px;  line-height: 1.15;  color: #e2e8f0;  text-align: center;  font-variant-numeric: tabular-nums;}
+[data-testid="presentation"] .waterfall-ground {  height: 2px;  background: rgba(226, 232, 240, 0.75);}
+[data-testid="presentation"] .waterfall-names {  display: flex;  align-items: flex-start;  margin-top: var(--space-1);}
+[data-testid="presentation"] .waterfall-name {  box-sizing: border-box;  padding: 0 2px;  font-size: 12px;  line-height: 1.2;  color: #e2e8f0;  text-align: center;  overflow-wrap: anywhere;}
+/* v0.6.15: the ledger waterfall (individual lines): name | scale | muted full-outflow share. */
+[data-testid="presentation"] .ledger-row {  display: grid;  grid-template-columns: minmax(9rem, 1.3fr) minmax(0, 2.2fr) 4.5em;  align-items: center;  gap: var(--space-2);  padding: 3px 0;}
+[data-testid="presentation"] .ledger-name {  font-size: 12px;  line-height: 1.25;  color: #e2e8f0;  overflow-wrap: anywhere;}
+[data-testid="presentation"] .ledger-track {  padding-right: 6.5em;}
+[data-testid="presentation"] .ledger-scale {  position: relative;  height: 16px;  border-right: 1px dashed rgba(226, 232, 240, 0.5);}
+[data-testid="presentation"] .ledger-bar {  position: absolute;  top: 2px;  height: 12px;  background: #38bdf8;  border-radius: 1px;}
+[data-testid="presentation"] .ledger-bar-operating {  background: repeating-linear-gradient(45deg, rgba(52, 211, 153, 0.85), rgba(52, 211, 153, 0.85) 4px, rgba(56, 189, 248, 0.45) 4px, rgba(56, 189, 248, 0.45) 8px);}
+[data-testid="presentation"] .ledger-bar-reinvestments {  background: repeating-linear-gradient(-45deg, rgba(232, 184, 75, 0.9), rgba(232, 184, 75, 0.9) 4px, rgba(251, 113, 133, 0.6) 4px, rgba(251, 113, 133, 0.6) 8px);}
+[data-testid="presentation"] .ledger-bar-total {  top: 0;  height: 16px;  background: #e2e8f0;}
+[data-testid="presentation"] .ledger-value {  position: absolute;  top: 50%;  transform: translateY(-50%);  font-size: 12px;  color: #ffffff;  white-space: nowrap;  font-variant-numeric: tabular-nums;}
+[data-testid="presentation"] .ledger-share {  font-size: 12px;  color: #94a3b8;  text-align: right;  font-variant-numeric: tabular-nums;}
+[data-testid="presentation"] .ledger-connector {  position: absolute;  top: 100%;  height: 10px;  border-left: 1px solid rgba(226, 232, 240, 0.4);}
+[data-testid="presentation"] .ledger-row-subtotal {  border-top: 1px solid rgba(226, 232, 240, 0.45);  border-bottom: 1px solid rgba(226, 232, 240, 0.2);}
+[data-testid="presentation"] .ledger-row-subtotal .ledger-name {  font-weight: 600;}
+[data-testid="presentation"] .ledger-tick {  position: absolute;  top: -2px;  bottom: -2px;  width: 2px;  background: #e2e8f0;}
+[data-testid="presentation"] .ledger-row-total .ledger-name {  font-weight: 700;}
 [data-testid="presentation"] .stage-returns-svg {  display: block;  width: 100%;  height: 150px;}
 [data-testid="presentation"] .stage-crossing-caption {  font-size: 12px;  color: #cce9ff;  margin: var(--space-1) 0 0;}
 [data-testid="presentation"] .slide-kicker {  font-size: 12px;  text-transform: uppercase;  letter-spacing: 0.18em;  color: #cce9ff;  margin: var(--space-1) 0 0;}
@@ -1311,6 +1334,16 @@
   }
   [data-testid="presentation"] .waterfall-track {
     height: 180px;
+  }
+  [data-testid="presentation"] [data-testid="cost-waterfall"] {
+    margin-top: 3.4rem;
+  }
+  [data-testid="presentation"] .ledger-row {
+    grid-template-columns: minmax(0, 1fr) 4em;
+  }
+  [data-testid="presentation"] .ledger-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
   [data-testid="presentation"] .stage-returns-svg {
     min-height: 120px;

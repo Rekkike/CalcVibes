@@ -36,7 +36,7 @@ describe("Task B: CHART-LABEL / ONE-COMPOSITION / PEAK-LABEL", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     expect(document.querySelectorAll('[data-slide-name="summary"] [data-testid="composition-donut"]').length).toBe(2);
-    expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-rows"]')).toBeTruthy();
+    expect(document.querySelector('[data-slide-name="investment"] [data-testid="ledger-waterfall"]')).toBeTruthy(); // v0.6.15: the ledger waterfall replaces the composition rows
   });
 
   it("the recovery chart labels its peak value", () => {
@@ -145,10 +145,10 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
 
   it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.14");
+    expect(VERSION).toBe("v0.6.15");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.14");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.15");
   });
 });
 

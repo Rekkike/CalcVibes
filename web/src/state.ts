@@ -202,12 +202,12 @@ export function shorePowerProgram(): ModelInputs {
     entryUnit: "millions",
     targetIrr: 6,
     costs: [
-      { id: "p1", name: "Container shore power — engineering & studies (RSP JV)", category: "recurring", amount: 37000000, startYear: 1, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
-      { id: "p2", name: "Container shore power — OPS installations (RSP JV)", category: "recurring", amount: 55000000, startYear: 2, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
-      { id: "p3", name: "Container shore power — quay cabling & commissioning", category: "capex", amount: 100000000, startYear: 3, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
-      { id: "p4", name: "Market pillar — bulk & liquid berths", category: "recurring", amount: 31250000, startYear: 2, durationYears: 4, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 6 } },
-      { id: "p5", name: "Cruise terminal shore power", category: "capex", amount: 20000000, startYear: 3, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
-      { id: "p6", name: "Inland & public berths", category: "recurring", amount: 4000000, startYear: 1, durationYears: 5, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 6 } },
+      { id: "p1", name: "Container shore power — engineering & studies (RSP JV)", group: "Container shore power", category: "recurring", amount: 37000000, startYear: 1, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
+      { id: "p2", name: "Container shore power — OPS installations (RSP JV)", group: "Container shore power", category: "recurring", amount: 55000000, startYear: 2, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
+      { id: "p3", name: "Container shore power — quay cabling & commissioning", group: "Container shore power", category: "capex", amount: 100000000, startYear: 3, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
+      { id: "p4", name: "Market pillar — bulk & liquid berths", group: "Market pillar", category: "recurring", amount: 31250000, startYear: 2, durationYears: 4, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 6 } },
+      { id: "p5", name: "Cruise terminal shore power", group: "Cruise terminal", category: "capex", amount: 20000000, startYear: 3, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 4 } },
+      { id: "p6", name: "Inland & public berths", group: "Inland & public berths", category: "recurring", amount: 4000000, startYear: 1, durationYears: 5, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 6 } },
     ],
     operatingLines: [
       { id: "o1", label: "Operations & maintenance", amount: 6000000, startYear: 4, yearCount: 20, escalation: 0 },
@@ -288,9 +288,9 @@ export function landNewbuildProject(): ModelInputs {
     entryUnit: "millions",
     targetIrr: 8,
     costs: [
-      { id: "c1", name: "Site acquisition (lakeside plot)", category: "capex", amount: 45000000, startYear: 1, durationYears: 0, escalation: 0, depreciation: { mode: "retained" } },
-      { id: "c2", name: "Turnkey construction (18-storey timber tower)", category: "recurring", amount: 160000000, startYear: 1, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 33, startYear: 3 } },
-      { id: "c3", name: "Interior & hotel fit-out", category: "capex", amount: 55000000, startYear: 2, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 3 } },
+      { id: "c1", name: "Site acquisition (lakeside plot)", group: "Site", category: "capex", amount: 45000000, startYear: 1, durationYears: 0, escalation: 0, depreciation: { mode: "retained" } },
+      { id: "c2", name: "Turnkey construction (18-storey timber tower)", group: "Building", category: "recurring", amount: 160000000, startYear: 1, durationYears: 2, escalation: 0, depreciation: { mode: "straight-line", years: 33, startYear: 3 } },
+      { id: "c3", name: "Interior & hotel fit-out", group: "Building", category: "capex", amount: 55000000, startYear: 2, durationYears: 0, escalation: 0, depreciation: { mode: "straight-line", years: 20, startYear: 3 } },
     ],
     operatingLines: [
       { id: "o1", label: "Property management & maintenance", amount: 4500000, startYear: 3, yearCount: 20, escalation: 2 },
@@ -697,4 +697,62 @@ export function validateTimeline(inputs: ModelInputs, result: ModelResult | null
     }
   }
   return out;
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// v0.6.15 — the investment composition. The group aggregation composes ONCE here; the deck model
+// (and through it the Presentation and the print route) consumes it and never recomputes it.
+// ---------------------------------------------------------------------------------------------
+
+const CATEGORY_LABELS: Record<CostLine["category"], string> = { recurring: "Recurring", capex: "CAPEX" };
+
+// A cost line's group: the trimmed free-text label, or the category label when the label is empty
+// or whitespace-only.
+export function groupLabelOf(c: CostLine): string {
+  const g = (c.group ?? "").trim();
+  return g === "" ? CATEGORY_LABELS[c.category] : g;
+}
+
+export interface InvestmentSegment {
+  id: string;
+  name: string;
+  kind: "capital" | "operating" | "reinvestments";
+  total: number;
+  // capital lines only: the group the line belongs to
+  group?: string;
+}
+
+export interface InvestmentComposition {
+  // every capital cost line in the delivered composition order
+  lines: InvestmentSegment[];
+  // the capital lines aggregated by group, in first-appearance order
+  groups: InvestmentSegment[];
+  operating: InvestmentSegment | null;
+  reinvestments: InvestmentSegment | null;
+  // the gross capital program: the sum of the capital lines (the figure the funding block emits)
+  capitalSubtotal: number;
+  totalCost: number;
+}
+
+export function composeInvestment(inputs: ModelInputs, result: ModelResult): InvestmentComposition {
+  const lines: InvestmentSegment[] = result.lineTotals.map((l) => {
+    const cost = inputs.costs.find((c) => c.id === l.id);
+    return { id: l.id, name: l.name, kind: "capital" as const, total: l.total, group: cost !== undefined ? groupLabelOf(cost) : "Recurring" };
+  });
+  const groups: InvestmentSegment[] = [];
+  for (const line of lines) {
+    const existing = groups.find((g) => g.name === line.group);
+    if (existing !== undefined) existing.total += line.total;
+    else groups.push({ id: "group:" + groups.length, name: line.group as string, kind: "capital", total: line.total });
+  }
+  const reinvestmentsTotal = (result.contractsInfo ?? []).reduce((a, c) => a + c.reinvestments.reduce((b, ri) => b + ri.amount, 0), 0);
+  return {
+    lines,
+    groups,
+    operating: result.operatingTotal > 0 ? { id: "operating", name: "Operating lines", kind: "operating", total: result.operatingTotal } : null,
+    reinvestments: reinvestmentsTotal > 0 ? { id: "reinvestments", name: "Reinvestments", kind: "reinvestments", total: reinvestmentsTotal } : null,
+    capitalSubtotal: result.lineTotals.reduce((a, l) => a + l.total, 0),
+    totalCost: result.totalCost,
+  };
 }
