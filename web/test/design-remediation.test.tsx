@@ -153,10 +153,10 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6R", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.15");
+    expect(VERSION).toBe("v0.6.16");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.15");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.16");
   });
 
   it("CHART-TRACE and ACTION-TITLES stand: the signed chart values equal the engine yearly rows; the deck titles carry no figures on the coverage slide (v0.6.7 re-anchor: the port demo)", () => {
