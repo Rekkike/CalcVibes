@@ -150,3 +150,30 @@ describe("v0.6.18 H1: the 'period' labeling is unambiguous", () => {
     }
   });
 });
+
+describe("v0.6.18 H1: the peak figure is never clipped by the grid's edge", () => {
+  it("PEAK-EDGE: a peak in the first third anchors at the left edge, one in the last third at the right edge, a middle peak stays centred", () => {
+    render(<App />);
+    fireEvent.click(byAction("load-demo"));
+    fireEvent.click(byAction("present"));
+    toRecovery();
+    const peak = (): HTMLElement => document.querySelector('[data-slide-name="recovery"] [data-testid="peak-label"]:not(.peak-hidden)') as HTMLElement;
+    const cols = Array.from(document.querySelectorAll('[data-slide-name="recovery"] [data-recovery-column]'));
+    const idx = cols.findIndex((c) => !c.querySelector(".peak-hidden"));
+    const n = cols.length;
+    const expected = idx < n / 3 ? "peak-start" : idx >= (2 * n) / 3 ? "peak-end" : null;
+    if (expected === null) expect(peak().className).toBe("peak-label");
+    else expect(peak().classList.contains(expected)).toBe(true);
+    const css = fs.readFileSync("src/index.css", "utf8");
+    expect(css).toContain(".peak-label.peak-start { align-self: flex-start; }");
+    expect(css).toContain(".peak-label.peak-end { align-self: flex-end; }");
+  });
+
+  it("PEAK-EDGE-LEVEL: the operations slide, whose level bars peak at the first year, anchors its peak at the left edge", () => {
+    render(<App />);
+    fireEvent.click(byAction("load-demo"));
+    fireEvent.click(byAction("present"));
+    const peak = document.querySelector('[data-slide-name="operations"] [data-testid="peak-label"]:not(.peak-hidden)') as HTMLElement;
+    expect(peak.classList.contains("peak-start")).toBe(true);
+  });
+});

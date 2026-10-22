@@ -208,6 +208,10 @@ export function CompositionDonut(props: {
 // basis only on request) — nothing is bucketed, nothing is recomputed here. A SHORT span draws a few wide bars
 // (each capped in width); a LONG span draws one narrow bar per year in a scrollable grid with the year labels
 // thinned to every n-th bar and the peak named once. One bar is named by the period note.
+// The peak label is wider than its narrow column: a peak in the first third anchors the label at its column's left edge
+// (it spills right over the empty labels), one in the last third at the right edge (it spills left), so the figure is
+// never clipped by the scroll grid's edge; a peak in the middle stays centred.
+const peakEdge = (k: number, n: number): string => (k < n / 3 ? " peak-start" : k >= (2 * n) / 3 ? " peak-end" : "");
 export function RecoveryBars(props: {
   series: { label: string; value: number }[];
   peakFor: (value: number) => string;
@@ -230,7 +234,7 @@ export function RecoveryBars(props: {
         <div className="recovery-grid" style={{ minWidth: `${series.length * colMin}px` }}>
           {series.map((d, k) => (
             <div key={k} data-recovery-column={k} data-bucket-width={1} className="recovery-column">
-              <span data-testid="peak-label" className={k === peakIdx && d.value > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && d.value > 0 ? `${peakFor(d.value)} in ${d.label}` : "\u00a0"}</span>
+              <span data-testid="peak-label" className={k === peakIdx && d.value > 0 ? "peak-label" + peakEdge(k, series.length) : "peak-label peak-hidden"}>{k === peakIdx && d.value > 0 ? `${peakFor(d.value)} in ${d.label}` : "\u00a0"}</span>
               <svg viewBox={`0 0 10 ${Math.max(1, Math.round((d.value / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
                 <rect x={0} y={0} width={10} height={Math.max(1, Math.round((d.value / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
               </svg>

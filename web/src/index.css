@@ -1428,3 +1428,5 @@
 .app-root section > .editor-scroll { margin-bottom: var(--space-2); }
 .app-root section > .editor-scroll + button[data-action^="add-"] { margin-top: var(--space-1); }
 .app-root section > label { margin-top: var(--space-2); margin-bottom: var(--space-2); }
+[data-testid="presentation"] .peak-label.peak-start { align-self: flex-start; }
+[data-testid="presentation"] .peak-label.peak-end { align-self: flex-end; }
