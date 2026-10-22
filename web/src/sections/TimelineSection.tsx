@@ -60,8 +60,10 @@ export function TimelineSection(props: {
   result: ModelResult | null;
   setTimeline: (tl: TimelineBlock) => void;
   startYear: number | null;
+  monthGrid?: boolean;
+  setMonthGrid?: (on: boolean) => void;
 }) {
-  const { inputs, result, setTimeline, startYear } = props;
+  const { inputs, result, setTimeline, startYear, monthGrid = false, setMonthGrid } = props;
   const tl = timelineOf(inputs);
   const span = programSpanYears(inputs, result);
   const events = availableEngineEvents(inputs, result);
@@ -173,6 +175,11 @@ export function TimelineSection(props: {
         A planning and presentation layer: the timeline never alters the cash flows, the solver or the horizon.{" "}
         {span !== null ? `The program span is years 1–${span}.` : "The program span appears once the model solves."}
       </p>
+      {setMonthGrid !== undefined && (
+        <label>Month gridlines on the Gantt (a view setting; not saved with the project){" "}
+          <input data-field="monthGrid" type="checkbox" checked={monthGrid} onChange={(e) => setMonthGrid(e.target.checked)} />
+        </label>
+      )}
       <label>Project scale{" "}
         <select data-field="projectScale" value={tl.projectScale ?? "full"} onChange={(e) => commit({ projectScale: e.target.value as "mini" | "full" })}>
           <option value="full">Full (DP1–DP8)</option>

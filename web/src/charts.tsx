@@ -443,6 +443,9 @@ export function GanttChart(props: { gantt: DeckGantt }) {
             )}
           </g>
         ))}
+        {gantt.monthGrid !== undefined && gantt.monthGrid.map((p) => (
+          <line key={p} data-gantt-month-grid={p} x1={xAt(p)} x2={xAt(p)} y1={top} y2={lanesBottom} stroke={STAGE_CHART_COLORS.gridline} strokeOpacity={0.9} strokeDasharray="2 3" />
+        ))}
         <line x1={xStart(first + n)} x2={xStart(first + n)} y1={top} y2={lanesBottom} stroke={STAGE_CHART_COLORS.gridline} />
         {gantt.lanes.map((lane, i) => {
           const laneTop = laneTops[i];
@@ -490,6 +493,9 @@ export function GanttChart(props: { gantt: DeckGantt }) {
           const cy = lanesBottom + 34 + gateShift + m.row * 30;
           return (
             <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
+              {m.computed !== null && m.computed.from !== m.computed.pos && (
+                <line data-gantt-computed-link={m.id} x1={xAt(m.computed.from)} x2={xAt(m.computed.pos)} y1={cy} y2={cy} stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1} />
+              )}
               {m.computed !== null && (
                 <circle data-gantt-computed={m.id} cx={xAt(m.computed.pos)} cy={cy} r={10} fill="none" stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1.5}>
                   <title>{`Computed month ${m.computed.month} of year ${m.computed.year} (read-only, from the live schedule)`}</title>

@@ -246,6 +246,12 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
         push(a.label);
       }
     }
+    if (g.monthGrid !== undefined) {
+      // the optional month gridlines (view state): hairlines in a lighter ink than the year lines
+      doc.setDrawColor(240, 240, 243);
+      for (const p of g.monthGrid) doc.line(xAt(p), lanesTop, xAt(p), lanesBottom);
+      doc.setDrawColor(229, 229, 234);
+    }
     doc.line(xStart(first + n), lanesTop, xStart(first + n), lanesBottom);
     let ly = lanesTop;
     seg.lanes.forEach((lane, i) => {
@@ -299,6 +305,7 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
       if (m.computed !== null) {
         // the computed engine-event month: a muted ring (read-only exposure, never authored)
         doc.setDrawColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+        if (m.computed.from !== m.computed.pos) doc.line(xAt(m.computed.from), cy, xAt(m.computed.pos), cy);
         doc.circle(xAt(m.computed.pos), cy, 3.6, "S");
         doc.setDrawColor(0, 0, 0);
       }

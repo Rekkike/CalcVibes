@@ -215,11 +215,13 @@ describe("Supplement 2 — the computed month as a muted Gantt marker (read-only
   const withTie = (tie: object | undefined, month?: number) => gantt(tlOf({ activities: [{ id: "a1", label: "Build", startYear: 3, endYear: 5, phase: "production" }], milestones: [{ id: "m1", label: "Collections start", year: 3, ...(month !== undefined ? { month } : {}), ...(tie !== undefined ? { tie: tie as never } : {}) }] })).milestones[0];
   it("a milestone tied to the first-collection-year event carries the computed month and its composed position", () => {
     const m = withTie({ kind: "engine-event", event: "first-collection-year" });
-    expect(m.computed).toEqual({ year: 3, month: 12, pos: markerPosition({ firstYear: 3 }, 3, 12) });
+    expect(m.computed).toEqual({ year: 3, month: 12, pos: markerPosition({ firstYear: 3 }, 3, 12), from: markerPosition({ firstYear: 3 }, 3) });
     // authored month untouched: the computed position never overwrites it
     expect(m.month).toBeNull();
     expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).month).toBe(4);
     expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).pos).toBe(markerPosition({ firstYear: 3 }, 3, 4));
+    // the connector runs from the authored diamond to the computed ring
+    expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).computed!.from).toBe(markerPosition({ firstYear: 3 }, 3, 4));
   });
   it("untied and activity-tied milestones carry no computed marker", () => {
     expect(withTie(undefined).computed).toBeNull();
@@ -240,5 +242,38 @@ describe("Supplement 4 — the milestone proximity stacking", () => {
   });
   it("a milestone alone in its year keeps row 0", () => {
     expect(ids([{ id: "a", year: 4, ordinal: 1 }])[0].row).toBe(0);
+  });
+});
+
+describe("Supplement 3 — the month gridlines (view state, composed once, off by default)", () => {
+  const tl = () => tlOf({ activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 4, phase: "production" }] });
+  const slide = (monthGrid?: boolean) => {
+    const inp = base(tl());
+    return deckSlides(inp, computeModel(inp), { startYear: null, ...(monthGrid !== undefined ? { monthGrid } : {}) }).slides.find((s) => s.name === "timeline")!;
+  };
+  it("off (the default and the explicit false) the model is byte-identical and carries no grid", () => {
+    expect(JSON.stringify(slide(false))).toBe(JSON.stringify(slide()));
+    expect("monthGrid" in slide().gantt!).toBe(false);
+  });
+  it("on, the eleven interior month boundaries of every year band compose once, strictly inside their bands", () => {
+    const g = slide(true).gantt!;
+    const n = g.window.lastYear - g.window.firstYear + 1;
+    expect(g.monthGrid).toHaveLength(11 * n);
+    g.monthGrid!.forEach((p, i) => {
+      const k = Math.floor(i / 11);
+      expect(p).toBe(k + ((i % 11) + 1) / 12);
+      expect(p).toBeGreaterThan(k);
+      expect(p).toBeLessThan(k + 1);
+    });
+    // the axis stays year-labeled and the rest of the model is unchanged
+    const { monthGrid: _g, ...rest } = g;
+    expect(JSON.stringify(rest)).toBe(JSON.stringify(slide().gantt));
+  });
+  it("the grid never reaches the document: the saved project is identical whatever the toggle", () => {
+    const inp = base(tl());
+    const text = serializeProject(inp, settings);
+    deckSlides(inp, computeModel(inp), { startYear: null, monthGrid: true });
+    expect(serializeProject(inp, settings)).toBe(text);
+    expect(text).not.toContain("monthGrid");
   });
 });

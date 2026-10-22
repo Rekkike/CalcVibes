@@ -10,6 +10,7 @@ vi.mock("jspdf", async (orig) => {
       const rect = this.rect.bind(this);
       const line = this.line.bind(this);
       const circle = this.circle.bind(this);
+      this.save = () => undefined; // the download route must not write a file
       this.rect = (...x: unknown[]) => { rec.rects.push(x as number[]); return rect(...x); };
       this.line = (...x: unknown[]) => { rec.lines.push(x as number[]); return line(...x); };
       this.circle = (...x: unknown[]) => { rec.circles.push(x as number[]); return circle(...x); };
@@ -181,4 +182,80 @@ describe("Task C — the sub-year positions in both renderers", () => {
     const colW = (257 - 32) / (g.window.lastYear - g.window.firstYear + 1);
     expect(rec.circles.some((c) => Math.abs(c[0] - (52 + m.computed!.pos * colW)) < 1e-9)).toBe(true);
   });
+
+  it("the computed ring is connected to its diamond by a thin muted line in the SVG and the PDF", () => {
+    const tied: TimelineBlock = { projectScale: "full", activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 5, phase: "production" }], decisionPoints: [], milestones: [{ id: "m1", label: "Collections", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } }] };
+    const inp = { ...demoProject(), projectLengthYears: 5, timeline: tied };
+    const model = deckSlides(inp, computeModel(inp), { startYear: null });
+    const g = model.slides.find((s) => s.name === "timeline")!.gantt!;
+    const c = g.milestones[0].computed!;
+    const { container } = render(<GanttChart gantt={g} />);
+    const link = container.querySelector('[data-gantt-computed-link="m1"]') as SVGLineElement;
+    const { labelW, plotW } = GANTT_SVG;
+    const colW = plotW / (g.window.lastYear - g.window.firstYear + 1);
+    expect(parseFloat(link.getAttribute("x1") as string)).toBeCloseTo(labelW + c.from * colW, 6);
+    expect(parseFloat(link.getAttribute("x2") as string)).toBeCloseTo(labelW + c.pos * colW, 6);
+    rec.lines.length = 0;
+    buildDeckPdf(model, "Connector");
+    const pc = (257 - 32) / (g.window.lastYear - g.window.firstYear + 1);
+    expect(rec.lines.some((q) => Math.abs(q[0] - (52 + c.from * pc)) < 1e-9 && Math.abs(q[2] - (52 + c.pos * pc)) < 1e-9 && q[1] === q[3])).toBe(true);
+  });
+});
+
+describe("Supplement 3 — the month gridlines toggle (app-shell view state)", () => {
+  const stubDownloads = () => {
+    const origCreate = window.URL.createObjectURL;
+    window.URL.createObjectURL = () => "blob:test";
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    return () => { window.URL.createObjectURL = origCreate; click.mockRestore(); };
+  };
+  const gridCount = () => document.querySelectorAll("[data-gantt-month-grid]").length;
+  const present = () => {
+    fireEvent.click(byAction("present"));
+    for (let i = 0; i < 9; i++) { if (document.querySelector('[data-slide-name="timeline"][data-slide-active="true"]')) break; fireEvent.keyDown(window, { key: "ArrowRight" }); }
+  };
+
+  it("the toggle stands off by default and the Presentation draws no gridline", () => {
+    openTimeline();
+    const box = document.querySelector('[data-field="monthGrid"]') as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    present();
+    expect(gridCount()).toBe(0);
+  });
+
+  it("on, the Presentation draws the gridlines (eleven per year band)", () => {
+    openTimeline();
+    fireEvent.click(document.querySelector('[data-field="monthGrid"]') as HTMLInputElement);
+    present();
+    const g = document.querySelectorAll("[data-gantt-month-grid]");
+    expect(g.length).toBeGreaterThan(0);
+    expect(g.length % 11).toBe(0);
+  });
+
+  it("both PDF routes agree: the app's Download PDF and the Presentation's draw the same number of lines, more than with the toggle off", async () => {
+    const restore = stubDownloads();
+    try {
+      const count = async (on: boolean, route: "app" | "presentation") => {
+        const { unmount } = render(<App />);
+        fireEvent.click(byAction("load-demo"));
+        fireEvent.click(byNav("timeline"));
+        if (on) fireEvent.click(document.querySelector('[data-field="monthGrid"]') as HTMLInputElement);
+        rec.lines.length = 0;
+        if (route === "presentation") fireEvent.click(byAction("present"));
+        const btn = route === "app" ? byAction("download-pdf") : (document.querySelector('[data-testid="presentation"] [data-action="download-pdf"]') as HTMLElement);
+        fireEvent.click(btn);
+        await new Promise((r) => setTimeout(r, 1500));
+        const n = rec.lines.length;
+        unmount();
+        return n;
+      };
+      const appOn = await count(true, "app");
+      const presOn = await count(true, "presentation");
+      const appOff = await count(false, "app");
+      expect(appOn).toBeGreaterThan(appOff);
+      expect(presOn).toBe(appOn);
+    } finally {
+      restore();
+    }
+  }, 30000);
 });

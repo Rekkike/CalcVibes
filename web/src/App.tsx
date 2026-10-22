@@ -30,6 +30,8 @@ export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
   const [view, setView] = useState<View>("overview");
   const [presOpen, setPresOpen] = useState(false);
+  // v0.6.17: the month gridlines on the Gantt — view state only (never a document field), off by default
+  const [monthGrid, setMonthGrid] = useState(false);
   const [mode, setMode] = useState<"A" | "B" | "C">("A");
   const [modePayment, setModePayment] = useState(400000);
   const [startYear, setStartYear] = useState<number | null>(null);
@@ -173,7 +175,7 @@ export function App() {
     if (result === null) return;
     const { buildDeckPdf } = await import("./pdf.js");
     const { deckSlides } = await import("./deck.js");
-    const model = deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons });
+    const model = deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, monthGrid });
     const doc = buildDeckPdf(model, inputs.projectName || "project");
     doc.save(`${inputs.projectName || "project"}.pdf`);
   };
@@ -198,7 +200,7 @@ export function App() {
   }, [issues]);
 
   if (presOpen) {
-    return <RootErrorBoundary><Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} /></RootErrorBoundary>;
+    return <RootErrorBoundary><Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} monthGrid={monthGrid} /></RootErrorBoundary>;
   }
 
   return (
@@ -354,7 +356,7 @@ export function App() {
           <FundingSection inputs={inputs} result={result} setFunding={setFunding} startYear={startYear} entryUnit={entryUnit} />
         )}
         {view === "timeline" && (
-          <TimelineSection inputs={inputs} result={result} setTimeline={setTimeline} startYear={startYear} />
+          <TimelineSection inputs={inputs} result={result} setTimeline={setTimeline} startYear={startYear} monthGrid={monthGrid} setMonthGrid={setMonthGrid} />
         )}
         {view === "financing" && (
           <FinancingSection inputs={inputs} result={result} setFacilities={setFacilities} setFacilityOptions={setFacilityOptions} entryUnit={entryUnit} />
