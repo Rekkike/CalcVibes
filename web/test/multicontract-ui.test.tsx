@@ -192,7 +192,7 @@ describe("v0.6 chunk 5 — the riding remediations and the multi-lease fixture",
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.14");
+    expect(VERSION).toBe("v0.6.15");
   });
 
   it("WATERFALL-FORM: the build-up is vertical floats to a ground-standing total column with the labels directly above the bars (v0.6.15 re-anchor)", () => {
