@@ -1381,3 +1381,20 @@
     grid-row: 1;
   }
 }
+
+/* v0.6.18 Task G — the Timeline editors' space allocation (the widths are the TIMELINE_SPACE constant of the section;
+   the pin compares them). The label column GROWS; the year, the month, the choices and the code take exactly what
+   they need; a year and its month sit on one line with the calendar note beneath. The rules out-rank the generic
+   full-width editor-scroll inputs (the "massive lines"). */
+.app-root .editor-scroll table.timeline-table td.tl-grow { width: 100%; }
+.app-root .editor-scroll table.timeline-table td.tl-grow input { width: 100%; min-width: 15rem; box-sizing: border-box; }
+.app-root .editor-scroll table.timeline-table td.tl-when { white-space: nowrap; }
+.app-root .editor-scroll table.timeline-table .tl-pair { display: inline-flex; gap: var(--space-1); align-items: center; }
+.app-root .editor-scroll table.timeline-table input.tl-year { width: 4.25rem; }
+.app-root .editor-scroll table.timeline-table select.tl-month { width: 6.75rem; }
+.app-root .editor-scroll table.timeline-table .tl-note { display: block; font-size: 11px; }
+.app-root .editor-scroll table.timeline-table td.tl-pick-phase select { width: 9rem; }
+.app-root .editor-scroll table.timeline-table td.tl-pick-lane select { width: 9rem; }
+.app-root .editor-scroll table.timeline-table td.tl-pick-outcome select { width: 11rem; }
+.app-root .editor-scroll table.timeline-table td.tl-pick-tie select { width: 16rem; max-width: 100%; }
+.app-root .editor-scroll table.timeline-table td.tl-code { width: 3.5rem; white-space: nowrap; }

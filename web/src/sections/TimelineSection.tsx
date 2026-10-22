@@ -9,6 +9,15 @@ import {
 
 // v0.6.13.2 Task B: the per-source suggestion buttons. Each derives one source of the project into
 // activities carrying that source's marker; the review note names what was derived.
+// v0.6.18 Task G: the space allocation of the Timeline editors — WHAT GETS WHAT SPACE, composed deliberately (the
+// walkthrough judges it). A free-text column (the label, the gate title) GROWS to take everything the fixed columns
+// leave; a year is a short whole number and gets four digits of room; a month select gets exactly its longest
+// option ("Year only" / "Month 12"); the year and its month sit on ONE line with their calendar note beneath, so the
+// pair no longer stacks into two full-width lines; a choice (the phase, the lane, the outcome, the tie) takes its
+// longest option, capped; the decision-point code is a short fixed token; an action is as wide as its button. The
+// widths below are the single source the stylesheet reads (the pin compares them).
+export const TIMELINE_SPACE = { label: "grow", year: "4.25rem", month: "6.75rem", phase: "9rem", lane: "9rem", outcome: "11rem", tie: "16rem", code: "3.5rem" } as const;
+
 const plural = (n: number) => `${n} ${n === 1 ? "activity" : "activities"}`;
 const SOURCES: { source: TimelineSource; action: string; label: string; noun: string; zero: string; note: (n: number) => string }[] = [
   {
@@ -163,7 +172,7 @@ export function TimelineSection(props: {
   };
   // v0.6.17: the optional month selector — the empty state is the year-grained default
   const monthSelect = (field: string, value: number | undefined, onPick: (m: number | undefined) => void) => (
-    <select data-field={field} value={value === undefined ? "" : String(value)} onChange={(e) => onPick(e.target.value === "" ? undefined : parseInt(e.target.value, 10))}>
+    <select className="tl-month" data-field={field} value={value === undefined ? "" : String(value)} onChange={(e) => onPick(e.target.value === "" ? undefined : parseInt(e.target.value, 10))}>
       <option value="">Year only</option>
       {Array.from({ length: 12 }, (_, i) => i + 1).map((mo) => <option key={mo} value={String(mo)}>Month {mo}</option>)}
       {value !== undefined && !(Number.isInteger(value) && value >= 1 && value <= 12) && <option value={String(value)}>{value} (outside 1–12)</option>}
@@ -248,15 +257,15 @@ export function TimelineSection(props: {
       <h3>Phases</h3>
       <p className="muted">The phase vocabulary is the lane set of the program Gantt. A lane is shown when it carries an activity; choose Always show to draw it empty or Hide to leave it off. The visibility is presentation-only: hiding a lane never removes its activities.</p>
       <div className="editor-scroll" data-testid="timeline-phases-scroll">
-        <table data-testid="timeline-phases">
+        <table className="timeline-table" data-testid="timeline-phases">
           <thead><tr><th>Id</th><th>Label</th><th>Activities</th><th>Lane</th><th></th></tr></thead>
           <tbody>
             {phases.map((p, i) => (
               <tr key={p.id + ":" + i} data-kind="phase" data-line={p.id}>
                 <td data-field="phaseId">{p.id}</td>
-                <td><input data-field="phaseLabel" value={p.label} onChange={(e) => commit({ phases: phases.map((q, j) => (j === i ? { ...q, label: e.target.value } : q)) })} /></td>
+                <td className="tl-grow"><input data-field="phaseLabel" value={p.label} onChange={(e) => commit({ phases: phases.map((q, j) => (j === i ? { ...q, label: e.target.value } : q)) })} /></td>
                 <td data-field="phaseCount">{activitiesInPhase(tl, p.id).length}</td>
-                <td>
+                <td className="tl-pick-lane">
                   <select data-field="laneVisibility" value={tl.laneVisibility?.[p.id] === undefined ? "auto" : tl.laneVisibility[p.id] ? "show" : "hide"} onChange={(e) => setLane(p.id, e.target.value)}>
                     <option value="auto">Automatic</option>
                     <option value="show">Always show</option>
@@ -279,15 +288,15 @@ export function TimelineSection(props: {
 
       <h3>Activities</h3>
       <div className="editor-scroll" data-testid="timeline-activities-scroll">
-        <table data-testid="timeline-activities">
+        <table className="timeline-table" data-testid="timeline-activities">
           <thead><tr><th>Label</th><th>Start year</th><th>End year</th><th>Phase</th><th></th></tr></thead>
           <tbody>
             {tl.activities.map((a) => (
               <tr key={a.id} data-kind="activity" data-line={a.id}>
-                <td><input data-field="activityLabel" value={a.label} onChange={(e) => updateActivity(a.id, { label: e.target.value })} /></td>
-                <td><input data-field="activityStart" type="number" value={a.startYear} onChange={(e) => updateActivity(a.id, { startYear: num(e.target.value) })} /> {monthSelect("activityStartMonth", a.startMonth, (mo) => updateActivity(a.id, { startMonth: mo }))}<span className="muted" data-span-note="start"> {monthNote(a.startYear, a.startMonth)}</span></td>
-                <td><input data-field="activityEnd" type="number" value={a.endYear} onChange={(e) => updateActivity(a.id, { endYear: num(e.target.value) })} /> {monthSelect("activityEndMonth", a.endMonth, (mo) => updateActivity(a.id, { endMonth: mo }))}<span className="muted" data-span-note="end"> {monthNote(a.endYear, a.endMonth)}</span></td>
-                <td>
+                <td className="tl-grow"><input data-field="activityLabel" value={a.label} onChange={(e) => updateActivity(a.id, { label: e.target.value })} /></td>
+                <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="activityStart" type="number" value={a.startYear} onChange={(e) => updateActivity(a.id, { startYear: num(e.target.value) })} />{monthSelect("activityStartMonth", a.startMonth, (mo) => updateActivity(a.id, { startMonth: mo }))}</span><span className="muted tl-note" data-span-note="start">{monthNote(a.startYear, a.startMonth)}</span></td>
+                <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="activityEnd" type="number" value={a.endYear} onChange={(e) => updateActivity(a.id, { endYear: num(e.target.value) })} />{monthSelect("activityEndMonth", a.endMonth, (mo) => updateActivity(a.id, { endMonth: mo }))}</span><span className="muted tl-note" data-span-note="end">{monthNote(a.endYear, a.endMonth)}</span></td>
+                <td className="tl-pick-phase">
                   <select data-field="activityPhase" value={a.phase} onChange={(e) => updateActivity(a.id, { phase: e.target.value as TimelinePhase })}>
                     {phases.map((p, i) => <option key={p.id + ":" + i} value={p.id}>{p.label}</option>)}
                   </select>
@@ -302,15 +311,15 @@ export function TimelineSection(props: {
 
       <h3>Decision points</h3>
       <div className="editor-scroll" data-testid="timeline-gates-scroll">
-        <table data-testid="timeline-gates">
+        <table className="timeline-table" data-testid="timeline-gates">
           <thead><tr><th>Title</th><th>Code</th><th>Year</th><th>Outcome</th><th></th></tr></thead>
           <tbody>
             {tl.decisionPoints.map((d) => (
               <tr key={d.id} data-kind="gate" data-line={d.id}>
-                <td><input data-field="gateTitle" value={d.title} onChange={(e) => updateGate(d.id, { title: e.target.value })} /></td>
-                <td data-field="gateCode">{d.code ?? "—"}</td>
-                <td><input data-field="gateYear" type="number" value={d.year} onChange={(e) => updateGate(d.id, { year: num(e.target.value) })} /> {monthSelect("gateMonth", d.month, (mo) => updateGate(d.id, { month: mo }))}<span className="muted" data-span-note="gate"> {monthNote(d.year, d.month)}</span></td>
-                <td>
+                <td className="tl-grow"><input data-field="gateTitle" value={d.title} onChange={(e) => updateGate(d.id, { title: e.target.value })} /></td>
+                <td className="tl-code" data-field="gateCode">{d.code ?? "—"}</td>
+                <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="gateYear" type="number" value={d.year} onChange={(e) => updateGate(d.id, { year: num(e.target.value) })} />{monthSelect("gateMonth", d.month, (mo) => updateGate(d.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="gate">{monthNote(d.year, d.month)}</span></td>
+                <td className="tl-pick-outcome">
                   <select data-field="gateOutcome" value={d.outcome ?? ""} onChange={(e) => {
                     if (e.target.value === "") {
                       const { outcome: _drop, ...rest } = d;
@@ -337,7 +346,7 @@ export function TimelineSection(props: {
 
       <h3>Milestones</h3>
       <div className="editor-scroll" data-testid="timeline-milestones-scroll">
-        <table data-testid="timeline-milestones">
+        <table className="timeline-table" data-testid="timeline-milestones">
           <thead><tr><th>Label</th><th>Year</th><th>Tie</th><th></th></tr></thead>
           <tbody>
             {tl.milestones.map((m) => {
@@ -345,9 +354,9 @@ export function TimelineSection(props: {
               const known = new Set(["", ...tl.activities.map((a) => "activity:" + a.id), ...events.map((e) => "engine-event:" + e.event)]);
               return (
                 <tr key={m.id} data-kind="milestone" data-line={m.id}>
-                  <td><input data-field="milestoneLabel" value={m.label} onChange={(e) => updateMilestone(m.id, { label: e.target.value })} /></td>
-                  <td><input data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} /> {monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}<span className="muted" data-span-note="milestone"> {monthNote(m.year, m.month)}</span></td>
-                  <td>
+                  <td className="tl-grow"><input data-field="milestoneLabel" value={m.label} onChange={(e) => updateMilestone(m.id, { label: e.target.value })} /></td>
+                  <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} />{monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="milestone">{monthNote(m.year, m.month)}</span></td>
+                  <td className="tl-pick-tie">
                     <select data-field="milestoneTie" value={current} onChange={(e) => chooseTie(m, e.target.value)}>
                       <option value="">No tie</option>
                       {tl.activities.map((a) => <option key={a.id} value={"activity:" + a.id}>Activity {a.id} ({a.label || "unnamed"})</option>)}
