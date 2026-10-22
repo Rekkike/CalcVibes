@@ -202,7 +202,9 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     // The three preset axes surface; the grant-scale axis ships empty (Task E.5).
     expect(scenarioAxisValues("target")).toEqual(["4", "6", "8"]);
     expect(scenarioAxisValues("term")).toEqual(["15", "20", "25"]);
-    expect(scenarioAxisValues("balloon")).toEqual(["0", "8", "16"]);
+    // v0.6.18 (AUD-14) re-anchor: the balloon axis holds entry-unit values; the fresh app is at unit thousands, so the
+    // raw balloons 0 / 8 000 000 / 16 000 000 read 0 / 8 000 / 16 000 (the retired preset assumed unit millions)
+    expect(scenarioAxisValues("balloon")).toEqual(["0", "8000", "16000"]);
     expect(scenarioAxisValues("grant-scale")).toEqual([]);
     // v0.6.11 re-anchor (Task E): the per-variant contract — the optimistic variant refuses
     // under its own terms (the term-25 shift leaves the declared tariff span) and carries its

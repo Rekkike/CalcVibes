@@ -91,7 +91,7 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     expect(byLabel("Achieved IRR").querySelector(".kpi-value")?.textContent).toBe(percentForDisplay(result.achievedIrr, 2));
     expect(byLabel("Achieved IRR").querySelector(".kpi-chip")?.textContent).toBe(`vs ${roundForDisplay(program.targetIrr, 2)}% target`);
     expect(byLabel("Achieved IRR").className).toContain("tone-ok");
-    expect(byLabel("NPV at WACC").querySelector(".kpi-value")?.textContent).toBe(deckMoneyForDisplay(result.npvAtWacc, "EUR", "ones"));
+    expect(byLabel("NPV at WACC").querySelector(".kpi-value")?.textContent).toBe(deckMoneyForDisplay(result.npvAtWacc, "EUR", "thousands")); // v0.6.18 (AUD-17) re-anchor: the NPV KPI carries the entry unit in force (the fresh app is at thousands)
     expect(byLabel("Payback (nominal)").querySelector(".kpi-value")?.textContent).toBe(deckYearsForDisplay(result.paybackYears as number));
     // The financing branch: the minimum DSCR through the two-decimal DSCR formatter with
     // its calendar chip at the preset start year 2026.
@@ -112,7 +112,7 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     const band = document.querySelector('[data-testid="figure-band"]') as HTMLElement;
     expect(band.querySelectorAll(".figure-item").length).toBe(3);
     expect(band.querySelector('[data-testid="figure-band"] .figure-value') === null ? null : Array.from(band.querySelectorAll(".figure-value")).map((e) => e.textContent))
-      .toEqual([deckMoneyForDisplay(result.totalCost, "EUR", "ones"), deckMoneyForDisplay(result.totalCollected, "EUR", "ones"), deckMoneyForDisplay(result.netGain, "EUR", "ones")]);
+      .toEqual([deckMoneyForDisplay(result.totalCost, "EUR", "thousands"), deckMoneyForDisplay(result.totalCollected, "EUR", "thousands"), deckMoneyForDisplay(result.netGain, "EUR", "thousands")]); // v0.6.18 (AUD-17) re-anchor: the figure band carries the entry unit in force
     expect(band.querySelector(".caveat")?.textContent).toBe("Nominal figures are undiscounted; the cost NPV and achieved IRR are discounted.");
   });
 

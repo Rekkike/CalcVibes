@@ -373,22 +373,24 @@ export function LedgerWaterfall(props: { waterfall: DeckWaterfall; kicker?: stri
 export function HurdlePlot(props: {
   target: number;
   achieved: number;
+  // v0.6.18 (AUD-10): the achieved IRR is null (no solution): no dot, the dash reads
+  achievedMissing?: boolean;
   goalMet: boolean;
   solved?: boolean;
 }) {
-  const { target, achieved, goalMet, solved = false } = props;
+  const { target, achieved, goalMet, solved = false, achievedMissing = false } = props;
   const bound = Math.max(target, achieved) * 1.15;
   const scale = Math.max(1e-12, bound);
   return (
     <div data-testid="hurdle-plot" className="chart-block">
       <div className="hurdle-track">
         <span data-testid="hurdle-target-dot" data-hurdle="target" className="hurdle-dot" style={{ left: `${(target / scale) * 100}%` }} />
-        <span data-testid="hurdle-achieved-dot" data-hurdle="achieved" className={"hurdle-dot " + (goalMet ? "tone-ok" : "tone-bad")} style={{ left: `${(achieved / scale) * 100}%` }} />
+        {!achievedMissing && <span data-testid="hurdle-achieved-dot" data-hurdle="achieved" className={"hurdle-dot " + (goalMet ? "tone-ok" : "tone-bad")} style={{ left: `${(achieved / scale) * 100}%` }} />}
       </div>
       <div className="hurdle-labels">
         <span data-testid="hurdle-target-label" className="column-year-label">Target {target.toFixed(2)}%</span>
-        <span data-testid="hurdle-margin-label" data-hurdle-mode={solved ? "solved" : "evaluated"} className="column-year-label">{solved ? "solved to the target" : goalMet ? "clears the hurdle" : "below the hurdle"}</span>
-        <span data-testid="hurdle-achieved-label" className="column-year-label">Achieved {achieved.toFixed(2)}%</span>
+        <span data-testid="hurdle-margin-label" data-hurdle-mode={solved ? "solved" : "evaluated"} className="column-year-label">{solved ? "solved to the target" : achievedMissing ? "no achieved rate" : goalMet ? "clears the hurdle" : "below the hurdle"}</span>
+        <span data-testid="hurdle-achieved-label" className="column-year-label">Achieved {achievedMissing ? "—" : `${achieved.toFixed(2)}%`}</span>
       </div>
     </div>
   );

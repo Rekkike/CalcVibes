@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import type { Facility, FacilityOptions, ModelInputs, ModelResult } from "../../core/src/types.js";
-import { composeFacilitySchedules, yearHeader } from "./state.js";
+import { composeBookCollections, composeFacilitySchedules, yearHeader } from "./state.js";
 
 export async function buildWorkbook(
   inputs: ModelInputs,
@@ -380,12 +380,20 @@ export async function buildWorkbook(
   if (result.bookView !== undefined && depreciationConfigured) {
     const bv = result.bookView;
     const bvWs = wb.addWorksheet("Book view");
-    bvWs.addRow(["Year", "Beginning book value", "Depreciation charge", "Ending book value", "Collections", "Operating", "Book result"]);
+    // v0.6.18 (AUD-28): the collections column names its basis (every project inflow); with grants or a note the
+    // identified columns follow it (fees, grant receipts, the note's advance net of installments) and sum to it.
+    const split = composeBookCollections(result);
+    bvWs.addRow(split === null
+      ? ["Year", "Beginning book value", "Depreciation charge", "Ending book value", "Collections (all project inflows)", "Operating", "Book result"]
+      : ["Year", "Beginning book value", "Depreciation charge", "Ending book value", "Collections (all project inflows)", "of which fee collections", "of which grant receipts", "of which the note (advance less installments)", "Operating", "Book result"]);
     bvWs.getRow(1).eachCell(bold);
     for (const row of bv.combined) {
-      bvWs.addRow([row.year, row.beginning, row.charge, row.ending, row.collections, row.operating, row.bookResult]);
+      const s = split?.find((x) => x.year === row.year);
+      bvWs.addRow(split === null
+        ? [row.year, row.beginning, row.charge, row.ending, row.collections, row.operating, row.bookResult]
+        : [row.year, row.beginning, row.charge, row.ending, row.collections, s?.fees ?? 0, s?.grants ?? 0, s?.note ?? 0, row.operating, row.bookResult]);
     }
-    for (const c of [2, 3, 4, 5, 6, 7]) bvWs.getColumn(c).numFmt = "#,##0.00";
+    for (const c of (split === null ? [2, 3, 4, 5, 6, 7] : [2, 3, 4, 5, 6, 7, 8, 9, 10])) bvWs.getColumn(c).numFmt = "#,##0.00";
     bvWs.addRow([]);
     bvWs.addRow(["Book view disclosure", "Depreciation is the book view; it never enters the cash flows."]);
     bvWs.addRow(["Residual mode", bv.residualMode]);

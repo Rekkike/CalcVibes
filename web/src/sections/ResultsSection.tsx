@@ -1,12 +1,13 @@
 import type { ModelResult } from "../../../core/src/types.js";
 import { percentForDisplay, roundForDisplay } from "../engine.js";
-import { composeFacilitySchedules, yearHeader } from "../state.js";
+import { composeBookCollections, composeFacilitySchedules, yearHeader } from "../state.js";
 import { SignedCashflowChart } from "../charts.js";
 import { deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } from "../engine.js";
 
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null; entryUnit?: import("../engine.js").EntryUnit }) {
   const { result, targetIrr, currency, startYear = null, entryUnit = "ones" } = props;
   const money = (v: number) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1], entryUnit);
+  const bookSplit = composeBookCollections(result);
   return (
     <section data-testid="results">
       <h2>Results</h2>
@@ -30,7 +31,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         </div>
         <div className={"kpi-card " + (result.npvAtWacc >= 0 ? "tone-ok" : "tone-bad")}>
           <span className="kpi-label">NPV at WACC</span>
-          <span className="kpi-value">{deckMoneyForDisplay(result.npvAtWacc, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span>
+          <span className="kpi-value">{money(result.npvAtWacc)}</span>
           <span className="kpi-chip">{result.npvAtWacc >= 0 ? "positive at the benchmark" : "negative at the benchmark"}</span>
         </div>
         <div className="kpi-card">
@@ -46,9 +47,9 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         </div>
       </div>
       <div data-testid="figure-band" className="figure-band">
-        <span className="figure-item"><span className="figure-label">Total cost</span> <span className="figure-value">{deckMoneyForDisplay(result.totalCost, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span></span>
-        <span className="figure-item"><span className="figure-label">Total collected</span> <span className="figure-value">{deckMoneyForDisplay(result.totalCollected, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span></span>
-        <span className="figure-item"><span className="figure-label">Net gain</span> <span className="figure-value">{deckMoneyForDisplay(result.netGain, currency as Parameters<typeof deckMoneyForDisplay>[1])}</span></span>
+        <span className="figure-item"><span className="figure-label">Total cost</span> <span className="figure-value">{money(result.totalCost)}</span></span>
+        <span className="figure-item"><span className="figure-label">Total collected</span> <span className="figure-value">{money(result.totalCollected)}</span></span>
+        <span className="figure-item"><span className="figure-label">Net gain</span> <span className="figure-value">{money(result.netGain)}</span></span>
         <p className="caveat">Nominal figures are undiscounted; the cost NPV and achieved IRR are discounted.</p>
       </div>
       <h3>Yearly schedule</h3>
@@ -71,7 +72,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
       <h3>Cost composition (line totals, nominal)</h3>
       <ul data-testid="cost-composition">
         {result.lineTotals.map((l) => (
-          <li key={l.id}>{l.name}: {roundForDisplay(l.total)}</li>
+          <li key={l.id}>{l.name}: {money(l.total)}</li>
         ))}
       </ul>
       <h3>Key metrics</h3>
@@ -158,7 +159,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
       )}
       <h3>Signed cashflow (costs below the line, collections above it, the cumulative net overlaid)</h3>
       <div data-testid="coverage-chart">
-        <SignedCashflowChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1])} />
+        <SignedCashflowChart yearly={result.yearly} labelFor={(y) => yearHeader(y, startYear)} valueFor={(v) => money(v)} />
       </div>
       {result.termPositions !== undefined && result.termPositions.length > 0 && (
         <>
@@ -187,10 +188,10 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
       {result.bookView !== undefined && (
         <>
           <h3>Book view (depreciation; not cash flow)</h3>
-          <p className="muted" data-testid="book-view-disclosure">The book view records the depreciation write-down; it never enters the cash flows (the investment was paid once, in the cost vector). The book result is collections minus operating minus depreciation.</p>
+          <p className="muted" data-testid="book-view-disclosure">The book view records the depreciation write-down; it never enters the cash flows (the investment was paid once, in the cost vector). The book result is collections minus operating minus depreciation.{bookSplit !== null && " The collections column is every project inflow of the year: the fee collections, the grant receipts and the interest-free note's advance net of its installments, which the project net flow carries as cash; the three columns beside it name that basis and sum to the collections figure."}</p>
           <table data-testid="book-schedule">
             <thead>
-              <tr><th>Year</th><th>Beginning book value</th><th>Depreciation charge</th><th>Ending book value</th><th>Collections</th><th>Operating</th><th>Book result</th></tr>
+              <tr><th>Year</th><th>Beginning book value</th><th>Depreciation charge</th><th>Ending book value</th><th>Collections (all project inflows)</th>{bookSplit !== null && (<><th>of which fee collections</th><th>of which grant receipts</th><th>of which the note (advance less installments)</th></>)}<th>Operating</th><th>Book result</th></tr>
             </thead>
             <tbody>
               {result.bookView.combined.map((row) => (
@@ -200,6 +201,10 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
                   <td>{roundForDisplay(row.charge)}</td>
                   <td>{roundForDisplay(row.ending)}</td>
                   <td>{roundForDisplay(row.collections)}</td>
+                  {bookSplit !== null && (() => {
+                    const s = bookSplit.find((x) => x.year === row.year);
+                    return (<><td data-book-fees>{roundForDisplay(s?.fees ?? 0)}</td><td data-book-grants>{roundForDisplay(s?.grants ?? 0)}</td><td data-book-note>{roundForDisplay(s?.note ?? 0)}</td></>);
+                  })()}
                   <td>{roundForDisplay(row.operating)}</td>
                   <td>{roundForDisplay(row.bookResult)}</td>
                 </tr>

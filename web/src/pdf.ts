@@ -625,16 +625,21 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           doc.setTextColor(50, 50, 50);
           doc.text(`Target ${t.toFixed(2)}%`, 24, y);
           doc.setTextColor(0, 0, 0);
-          doc.text(sc.solved === true ? "solved to the target" : a >= t ? "clears the hurdle" : "below the hurdle", 120, y);
-          doc.text(`Achieved ${a.toFixed(2)}%`, 216, y, { align: "right" });
+          // v0.6.18 (AUD-10): a null achieved IRR reads "—" and draws no achieved dot
+          const missing = sc.achievedMissing === true;
+          const achievedText = missing ? "Achieved —" : `Achieved ${a.toFixed(2)}%`;
+          doc.text(sc.solved === true ? "solved to the target" : missing ? "no achieved rate" : a >= t ? "clears the hurdle" : "below the hurdle", 120, y);
+          doc.text(achievedText, 216, y, { align: "right" });
           doc.setFillColor(0, 116, 186);
           doc.circle(40 + (t / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");
-          const hc: [number, number, number] = a >= t ? PRINT_OK : PRINT_BAD;
-          doc.setFillColor(hc[0], hc[1], hc[2]);
-          doc.circle(40 + (a / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");
+          if (!missing) {
+            const hc: [number, number, number] = a >= t ? PRINT_OK : PRINT_BAD;
+            doc.setFillColor(hc[0], hc[1], hc[2]);
+            doc.circle(40 + (a / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");
+          }
           if (trace) {
             trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`Target ${t.toFixed(2)}%`);
-            trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`Achieved ${a.toFixed(2)}%`);
+            trace.drawnFigures[trace.drawnFigures.length - 1]?.push(achievedText);
           }
           y += 14;
         } else if (sc.kind === "rows" && sc.data.length > 0) {

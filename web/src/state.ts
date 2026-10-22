@@ -958,3 +958,22 @@ export function composeFacilitySchedules(result: ModelResult | null): FacilitySc
     };
   });
 }
+
+// v0.6.18 (AUD-28): the book view's "Collections" column is every project inflow of the year — the fee
+// collections, the grant receipts and the interest-free note's advance net of its installments (the Round 92
+// classification of record keeps the note's cash in the project net flow). The split names the basis: the
+// fees are the remainder after the identified grants and note cash, so the three columns reconcile to the
+// collections figure exactly. Null when the project carries neither grants nor a note.
+export interface BookCollectionsSplit { year: number; fees: number; grants: number; note: number }
+export function composeBookCollections(result: ModelResult): BookCollectionsSplit[] | null {
+  const grid = result.collectionsGrid;
+  const grantRows = grid.filter((r) => r.kind === "grant");
+  const noteRows = grid.filter((r) => r.kind === "funding-loan");
+  if (grantRows.length === 0 && noteRows.length === 0) return null;
+  return (result.bookView?.combined ?? []).map((row) => {
+    const at = (rows: typeof grid) => rows.reduce((a, r) => a + (r.amounts[row.year - 1] ?? 0), 0);
+    const grants = at(grantRows);
+    const note = at(noteRows);
+    return { year: row.year, fees: row.collections - grants - note, grants, note };
+  });
+}

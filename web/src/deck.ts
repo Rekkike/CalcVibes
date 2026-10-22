@@ -1,7 +1,7 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
 import { GANTT_LANE_LABEL_CHARS, ganttWindow, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
-import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
+import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
 import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
@@ -20,6 +20,8 @@ export interface DeckChartSlot {
   kind: "donut" | "bars" | "rows" | "coverage" | "hurdle";
   data: { label: string; value: number }[];
   solved?: boolean;
+  // v0.6.18 (AUD-10): a hurdle chart whose achieved IRR is null draws no achieved dot and reads "—"
+  achievedMissing?: boolean;
   crossingX?: number | null;
   // v0.6.8 Task G: the deck model emits the chart's kicker (an action title naming the varied
   // parameter); the hard-coded Presentation line is gone.
@@ -274,7 +276,7 @@ export function deckSlides(
     disclosures: [],
     tiles: [
       { label: "Cost NPV", value: money(result.costNpv), rawValue: result.costNpv, disclosure: "at the target rate" },
-      { label: "Achieved IRR", value: percentTwoForDisplay(result.achievedIrr ?? 0), rawValue: result.achievedIrr, tone: result.goalMet ? "ok" : "bad" },
+      { label: "Achieved IRR", value: percentTwoOrDash(result.achievedIrr), rawValue: result.achievedIrr, tone: result.goalMet ? "ok" : "bad" },
       { label: "Payback", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), rawValue: result.paybackYears },
       { label: "Solved payment", value: result.paymentAmount === null ? "—" : fee(result.paymentAmount), rawValue: result.paymentAmount },
       { label: "Collected vs cost", value: `${money(result.totalCollected)} vs ${money(result.totalCost)}`, rawValue: result.totalCollected },
@@ -456,7 +458,7 @@ export function deckSlides(
     name: "returns",
     title: "The returns",
     body: [
-      { label: "Achieved IRR", value: percentTwoForDisplay(result.achievedIrr ?? 0), kind: "percent", rawValue: result.achievedIrr },
+      { label: "Achieved IRR", value: percentTwoOrDash(result.achievedIrr), kind: "percent", rawValue: result.achievedIrr },
       { label: "Goal check", value: result.goalMet ? "target achieved" : "target not achieved", kind: "text", rawValue: null },
       { label: "NPV at WACC (discounted)", value: money(result.npvAtWacc), kind: "money", rawValue: result.npvAtWacc, disclosure: "discounted at the WACC" },
       { label: "Profitability index", value: result.profitabilityIndex === null ? "—" : dscrTwoForDisplay(result.profitabilityIndex), kind: "dscr", rawValue: result.profitabilityIndex },
@@ -486,14 +488,14 @@ export function deckSlides(
   } else {
     const eq = result.financing.equity;
     verdict = result.goalMet
-      ? `Target met — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid.`
-      : `Target missed — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid.`;
+      ? `Target met — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoOrDash(eq.irr)} on ${money(eq.outlay)} outlaid.`
+      : `Target missed — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoOrDash(eq.irr)} on ${money(eq.outlay)} outlaid.`;
   }
   const tiles: DeckTile[] = [
     { label: "Total cost", value: money(result.totalCost), rawValue: result.totalCost },
     { label: "Total collected", value: money(result.totalCollected), rawValue: result.totalCollected },
     { label: "Net gain", value: money(result.netGain), tone: result.netGain >= 0 ? "ok" : "bad", rawValue: result.netGain },
-    { label: "Achieved IRR", value: `${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad", rawValue: result.achievedIrr },
+    { label: "Achieved IRR", value: `${percentTwoOrDash(result.achievedIrr)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad", rawValue: result.achievedIrr },
     { label: "NPV at WACC", value: money(result.npvAtWacc), tone: result.npvAtWacc >= 0 ? "ok" : "bad", rawValue: result.npvAtWacc },
     { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), rawValue: result.paybackYears },
   ];
@@ -506,7 +508,7 @@ export function deckSlides(
     }
   }
   const summaryCharts: DeckChartSlot[] = [
-    { kind: "hurdle", solved: result.paymentAmount !== null, data: [
+    { kind: "hurdle", solved: result.paymentAmount !== null, ...(result.achievedIrr === null ? { achievedMissing: true } : {}), data: [
       { label: "Target", value: inputs.targetIrr },
       { label: "Achieved", value: (result.achievedIrr ?? 0) * 100 },
     ] },
@@ -602,7 +604,7 @@ export function deckSlides(
           if (r.paymentAmount !== null) {
             sceBody.push({ label: `Payment at target ${g}%`, value: money(r.paymentAmount), kind: "money", rawValue: r.paymentAmount });
           } else {
-            sceBody.push({ label: `Verdict at target ${g}%`, value: r.goalMet ? `met — achieved ${percentTwoForDisplay(r.achievedIrr ?? 0)}` : `not met — achieved ${percentTwoForDisplay(r.achievedIrr ?? 0)}`, kind: "percent", rawValue: r.achievedIrr });
+            sceBody.push({ label: `Verdict at target ${g}%`, value: r.goalMet ? `met — achieved ${percentTwoOrDash(r.achievedIrr)}` : `not met — achieved ${percentTwoOrDash(r.achievedIrr)}`, kind: "percent", rawValue: r.achievedIrr });
           }
         }
       }

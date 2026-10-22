@@ -2,6 +2,7 @@ import type { ContractParams, ModelInputs, ModelResult } from "../../../core/src
 import { moneyForDisplay, entryToValue, feeForDisplay } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
+import { YearMapEditor } from "../YearMapEditor.js";
 import { blankContract, nextContractId, spreadFill, yearHeader } from "../state.js";
 
 export function RepaymentSection(props: {
@@ -97,36 +98,7 @@ export function RepaymentSection(props: {
                 <label>Payment per period <MoneyEditor dataField="contract-evaluatedPayment" value={c.evaluatedPayment ?? 0} entryUnit={entryUnit} onChange={(v) => updateContract(c.id, { evaluatedPayment: v })} /></label>
                 <details data-testid="contract-profile-editor">
                   <summary>Per-year collections profile (optional)</summary>
-                  <table data-testid="contract-profile-rows">
-                    <thead><tr><th>Year</th><th>Collected sum</th><th></th></tr></thead>
-                    <tbody>
-                      {Object.entries(c.evaluatedProfile ?? {}).map(([y, amount]) => (
-                        <tr key={y} data-profile-year={y}>
-                          <td><input data-field="profile-year" value={y} onChange={(e) => {
-                            const next = { ...(c.evaluatedProfile ?? {}) };
-                            delete next[Number(y)];
-                            next[parseFloat(e.target.value) || 0] = amount;
-                            updateContract(c.id, { evaluatedProfile: next });
-                          }} /></td>
-                          <td><MoneyEditor dataField="profile-amount" value={amount} entryUnit={entryUnit} onChange={(v) => {
-                            const next = { ...(c.evaluatedProfile ?? {}) };
-                            next[Number(y)] = v;
-                            updateContract(c.id, { evaluatedProfile: next });
-                          }} /></td>
-                          <td><button data-action="remove-profile-year" data-year={y} onClick={() => {
-                            const next = { ...(c.evaluatedProfile ?? {}) };
-                            delete next[Number(y)];
-                            updateContract(c.id, { evaluatedProfile: next });
-                          }}>Remove</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <button data-action="add-profile-year" onClick={() => {
-                    const next = { ...(c.evaluatedProfile ?? {}) };
-                    next[3] = next[3] ?? 0;
-                    updateContract(c.id, { evaluatedProfile: next });
-                  }}>Add year</button>
+                  <YearMapEditor value={c.evaluatedProfile ?? {}} onChange={(next) => updateContract(c.id, { evaluatedProfile: next })} entryUnit={entryUnit} tableTestId="contract-profile-rows" rowAttr="data-profile-year" yearField="profile-year" amountField="profile-amount" removeAction="remove-profile-year" addAction="add-profile-year" defaultNewYear={3} />
                 </details>
               </>
             )}
@@ -180,36 +152,7 @@ export function RepaymentSection(props: {
           </p>
           <details data-testid="collections-editor">
             <summary>Per-year collections profile (optional; overrides the solved stream)</summary>
-            <table data-testid="collections-rows">
-              <thead><tr><th>Year</th><th>Collected sum</th><th></th></tr></thead>
-              <tbody>
-                {Object.entries(inputs.repayment.collectionsOverrides ?? {}).map(([y, amount]) => (
-                  <tr key={y} data-override-year={y} data-calendar-label={yearHeader(Number(y), startYear)}>
-                    <td><input data-field="col-override-year" value={y} onChange={(e) => {
-                      const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
-                      delete next[Number(y)];
-                      next[parseFloat(e.target.value) || 0] = amount;
-                      setRepayment({ collectionsOverrides: next });
-                    }} /> <span className="muted" data-testid="col-override-calendar-label">{yearHeader(Number(y), startYear)}</span></td>
-                    <td><MoneyEditor dataField="col-override-amount" value={amount} entryUnit={entryUnit} onChange={(v) => {
-                      const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
-                      next[Number(y)] = v;
-                      setRepayment({ collectionsOverrides: next });
-                    }} /></td>
-                    <td><button data-action="remove-col-override" data-year={y} onClick={() => {
-                      const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
-                      delete next[Number(y)];
-                      setRepayment({ collectionsOverrides: next });
-                    }}>Remove</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <button data-action="add-col-override" onClick={() => {
-              const next = { ...(inputs.repayment.collectionsOverrides ?? {}) };
-              next[3] = next[3] ?? 0;
-              setRepayment({ collectionsOverrides: next });
-            }}>Add year</button>
+            <YearMapEditor value={inputs.repayment.collectionsOverrides ?? {}} onChange={(next) => setRepayment({ collectionsOverrides: next })} entryUnit={entryUnit} tableTestId="collections-rows" rowAttr="data-override-year" yearField="col-override-year" amountField="col-override-amount" removeAction="remove-col-override" addAction="add-col-override" defaultNewYear={3} rowExtra={(y) => ({ "data-calendar-label": yearHeader(y, startYear) })} yearNote={(y) => <span className="muted" data-testid="col-override-calendar-label">{yearHeader(y, startYear)}</span>} />
             <div data-testid="collections-spread">
               <label>Spread total <input data-field="col-spread-total" type="number" defaultValue="" /></label>
               <label>First year <input data-field="col-spread-first" type="number" defaultValue={3} /></label>

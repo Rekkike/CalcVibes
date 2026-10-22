@@ -7,7 +7,7 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
 describe("Task A2: YEARLY-HONEST", () => {
-  it("the paired columns carry direct peak labels through the formatters and the year labels in HTML (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
+  it("(v0.6.18 AUD-17 re-anchor: the app cashflow chart carries the entry unit in force, thousands on a fresh app) the paired columns carry direct peak labels through the formatters and the year labels in HTML (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
@@ -19,10 +19,10 @@ describe("Task A2: YEARLY-HONEST", () => {
     const chart = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
     const costPeak = Array.from(chart.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakCost = Math.max(...result.yearly.map((y) => y.cost));
-    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "ones")}`);
+    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "thousands")}`);
     const inflowPeak = Array.from(chart.querySelectorAll('[data-testid="column-peak-inflow"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakInflow = Math.max(...result.yearly.map((y) => y.inflow));
-    expect(inflowPeak.textContent).toBe(`Inflow peak ${deckMoneyForDisplay(peakInflow, "EUR", "ones")}`);
+    expect(inflowPeak.textContent).toBe(`Inflow peak ${deckMoneyForDisplay(peakInflow, "EUR", "thousands")}`);
     expect(chart.querySelector('[data-testid="column-year-label-first"]')?.textContent).toBe(yearHeader(1, 2026));
   });
 
@@ -35,8 +35,8 @@ describe("Task A2: YEARLY-HONEST", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
     const line = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
-    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "ones"));
-    expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[result.yearly.length - 1].cumulative, "EUR", "ones"));
+    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "thousands"));
+    expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[result.yearly.length - 1].cumulative, "EUR", "thousands"));
     expect(line.querySelector('[data-testid="zero-baseline"]')).toBeTruthy();
     const crossing = line.querySelector('[data-testid="line-zero-crossing"]');
     const values = result.yearly.map((y) => y.cumulative);
@@ -152,9 +152,9 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
     const costPeak = Array.from(columns.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakCost = Math.max(...result.yearly.map((y) => y.cost));
-    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "ones")}`);
+    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "thousands")}`);
     const line = columns;
-    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "ones"));
+    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "thousands"));
     expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).not.toMatch(/,\d{2}/);
     fireEvent.click(byNav("detail"));
     const detailCell = Array.from(document.querySelectorAll("td.table-value-cell")).find((td) => (td.textContent ?? "").includes(","))?.textContent ?? "";
