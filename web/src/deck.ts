@@ -4,7 +4,7 @@ import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader } from "./state.js";
+import { DECISION_DISCLOSURE, composeInvestment, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -111,6 +111,37 @@ export interface DeckGantt {
   milestones: DeckGanttMilestone[];
 }
 
+// v0.6.15: the investment waterfall — composed once by the deck model and consumed by the
+// Presentation and the print route (neither recomputes it). The upper section is the ledger at the
+// individual-line level (percent left and width on the shared left-baseline scale, the shares on the
+// full-outflow basis); the lower section is the stepped columns at group level (percent bottom and
+// height, the total a ground-standing column).
+export interface DeckLedgerRow {
+  id: string;
+  name: string;
+  kind: "capital" | "subtotal" | "operating" | "reinvestments" | "total";
+  raw: number;
+  value: string;
+  // the share of the total program cost (the full-outflow basis), one decimal
+  share: string;
+  startPct: number;
+  widthPct: number;
+}
+export interface DeckStepColumn {
+  id: string;
+  name: string;
+  kind: "capital" | "operating" | "reinvestments" | "total";
+  raw: number;
+  value: string;
+  bottomPct: number;
+  heightPct: number;
+}
+export interface DeckWaterfall {
+  totalRaw: number;
+  rows: DeckLedgerRow[];
+  columns: DeckStepColumn[];
+}
+
 export interface DeckSlide {
   name: string;
   title: string;
@@ -128,6 +159,7 @@ export interface DeckSlide {
   solverScenario?: { label: string; requiredPayment: string | null } | null;
   funding?: DeckFundingBlock;
   gantt?: DeckGantt;
+  waterfall?: DeckWaterfall;
 }
 
 export const TERM_GLOSSES: { term: string; gloss: string }[] = [
@@ -278,6 +310,7 @@ export function deckSlides(
     disclosures: ["Composition shares are of the capital program."],
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
     ...(fundingBlock !== undefined ? { funding: fundingBlock } : {}),
+    waterfall: composeWaterfall(composeInvestment(inputs, result), money),
   });
 
   // v0.6.13: the timeline slide — ONE program-level slide, composed once (never per variant),
@@ -632,6 +665,37 @@ export function deckSlides(
   }
   if (timelineProvenance !== null) provenance.push(timelineProvenance);
   return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
+}
+
+function composeWaterfall(c: ReturnType<typeof composeInvestment>, money: (v: number) => string): DeckWaterfall {
+  const cap = Math.max(1e-12, c.totalCost);
+  const share = (v: number) => percentOneForDisplay(v / cap);
+  const rows: DeckLedgerRow[] = [];
+  let acc = 0;
+  const push = (id: string, name: string, kind: DeckLedgerRow["kind"], raw: number) => {
+    rows.push({ id, name, kind, raw, value: money(raw), share: share(raw), startPct: (acc / cap) * 100, widthPct: (raw / cap) * 100 });
+    acc += raw;
+  };
+  for (const l of c.lines) push(l.id, l.name, "capital", l.total);
+  // the capital subtotal marks the end of the capital program; it exists only when a segment
+  // follows (otherwise it would equal the total and encode nothing)
+  if (c.operating !== null || c.reinvestments !== null) {
+    rows.push({ id: "subtotal", name: "Capital program", kind: "subtotal", raw: c.capitalSubtotal, value: money(c.capitalSubtotal), share: share(c.capitalSubtotal), startPct: (c.capitalSubtotal / cap) * 100, widthPct: 0 });
+  }
+  if (c.operating !== null) push(c.operating.id, c.operating.name, "operating", c.operating.total);
+  if (c.reinvestments !== null) push(c.reinvestments.id, c.reinvestments.name, "reinvestments", c.reinvestments.total);
+  rows.push({ id: "total", name: "Total program cost", kind: "total", raw: c.totalCost, value: money(c.totalCost), share: share(c.totalCost), startPct: 0, widthPct: 100 });
+  const columns: DeckStepColumn[] = [];
+  let colAcc = 0;
+  const pushCol = (id: string, name: string, kind: DeckStepColumn["kind"], raw: number) => {
+    columns.push({ id, name, kind, raw, value: money(raw), bottomPct: (colAcc / cap) * 100, heightPct: (raw / cap) * 100 });
+    colAcc += raw;
+  };
+  for (const g of c.groups) pushCol(g.id, g.name, "capital", g.total);
+  if (c.operating !== null) pushCol(c.operating.id, c.operating.name, "operating", c.operating.total);
+  if (c.reinvestments !== null) pushCol(c.reinvestments.id, c.reinvestments.name, "reinvestments", c.reinvestments.total);
+  columns.push({ id: "total", name: "Total program cost", kind: "total", raw: c.totalCost, value: money(c.totalCost), bottomPct: 0, heightPct: 100 });
+  return { totalRaw: c.totalCost, rows, columns };
 }
 
 const startYearOf = (opts: { startYear: number | null }): number | null => opts.startYear;
