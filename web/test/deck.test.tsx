@@ -52,7 +52,7 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
       expect(row.raw).toBe(lt.total);
     }
     const recovery = deck.slides[3].body;
-    expect(recovery.find((f) => f.label === "Payment per period")!.rawValue).toBe(result.paymentAmount);
+    expect(recovery.find((f) => f.label === "Payment per quarter")!.rawValue).toBe(result.paymentAmount); // v0.6.18 Task H1: the cadence names the period
     expect(recovery.find((f) => f.label === "Total collected (nominal)")!.rawValue).toBe(result.totalCollected);
     const coverage = deck.slides[4].body;
     expect(coverage.find((f) => f.label === "Nominal payback")!.rawValue).toBe(result.paybackYears);

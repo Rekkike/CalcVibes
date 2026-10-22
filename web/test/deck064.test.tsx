@@ -118,7 +118,7 @@ describe("v0.6.4 Part A: the board-room simplification", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
-    expect(deck.slides[3].body.map((f) => f.label)).toEqual(["Payments", "Payment per period", "Total collected (nominal)"]);
+    expect(deck.slides[3].body.map((f) => f.label)).toEqual(["Payments", "Payment per quarter", "Total collected (nominal)"] /* v0.6.18 Task H1: the cadence names the period */);
     expect(deck.slides[3].insights).toBeUndefined();
   });
 

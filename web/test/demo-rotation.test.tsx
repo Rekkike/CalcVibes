@@ -310,7 +310,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — " + inputs.tariff?.priceUnitLabel + " prices");
     expect(bodyFigureValue("recovery", "Payments")).toBe("240");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€2 843 366");
+    expect(bodyFigureValue("recovery", "Payment per month")).toBe("€2 843 366"); // v0.6.18 Task H1: the cadence names the period
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€855 907 745");
     expect(bodyFigureValue("recovery", "Unit price 2028")).toBe("€7 108,41");
     expect(bodyFigureValue("recovery", "Segment rate — Deep-sea container berths (full ramp)")).toBe("5,83 €ct/kWh");
@@ -541,7 +541,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — solved payments");
     expect(bodyFigureValue("recovery", "Payments")).toBe("360");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("NOK 2 393 k");
+    expect(bodyFigureValue("recovery", "Payment per month")).toBe("NOK 2 393 k"); // v0.6.18 Task H1
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("NOK 1 132 569 k");
     // v0.6.8 Task E.5 pin: the land fixture carries neither basis note — the recovery slide
     // gains no note disclosures (the null-tolerance demo).

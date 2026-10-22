@@ -309,9 +309,13 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
       if (m.computed !== null) {
         // the computed engine-event month: a muted ring (read-only exposure, never authored)
         doc.setDrawColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-        if (m.computed.from !== m.computed.pos) doc.line(xAt(m.computed.from), cy, xAt(m.computed.pos), cy);
         doc.circle(xAt(m.computed.pos), cy, 3.6, "S");
         doc.setDrawColor(0, 0, 0);
+        // v0.6.18 Task H2: the ring is named in place of the retired connector
+        doc.setFontSize(6);
+        doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+        doc.text(m.computed.label, xAt(m.computed.pos) + (m.computed.side === "right" ? 5 : -5), cy + 0.8, { align: m.computed.side === "right" ? "left" : "right" });
+        push(m.computed.label);
       }
       doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
       doc.lines([[2.5, 2.5], [-2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]], cx, cy - 2.5, [1, 1], "F", true);
@@ -804,8 +808,15 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
         doc.text(slide.chart.kicker, 20, y);
         if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.chart.kicker);
+        y += 4;
+        if (slide.chart.periodNote !== undefined) {
+          doc.setFontSize(7);
+          doc.text(slide.chart.periodNote, 20, y);
+          if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.chart.periodNote);
+          y += 4;
+        }
         doc.setTextColor(0, 0, 0);
-        y += 5;
+        y += 1;
       }
       bars.forEach((d, di) => {
         const h = (d.value / chartMax) * 40;

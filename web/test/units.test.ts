@@ -54,7 +54,7 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
     // v0.6.9 Task F (finding W28): the fee-class figures close at feeForDisplay — at the
     // thousands entry the 475 309 kr payment renders at the entry unit's integer-thousands
     // form (the fee-class exemption covers only |value| < 1000; the boundary pin).
-    expect(deck.slides[3].body.find((f) => f.label === "Payment per period")!.value).toBe(feeForDisplay(result.paymentAmount as number, "SEK", "thousands"));
+    expect(deck.slides[3].body.find((f) => f.label === "Payment per quarter")!.value) /* v0.6.18 Task H1: the cadence names the period */.toBe(feeForDisplay(result.paymentAmount as number, "SEK", "thousands"));
     expect(deck.slides[6].tiles?.find((t) => t.label === "Total collected")?.value).toBe(deckMoneyForDisplay(result.totalCollected, "SEK", "thousands"));
   });
 

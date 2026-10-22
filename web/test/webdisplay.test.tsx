@@ -165,7 +165,6 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
-    const { bucketSeries } = await import("../src/charts.js");
     const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -173,14 +172,13 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const peak = Array.from(document.querySelectorAll('[data-slide-name="recovery"] [data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
-    const inflows = result.collectionsGrid.reduce((acc, row) => {
+    // v0.6.18 Task H1 / AUD-27: the annual basis; the grants and the interest-free note are not in the bars
+    const inflows = result.collectionsGrid.filter((r) => r.kind !== "grant" && r.kind !== "funding-loan").reduce((acc, row) => {
       for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
       return acc;
     }, new Array<number>(result.yearly.length).fill(0));
-    const { buckets, width } = bucketSeries(inflows, 15);
-    const peakIdx = buckets.reduce((bi, v, i) => (v > buckets[bi] ? i : bi), 0);
-    // v0.6.8 Task C: the peak label names the bucket range, not just its first year.
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx * width + 1, 2026)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), 2026)}`);
+    const peakIdx = inflows.reduce((bi, v, i) => (v > inflows[bi] ? i : bi), 0);
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(inflows[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx + 1, 2026)}`);
     fireEvent.click(byAction("exit-presentation"));
     fireEvent.click(byNav("results"));
     const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;

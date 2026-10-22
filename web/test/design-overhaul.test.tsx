@@ -184,8 +184,8 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     expect(investmentSlot.querySelector('[data-testid="ledger-waterfall"]')).toBeTruthy(); // v0.6.15: the composition rows retired from the investment slide
     expect(recoverySlot.querySelector('[data-testid="recovery-bars"]')).toBeTruthy();
     const bars = recoverySlot.querySelectorAll('[data-recovery-column]');
-    // v0.6.7 re-anchor: 23 inflow years bucket at width 2 under the cap of 15 — 12 columns.
-    expect(bars.length).toBe(12);
+    // v0.6.18 Task H1 re-anchor: the annual basis — one column per program year (23), never bucketed.
+    expect(bars.length).toBe(23);
   });
 
   it("CHART-TRACE: the mapped values equal the engine fields (perturb the mapping and this fails)", async () => {

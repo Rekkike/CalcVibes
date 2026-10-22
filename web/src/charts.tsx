@@ -1,4 +1,4 @@
-import type { GridRow, LineTotal, YearlyRow } from "../../core/src/types.js";
+import type { LineTotal, YearlyRow } from "../../core/src/types.js";
 import type { DeckGantt, DeckWaterfall } from "./deck.js";
 import { percentOneForDisplay } from "./engine.js";
 
@@ -204,40 +204,37 @@ export function CompositionDonut(props: {
   );
 }
 
+// v0.6.18 Task H1: the recovery bars draw the deck model's per-year series (the annual basis by default; the monthly
+// basis only on request) — nothing is bucketed, nothing is recomputed here. A SHORT span draws a few wide bars
+// (each capped in width); a LONG span draws one narrow bar per year in a scrollable grid with the year labels
+// thinned to every n-th bar and the peak named once. One bar is named by the period note.
 export function RecoveryBars(props: {
-  collectionsGrid: GridRow[];
-  years: number;
-  labelFor: (year: number) => string;
+  series: { label: string; value: number }[];
   peakFor: (value: number) => string;
   kicker?: string;
-  cap?: number;
+  periodNote?: string;
+  basis?: "annual" | "monthly";
 }) {
-  const { collectionsGrid, years, labelFor, peakFor, kicker, cap = 20 } = props;
-  const rawInflows = new Array<number>(years).fill(0);
-  for (const row of collectionsGrid) {
-    for (let k = 0; k < Math.min(years, row.amounts.length); k++) rawInflows[k] += row.amounts[k];
-  }
-  const { buckets: inflows, width } = bucketSeries(rawInflows, cap);
-  const max = Math.max(1, ...inflows);
-  const peakIdx = inflows.indexOf(Math.max(...inflows));
-  // v0.6.8 Task C (finding W22): when the bucket width is greater than 1, the range label renders
-  // only on every ceil(bucketCount / 8)th column; the thinned columns render an empty label with
-  // data-thinned="true". At width 1 the yearly label set is the designed shape and is unchanged.
-  const thinStep = width > 1 ? Math.ceil(inflows.length / 8) : 1;
+  const { series, peakFor, kicker, periodNote, basis = "annual" } = props;
+  const max = Math.max(1, ...series.map((d) => d.value));
+  const peakIdx = series.findIndex((d) => d.value === Math.max(...series.map((x) => x.value)));
+  const labelStep = Math.max(1, Math.ceil(series.length / 12));
+  const colMin = basis === "monthly" ? 6 : 26;
   return (
-    <div data-testid="recovery-bars" className="chart-block">
+    <div data-testid="recovery-bars" data-basis={basis} className="chart-block">
       {kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{kicker}</p>}
-      {/* v0.6.9 Task B (finding W26): the scrollable bucket grid — the honest-overflow pattern
-          (the app's .editor-scroll) so the axis labels never overlap at phone width. */}
+      {periodNote !== undefined && <p data-testid="recovery-period-note" className="muted recovery-period-note">{periodNote}</p>}
+      {/* the scrollable grid — the honest-overflow pattern (the app's .editor-scroll), so a long span scrolls
+          instead of crowding and the labels never overlap at phone width. */}
       <div data-testid="recovery-scroll" className="recovery-scroll">
-        <div className="recovery-grid">
-          {inflows.map((v, k) => (
-            <div key={k} data-recovery-column={k} data-bucket-width={width} className="recovery-column">
-              <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? (width === 1 ? `${peakFor(v)} in ${labelFor(k * width + 1)}` : `${peakFor(v)} in ${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}`) : "\u00a0"}</span>
-              <svg viewBox={`0 0 10 ${Math.max(1, Math.round((v / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
-                <rect x={0} y={0} width={10} height={Math.max(1, Math.round((v / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
+        <div className="recovery-grid" style={{ minWidth: `${series.length * colMin}px` }}>
+          {series.map((d, k) => (
+            <div key={k} data-recovery-column={k} data-bucket-width={1} className="recovery-column">
+              <span data-testid="peak-label" className={k === peakIdx && d.value > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && d.value > 0 ? `${peakFor(d.value)} in ${d.label}` : "\u00a0"}</span>
+              <svg viewBox={`0 0 10 ${Math.max(1, Math.round((d.value / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
+                <rect x={0} y={0} width={10} height={Math.max(1, Math.round((d.value / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
               </svg>
-              <span data-testid="bar-year-label" {...(width > 1 && k % thinStep !== 0 ? { "data-thinned": "true" } : {})} className="bar-year-label">{width === 1 ? labelFor(k + 1) : (k % thinStep === 0 ? `${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}` : "\u00a0")}</span>
+              <span data-testid="bar-year-label" {...(k % labelStep !== 0 ? { "data-thinned": "true" } : {})} className="bar-year-label">{k % labelStep === 0 ? d.label : "\u00a0"}</span>
             </div>
           ))}
         </div>
@@ -245,7 +242,6 @@ export function RecoveryBars(props: {
     </div>
   );
 }
-
 export function StageReturnsChart(props: {
   yearly: YearlyRow[];
   labelFor: (year: number) => string;
@@ -495,13 +491,14 @@ export function GanttChart(props: { gantt: DeckGantt }) {
           const cy = lanesBottom + 34 + gateShift + m.row * 30;
           return (
             <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
-              {m.computed !== null && m.computed.from !== m.computed.pos && (
-                <line data-gantt-computed-link={m.id} x1={xAt(m.computed.from)} x2={xAt(m.computed.pos)} y1={cy} y2={cy} stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1} />
-              )}
               {m.computed !== null && (
-                <circle data-gantt-computed={m.id} cx={xAt(m.computed.pos)} cy={cy} r={10} fill="none" stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1.5}>
-                  <title>{`Computed month ${m.computed.month} of year ${m.computed.year} (read-only, from the live schedule)`}</title>
-                </circle>
+                <>
+                  <circle data-gantt-computed={m.id} cx={xAt(m.computed.pos)} cy={cy} r={10} fill="none" stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1.5}>
+                    <title>{`Computed month ${m.computed.month} of year ${m.computed.year} (read-only, from the live schedule)`}</title>
+                  </circle>
+                  {/* v0.6.18 Task H2: the ring is named in place of the retired connector */}
+                  <text data-gantt-computed-label={m.id} x={xAt(m.computed.pos) + (m.computed.side === "right" ? 14 : -14)} y={cy + 4} textAnchor={m.computed.side === "right" ? "start" : "end"} fontSize={11} fill={STAGE_CHART_COLORS.axisText} fillOpacity={0.85}>{m.computed.label}</text>
+                </>
               )}
               <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />
               <text data-gantt-milestone-number={m.ordinal} x={cx} y={cy + 19} textAnchor="middle" fontSize={12} fontWeight={700} fill={STAGE_CHART_COLORS.axisText}>{m.ordinal}</text>

@@ -73,20 +73,17 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const cols = document.querySelectorAll('[data-slide-name="recovery"] [data-recovery-column]');
-    // RecoveryBars buckets the 23 yearly inflows via bucketSeries(values, cap 15): width 2,
-    // 12 buckets — the honest bucketing, not per-year bars.
-    expect(cols.length).toBe(12);
-    const width = 2;
+    // v0.6.18 Task H1: the annual basis — one bar per program year (23 here), never bucketed; the labels thin
+    // to every ceil(23 / 12) = 2nd bar (twelve visible, eleven thinned), the calendar years via the preset 2026.
+    expect(cols.length).toBe(23);
     const years = result.yearly.length;
     expect(years).toBe(23);
-    // v0.6.8 Task C: at width > 1 the label set thins to every ceil(bucketCount/8)th column;
-    // thinned columns carry a non-breaking space and data-thinned="true". Program at cap 15:
-    // 12 buckets, thinStep 2, six visible labels and six thinned.
-    const thinStep = width > 1 ? Math.ceil(cols.length / 8) : 1;
-    expect(Array.from(cols).filter((c) => (c.querySelector('[data-testid="bar-year-label"]') as HTMLElement)?.getAttribute("data-thinned") !== "true").length).toBe(6);
+    const thinStep = Math.ceil(cols.length / 12);
+    expect(thinStep).toBe(2);
+    expect(Array.from(cols).filter((c) => (c.querySelector('[data-testid="bar-year-label"]') as HTMLElement)?.getAttribute("data-thinned") !== "true").length).toBe(12);
     for (let k = 0; k < cols.length; k++) {
       const labelEl = cols[k].querySelector('[data-testid="bar-year-label"]') as HTMLElement;
-      const expected = `${yearHeader(k * width + 1, 2026)}–${yearHeader(Math.min(years, (k + 1) * width), 2026)}`; // v0.6.10: calendar years via the loader-preset start year 2026.
+      const expected = yearHeader(k + 1, 2026);
       if (k % thinStep === 0) {
         expect(labelEl.textContent).toBe(expected);
       } else {
@@ -122,8 +119,8 @@ describe("Task C3/C4: ACTION-TITLES / DECLUTTER", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const barSvgs = document.querySelectorAll('[data-slide-name="recovery"] .recovery-bar-svg');
-    // 12 bucketed bars (bucketSeries width 2 over 23 years), not 23 per-year bars.
-    expect(barSvgs.length).toBe(12);
+    // v0.6.18 Task H1: 23 annual bars (one per program year), not 12 bucketed bars.
+    expect(barSvgs.length).toBe(23);
     for (const svg of Array.from(barSvgs)) {
       const rect = svg.querySelector("rect");
       expect(rect).toBeTruthy();

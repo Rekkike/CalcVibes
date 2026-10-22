@@ -1398,3 +1398,9 @@
 .app-root .editor-scroll table.timeline-table td.tl-pick-outcome select { width: 11rem; }
 .app-root .editor-scroll table.timeline-table td.tl-pick-tie select { width: 16rem; max-width: 100%; }
 .app-root .editor-scroll table.timeline-table td.tl-code { width: 3.5rem; white-space: nowrap; }
+
+/* v0.6.18 Task H1 — the recovery bars on the annual basis: a few years draw a few wide columns (capped, centred);
+   many years draw one narrow column each in the scroll grid (the inline min-width reserves it). */
+[data-testid="presentation"] .recovery-column { max-width: 7rem; }
+[data-testid="presentation"] .recovery-grid { justify-content: center; }
+[data-testid="presentation"] .recovery-period-note { font-size: 12px; margin: 0 0 var(--space-1); }

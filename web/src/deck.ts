@@ -22,6 +22,10 @@ export interface DeckChartSlot {
   solved?: boolean;
   // v0.6.18 (AUD-10): a hurdle chart whose achieved IRR is null draws no achieved dot and reads "—"
   achievedMissing?: boolean;
+  // v0.6.18 Task H1: the basis of a per-year bar series (annual by default; monthly only on request) and the one
+  // line that names what one bar is, composed once with the series
+  basis?: "annual" | "monthly";
+  periodNote?: string;
   crossingX?: number | null;
   // v0.6.8 Task G: the deck model emits the chart's kicker (an action title naming the varied
   // parameter); the hard-coded Presentation line is gone.
@@ -105,8 +109,12 @@ export interface DeckGanttGate { id: string; code: string | null; title: string;
 // stack position among the drawn milestones sharing a year (0 = the first).
 // v0.6.17 supplement: a milestone tied to an engine event whose live schedule carries a month also carries the
 // COMPUTED position (read-only exposure, never authored): drawn as a muted ring, composed once here.
-// from is the authored diamond's position: the renderers draw the thin muted connector from it to pos.
-export interface DeckGanttComputed { year: number; month: number; pos: number; from: number }
+// v0.6.18 Task H2 (the builder proposal, applied): the thin connector from the authored diamond to the ring is RETIRED —
+// it carried no meaning to a reader (a line between two marks says nothing about what the second one is). The ring
+// is NAMED instead: it carries its own short text label, composed once here ("computed: month 12"), set on the side
+// of the ring away from the authored diamond so it never lands on it. The authored diamond never changes; the ring
+// stays the read-only exposure of the live schedule (never authored).
+export interface DeckGanttComputed { year: number; month: number; pos: number; label: string; side: "left" | "right" }
 export interface DeckGanttMilestone { id: string; label: string; year: number; month: number | null; pos: number; tie: string | null; ordinal: number; row: number; computed: DeckGanttComputed | null }
 export interface DeckGantt {
   // the program span; the axis and the plot cover the year window only
@@ -199,7 +207,7 @@ export interface DeckModel {
 export function deckSlides(
   inputs: ModelInputs,
   result: ModelResult,
-  opts: { startYear: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean } = { startYear: null },
+  opts: { startYear: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean; recoveryMonthly?: boolean } = { startYear: null },
 ): DeckModel {
   const currency = (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK";
   const unit = opts.entryUnit ?? "ones";
@@ -360,7 +368,9 @@ export function deckSlides(
   if (!tariffCollectionMode && result.paymentAmount !== null) {
     recoveryTitle = "The recovery — solved payments";
     recoveryBody.push({ label: "Payments", value: String(result.paymentCount), kind: "count", rawValue: result.paymentCount });
-    recoveryBody.push({ label: "Payment per period", value: fee(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
+    // v0.6.18 Task H1: "period" named — the payment is per PAYMENT PERIOD of the repayment cadence, never confused
+    // with the bars below (one bar is one program year)
+    recoveryBody.push({ label: `Payment per ${CADENCE_WORD[inputs.repayment.paymentsPerYear] ?? "period"}`, value: fee(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
     if (inputs.tariff?.mode === "decompose") {
       // v0.6.12 Task C (Round 46 Supplement 12): the title composes from the declared vocabulary;
@@ -400,10 +410,13 @@ export function deckSlides(
     recoveryTitle = "The recovery — evaluated, not solved";
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   }
-  const yearsCount = result.yearly.length;
-  const inflowByYear = new Array<number>(yearsCount).fill(0);
-  for (const row of result.collectionsGrid) {
-    for (let k = 0; k < Math.min(yearsCount, row.amounts.length); k++) inflowByYear[k] += row.amounts[k];
+  // v0.6.18 Task H1 (and AUD-27): the recovery series is composed here ONCE — the annual basis by default, the month
+  // level only on request; the grants and the interest-free note are identified in their own figures, never summed
+  // into the bars unidentified.
+  const recoverySeries = composeRecoverySeries(result, startYear, opts.recoveryMonthly === true);
+  if (grantsTotal > 0 || recoverySeries.noteAdvance > 0) {
+    if (grantsTotal > 0) recoveryBody.push({ label: "Grant receipts (identified; not in the bars)", value: fee(grantsTotal), kind: "money", rawValue: grantsTotal, disclosure: "received once per grant row; shown on the investment slide" });
+    if (recoverySeries.noteAdvance > 0) recoveryBody.push({ label: "Interest-free note advance (identified; not in the bars)", value: fee(recoverySeries.noteAdvance), kind: "money", rawValue: recoverySeries.noteAdvance, disclosure: "repaid by installments; nets to zero over the horizon" });
   }
   // v0.6.8 Task E.4 (finding W21): the user basis notes surface here — disclosed verbatim when
   // non-empty, absent when empty (the land fixture is the null-tolerance demo and gains none).
@@ -419,7 +432,7 @@ export function deckSlides(
     title: recoveryTitle,
     body: recoveryBody,
     disclosures: recoveryDisclosures,
-    chart: { kind: "bars", data: inflowByYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })) },
+    chart: { kind: "bars", data: recoverySeries.data, kicker: recoverySeries.kicker, basis: recoverySeries.basis, periodNote: recoverySeries.periodNote },
   });
 
   // Slide 3 — returns
@@ -507,12 +520,14 @@ export function deckSlides(
       tiles.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), tone: result.financing.minDscr.value >= 1.0 ? "ok" : "bad", disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}`, rawValue: result.financing.minDscr.value });
     }
   }
+  // the deal slide's inflow bars are always the annual basis (the monthly request applies to the recovery slide)
+  const annualRecovery = composeRecoverySeries(result, startYear, false);
   const summaryCharts: DeckChartSlot[] = [
     { kind: "hurdle", solved: result.paymentAmount !== null, ...(result.achievedIrr === null ? { achievedMissing: true } : {}), data: [
       { label: "Target", value: inputs.targetIrr },
       { label: "Achieved", value: (result.achievedIrr ?? 0) * 100 },
     ] },
-    { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },
+    { kind: "bars", data: annualRecovery.data, kicker: annualRecovery.kicker, basis: "annual", periodNote: annualRecovery.periodNote },
   ];
   if (result.residualDisclosure !== null && result.residualDisclosure !== undefined) {
     // v0.6.5 Task A (W8): the deck composes its sale disclosure from structured fields through the
@@ -701,6 +716,40 @@ export function deckSlides(
 // the capital groups (the stepped columns) — and closes at the Capital program step; the shares are of
 // the capital program. The operating lines and the reinvestments no longer draw as steps: the total
 // program cost stays a labeled figure of the slide, and its disclosure names the segments beyond.
+
+const CADENCE_WORD: Record<number, string> = { 1: "year", 2: "half-year", 4: "quarter", 12: "month" };
+
+// v0.6.18 Task H1: the recovery bars. The annual basis is the default: one bar per program year, the sum of its
+// collections EXCLUDING the grant receipts and the interest-free note's cash (those are identified in their own
+// figures). The month level composes only on request (the view toggle), as the monthly project inflows: every
+// project inflow in the month it falls, the grants and the note's cash included — the kicker says so. The series
+// is the single source the Presentation and the print route draw.
+function composeRecoverySeries(result: ModelResult, startYear: number | null, monthly: boolean): { basis: "annual" | "monthly"; data: { label: string; value: number }[]; kicker: string; periodNote: string; noteAdvance: number } {
+  const noteAdvance = (result.fundingView?.rows ?? []).filter((r) => r.kind === "interest-free-loan").reduce((a, r) => a + r.amount, 0);
+  if (monthly) {
+    return {
+      basis: "monthly",
+      data: result.monthly.map((m) => ({ label: `${yearHeader(m.year, startYear)} · month ${((m.period - 1) % 12) + 1}`, value: m.inflow })),
+      kicker: "Project inflows by month, including the grants and the interest-free note's cash",
+      periodNote: "Each bar is one month of every project inflow.",
+      noteAdvance,
+    };
+  }
+  const years = result.yearly.length;
+  const byYear = new Array<number>(years).fill(0);
+  for (const row of result.collectionsGrid) {
+    if (row.kind === "grant" || row.kind === "funding-loan") continue;
+    for (let k = 0; k < Math.min(years, row.amounts.length); k++) byYear[k] += row.amounts[k];
+  }
+  const funded = result.collectionsGrid.some((r) => r.kind === "grant" || r.kind === "funding-loan");
+  return {
+    basis: "annual",
+    data: byYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })),
+    kicker: funded ? "Collections per year, excluding the grants and the interest-free note" : "Collections per year",
+    periodNote: "Each bar is one program year: the sum of its twelve months.",
+    noteAdvance,
+  };
+}
 function composeWaterfall(c: ReturnType<typeof composeInvestment>, money: (v: number) => string): DeckWaterfall {
   const cap = Math.max(1e-12, c.capitalSubtotal);
   const share = (v: number) => percentOneForDisplay(v / cap);
@@ -799,7 +848,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     const tie = tieOf.get(m.id);
     const ev = tie !== undefined && tie.kind === "engine-event" ? events.find((e) => e.event === tie.event) : undefined;
     const computed = ev !== undefined && ev.month !== undefined && inWindow(ev.year)
-      ? { year: ev.year, month: ev.month, pos: markerPosition(win, ev.year, ev.month), from: stacked[i].pos }
+      ? { year: ev.year, month: ev.month, pos: markerPosition(win, ev.year, ev.month), label: `computed: month ${ev.month}`, side: markerPosition(win, ev.year, ev.month) >= stacked[i].pos ? "right" as const : "left" as const }
       : null;
     return { ...m, pos: stacked[i].pos, row: stacked[i].row, computed };
   });
