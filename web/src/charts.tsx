@@ -406,6 +406,8 @@ const svgRowH = (lines: number) => GANTT_SVG.rowPad + (lines > 0 ? lines * GANTT
 export const ganttLaneHeight = (lane: DeckGantt["lanes"][number]): number =>
   Math.max(lane.rowLines.reduce((a, l) => a + svgRowH(l), 0) + GANTT_SVG.rowPad, lane.labelLines.length * 15 + 14);
 
+// v0.6.17: the height of one gate-label row
+const GATE_ROW_H = 14;
 export function GanttChart(props: { gantt: DeckGantt }) {
   const { gantt } = props;
   const { labelW, plotW, top, rowPad, barH, lineH, barInset } = GANTT_SVG;
@@ -414,6 +416,8 @@ export function GanttChart(props: { gantt: DeckGantt }) {
   const colW = plotW / n;
   const xStart = (y: number) => labelW + (y - first) * colW;
   const xMid = (y: number) => labelW + (y - first + 0.5) * colW;
+  // v0.6.17: the composed sub-year position of a marker (year columns from the window start)
+  const xAt = (pos: number) => labelW + pos * colW;
   const laneTops: number[] = [];
   let cursor = top;
   for (const lane of gantt.lanes) {
@@ -424,7 +428,9 @@ export function GanttChart(props: { gantt: DeckGantt }) {
   // v0.6.13.4: a milestone row (one per same-year stack position) is 30 units tall: the diamond, then its
   // ordinal centered beneath it. With no milestone the height stands as before.
   const milestoneRows = gantt.milestones.reduce((a, m) => Math.max(a, m.row + 1), 0);
-  const height = milestoneRows === 0 ? lanesBottom + 44 : lanesBottom + 34 + (milestoneRows - 1) * 30 + 26;
+  // v0.6.17: gate labels stacked on extra rows (the same-year relief) push the milestone area down
+  const gateShift = Math.max(0, gantt.gateRows - 1) * GATE_ROW_H;
+  const height = (milestoneRows === 0 ? lanesBottom + 44 : lanesBottom + 34 + (milestoneRows - 1) * 30 + 26) + gateShift;
   const step = Math.max(1, Math.ceil(n / 12));
   return (
     <div data-testid="gantt-chart" className="chart-block gantt-chart">
@@ -453,8 +459,8 @@ export function GanttChart(props: { gantt: DeckGantt }) {
               {lane.bars.map((b) => {
                 const rowTop = rowTops[b.row];
                 const band = lane.rowLines[b.row] > 0 ? lane.rowLines[b.row] * lineH + 3 : 0;
-                const bx = xStart(b.startYear) + barInset;
-                const bw = (b.endYear - b.startYear + 1) * colW - 2 * barInset;
+                const bx = xAt(b.left) + barInset;
+                const bw = (b.right - b.left) * colW - 2 * barInset;
                 const by = rowTop + band;
                 return (
                   <g key={b.id} data-gantt-bar={b.id} data-row={b.row} data-label-mode={b.labelMode}>
@@ -475,13 +481,13 @@ export function GanttChart(props: { gantt: DeckGantt }) {
         <line x1={labelW} x2={labelW + plotW} y1={lanesBottom} y2={lanesBottom} stroke={STAGE_CHART_COLORS.zeroLine} />
         {gantt.gates.map((g) => (
           <g key={g.id} data-gantt-gate={g.id} data-gate-code={g.code ?? ""}>
-            <line x1={xMid(g.year)} x2={xMid(g.year)} y1={top - 6} y2={lanesBottom + 6} stroke={STAGE_GOLD} strokeWidth={2} />
-            <text x={xMid(g.year)} y={lanesBottom + 20} textAnchor="middle" fontSize={12} fill={STAGE_GOLD}>{g.code ?? "Gate"}</text>
+            <line x1={xAt(g.pos)} x2={xAt(g.pos)} y1={top - 6} y2={lanesBottom + 6 + g.row * GATE_ROW_H} stroke={STAGE_GOLD} strokeWidth={2} />
+            <text x={xAt(g.pos)} y={lanesBottom + 20 + g.row * GATE_ROW_H} textAnchor="middle" fontSize={12} fill={STAGE_GOLD}>{g.code ?? "Gate"}</text>
           </g>
         ))}
         {gantt.milestones.map((m) => {
-          const cx = xMid(m.year);
-          const cy = lanesBottom + 34 + m.row * 30;
+          const cx = xAt(m.pos);
+          const cy = lanesBottom + 34 + gateShift + m.row * 30;
           return (
             <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
               <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />

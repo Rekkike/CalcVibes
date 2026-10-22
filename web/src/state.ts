@@ -641,22 +641,26 @@ export function programSpanYears(inputs: ModelInputs, result: ModelResult | null
 //     result.repaymentStartYear;
 //   funding-received -> the earliest funding row year (fundingView.rows[].year), only when the
 //     project carries a funding block.
-export function availableEngineEvents(inputs: ModelInputs, result: ModelResult | null): { event: TimelineEngineEvent; year: number }[] {
+export function availableEngineEvents(inputs: ModelInputs, result: ModelResult | null): { event: TimelineEngineEvent; year: number; month?: number }[] {
   if (result === null) return [];
-  const out: { event: TimelineEngineEvent; year: number }[] = [{ event: "construction-complete", year: result.lastCostYear }];
+  const out: { event: TimelineEngineEvent; year: number; month?: number }[] = [{ event: "construction-complete", year: result.lastCostYear }];
   const profile = inputs.repayment.collectionsOverrides !== undefined && Object.keys(inputs.repayment.collectionsOverrides).length > 0;
   let firstCollection = result.repaymentStartYear;
   if (profile) firstCollection = Math.ceil(result.firstPaymentMonth / 12);
   else if ((inputs.contracts ?? []).length > 0 && (result.contractsInfo ?? []).length > 0) firstCollection = Math.min(...(result.contractsInfo ?? []).map((c) => c.startYear));
   else if (result.tariffYears.length > 0) firstCollection = result.tariffYears[0].year;
-  out.push({ event: "first-collection-year", year: firstCollection });
+  // v0.6.17: the computed month (read-only exposure): the month of the first payment in the live monthly
+  // schedule, exposed only where it falls in the event's own year. Composed, never authored.
+  const firstMonth = result.firstPaymentMonth;
+  const computed = Number.isInteger(firstMonth) && firstMonth >= 1 && Math.ceil(firstMonth / 12) === firstCollection ? ((firstMonth - 1) % 12) + 1 : undefined;
+  out.push(computed === undefined ? { event: "first-collection-year", year: firstCollection } : { event: "first-collection-year", year: firstCollection, month: computed });
   const fundingRows = result.fundingView?.rows ?? [];
   if (fundingRows.length > 0) out.push({ event: "funding-received", year: Math.min(...fundingRows.map((r) => r.year)) });
   return out;
 }
 
 export interface TimelineRefusal {
-  code: "TIMELINE-ACTIVITY-SPAN" | "TIMELINE-ACTIVITY-ORDER" | "TIMELINE-GATE-SPAN" | "TIMELINE-MILESTONE-SPAN" | "TIMELINE-MILESTONE-TIE" | "TIMELINE-PHASE-UNKNOWN";
+  code: "TIMELINE-ACTIVITY-SPAN" | "TIMELINE-ACTIVITY-ORDER" | "TIMELINE-GATE-SPAN" | "TIMELINE-MILESTONE-SPAN" | "TIMELINE-MILESTONE-TIE" | "TIMELINE-PHASE-UNKNOWN" | "TIMELINE-MONTH-DOMAIN";
   message: string;
 }
 
@@ -677,22 +681,39 @@ export function validateTimeline(inputs: ModelInputs, result: ModelResult | null
     }
   }
   const inSpan = (y: number) => Number.isInteger(y) && y >= 1 && y <= span;
+  const monthOk = (m: number | undefined) => m === undefined || (Number.isInteger(m) && m >= 1 && m <= 12);
   const spanText = `the program span of years 1–${span}`;
   for (const a of tl.activities) {
     if (!inSpan(a.startYear) || !inSpan(a.endYear)) {
       out.push({ code: "TIMELINE-ACTIVITY-SPAN", message: `Activity ${a.id} (${a.label}) runs years ${a.startYear}–${a.endYear}, outside ${spanText}: set whole years inside the span or widen the project length (TIMELINE-ACTIVITY-SPAN).` });
     }
+    for (const [field, value] of [["startMonth", a.startMonth], ["endMonth", a.endMonth]] as const) {
+      if (!monthOk(value)) {
+        out.push({ code: "TIMELINE-MONTH-DOMAIN", message: `Activity ${a.id} (${a.label}) carries ${field} ${value}, which is not a whole month from 1 to 12: set a month from 1 to 12 or clear it (TIMELINE-MONTH-DOMAIN).` });
+      }
+    }
     if (a.startYear > a.endYear) {
       out.push({ code: "TIMELINE-ACTIVITY-ORDER", message: `Activity ${a.id} (${a.label}) starts in year ${a.startYear}, after it ends in year ${a.endYear}: set the start year at or before the end year (TIMELINE-ACTIVITY-ORDER).` });
+    } else if (a.startYear === a.endYear && monthOk(a.startMonth) && monthOk(a.endMonth) && a.startMonth !== undefined && a.endMonth !== undefined && a.endMonth < a.startMonth) {
+      // v0.6.17: the month-aware order — an end bound closes at its month's closing, a start bound opens at
+      // its month's opening, so the same month is a valid one-month span and an earlier end month closes
+      // before the bar opens
+      out.push({ code: "TIMELINE-ACTIVITY-ORDER", message: `Activity ${a.id} (${a.label}) starts in year ${a.startYear} month ${a.startMonth}, after it ends in year ${a.endYear} month ${a.endMonth}: set the start month at or before the end month (TIMELINE-ACTIVITY-ORDER).` });
     }
   }
   for (const d of tl.decisionPoints) {
+    if (!monthOk(d.month)) {
+      out.push({ code: "TIMELINE-MONTH-DOMAIN", message: `Decision point ${d.id} (${d.title}) carries month ${d.month}, which is not a whole month from 1 to 12: set a month from 1 to 12 or clear it (TIMELINE-MONTH-DOMAIN).` });
+    }
     if (!inSpan(d.year)) {
       out.push({ code: "TIMELINE-GATE-SPAN", message: `Decision point ${d.id} (${d.title}) falls in year ${d.year}, outside ${spanText}: set a whole year inside the span or widen the project length (TIMELINE-GATE-SPAN).` });
     }
   }
   const events = availableEngineEvents(inputs, result);
   for (const m of tl.milestones) {
+    if (!monthOk(m.month)) {
+      out.push({ code: "TIMELINE-MONTH-DOMAIN", message: `Milestone ${m.id} (${m.label}) carries month ${m.month}, which is not a whole month from 1 to 12: set a month from 1 to 12 or clear it (TIMELINE-MONTH-DOMAIN).` });
+    }
     if (!inSpan(m.year)) {
       out.push({ code: "TIMELINE-MILESTONE-SPAN", message: `Milestone ${m.id} (${m.label}) falls in year ${m.year}, outside ${spanText}: set a whole year inside the span or widen the project length (TIMELINE-MILESTONE-SPAN).` });
     }
@@ -873,4 +894,10 @@ export function composeFacility(inputs: ModelInputs, result: ModelResult | null,
     drift,
     drifts: drift !== null && Math.abs(drift) > 1e-6 + 1e-9 * Math.abs(fr.amount),
   };
+}
+
+// v0.6.17 — the month reading of a bound (the yearHeader precedent): a month-bearing bound reads its
+// composed position ("Year 3, month 7"); an absent month reads as today (the year header alone).
+export function yearMonthHeader(year: number, month: number | undefined, startYear: number | null): string {
+  return month === undefined || !Number.isInteger(month) || month < 1 || month > 12 ? yearHeader(year, startYear) : `${yearHeader(year, startYear)}, month ${month}`;
 }
