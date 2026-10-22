@@ -4,7 +4,7 @@ import {
   DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
   phaseVocabularyIssues, phasesOf, programSpanYears, replaceSourceActivities, sourceHasActivities, suggestActivitiesFromContracts,
   suggestActivitiesFromCosts, suggestActivitiesFromFinancing, suggestActivitiesFromFunding, suggestActivitiesFromOperating,
-  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, withScalePreset, yearMonthHeader,
+  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, timelineWindow, validateTimeline, withScalePreset, yearHeader, yearMonthHeader,
 } from "../state.js";
 
 // v0.6.13.2 Task B: the per-source suggestion buttons. Each derives one source of the project into
@@ -135,8 +135,32 @@ export function TimelineSection(props: {
     commit({ activities: tl.activities.map((a) => (a.id === id ? merged(a, patch) : a)) });
   const updateGate = (id: string, patch: Partial<TimelineDecisionPoint>) =>
     commit({ decisionPoints: tl.decisionPoints.map((d) => (d.id === id ? merged(d, patch) : d)) });
-  const updateMilestone = (id: string, patch: Partial<TimelineMilestone>) =>
+  // v0.6.18 Task F: a milestone authored outside the chart window is asked about, never dropped silently: the
+  // guard follows the milestone whose year was just authored; "Extend the window" widens it (a confirmed
+  // extension carried in the block), "Keep the window" leaves it and the deck caption keeps counting the
+  // milestone as omitted. Nothing extends on its own.
+  const [guardFor, setGuardFor] = useState<{ id: string; year: number } | null>(null);
+  const [keptOutside, setKeptOutside] = useState<string[]>([]);
+  const updateMilestone = (id: string, patch: Partial<TimelineMilestone>) => {
     commit({ milestones: tl.milestones.map((m) => (m.id === id ? merged(m, patch) : m)) });
+    if (patch.year !== undefined) setGuardFor({ id, year: patch.year });
+  };
+  const chartWindow = span !== null ? timelineWindow(tl, span) : null;
+  const guardTarget = guardFor === null ? undefined : tl.milestones.find((m) => m.id === guardFor.id && m.year === guardFor.year);
+  const guardOutside = guardTarget !== undefined && chartWindow !== null && span !== null && Number.isInteger(guardTarget.year) && guardTarget.year >= 1 && guardTarget.year <= span
+    && (guardTarget.year < chartWindow.firstYear || guardTarget.year > chartWindow.lastYear) && !keptOutside.includes(`${guardTarget.id}:${guardTarget.year}`);
+  const extendWindow = () => {
+    if (guardTarget === undefined || chartWindow === null) return;
+    const ext = { ...(tl.windowExtension ?? {}) };
+    if (guardTarget.year < chartWindow.firstYear) ext.firstYear = guardTarget.year;
+    else ext.lastYear = guardTarget.year;
+    commit({ windowExtension: ext } as Partial<TimelineBlock>);
+    setGuardFor(null);
+  };
+  const keepWindow = () => {
+    if (guardTarget !== undefined) setKeptOutside((k) => [...k, `${guardTarget.id}:${guardTarget.year}`]);
+    setGuardFor(null);
+  };
   // v0.6.17: the optional month selector — the empty state is the year-grained default
   const monthSelect = (field: string, value: number | undefined, onPick: (m: number | undefined) => void) => (
     <select data-field={field} value={value === undefined ? "" : String(value)} onChange={(e) => onPick(e.target.value === "" ? undefined : parseInt(e.target.value, 10))}>
@@ -345,7 +369,18 @@ export function TimelineSection(props: {
           </tbody>
         </table>
       </div>
-      <button data-action="add-milestone" onClick={() => commit({ milestones: [...tl.milestones, { id: nextId("m", tl.milestones.map((m) => m.id)), label: "", year: 1 }] })}>Add milestone</button>
+      <button data-action="add-milestone" onClick={() => {
+        const id = nextId("m", tl.milestones.map((m) => m.id));
+        commit({ milestones: [...tl.milestones, { id, label: "", year: 1 }] });
+        setGuardFor({ id, year: 1 });
+      }}>Add milestone</button>
+      {guardOutside && guardTarget !== undefined && chartWindow !== null && (
+        <div data-testid="milestone-window-guard" role="alertdialog" className="warning">
+          <p data-testid="milestone-window-guard-message">Milestone {guardTarget.id} ({guardTarget.label || "unnamed"}) falls in {yearMonthHeader(guardTarget.year, guardTarget.month, startYear)}, outside the chart window of {yearHeader(chartWindow.firstYear, startYear)}–{yearHeader(chartWindow.lastYear, startYear)}. Extend the window to show it, or keep the window: the milestone then stays authored and the chart caption counts it as omitted.</p>
+          <button data-action="window-extend" onClick={extendWindow}>Extend the window</button>{" "}
+          <button data-action="window-keep" onClick={keepWindow}>Keep the window</button>
+        </div>
+      )}
 
       {result === null && authored && (
         <p data-testid="timeline-standdown" className="muted">The span checks stand down while the model has input issues; the input-issues panel governs.</p>

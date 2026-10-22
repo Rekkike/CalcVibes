@@ -1,10 +1,10 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
-import { GANTT_LANE_LABEL_CHARS, ganttWindow, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
+import { GANTT_LANE_LABEL_CHARS, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
+import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -771,7 +771,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   // activities (the program span when none); the bars stack on sub-rows; markers outside the window
   // are omitted and counted. All of it composes here, once.
   const lanes = visibleLanes(tl);
-  const win = ganttWindow(lanes.flatMap((l) => l.activities), spanYears);
+  const win = timelineWindow(tl, spanYears);
   // v0.6.13.4: the ordinal composes here, once, over the FULL set after the chronological sort (stable,
   // so same-year milestones keep their authored order) and BEFORE the window filter: a milestone the
   // window omits never renumbers the others, and the authored id plays no part.

@@ -23,11 +23,14 @@ export interface GanttWindow {
 
 // The adaptive year window (Addendum 2): the minimum start year to the maximum end year across the
 // VISIBLE activities; with none, the program span (the degenerate guard — never a contentless axis).
-export function ganttWindow(visible: { startYear: number; endYear: number }[], spanYears: number): GanttWindow {
+// v0.6.18 Task F: an optional EXTENSION the user confirmed (the out-of-window milestone guard) widens the window
+// beyond the activities' extent; it never narrows it and is clamped to the program span.
+export interface GanttWindowExtension { firstYear?: number; lastYear?: number }
+export function ganttWindow(visible: { startYear: number; endYear: number }[], spanYears: number, extension?: GanttWindowExtension): GanttWindow {
   const span = Math.max(1, spanYears);
   if (visible.length === 0) return { firstYear: 1, lastYear: span, years: span, narrowed: false };
-  const firstYear = Math.max(1, Math.min(...visible.map((a) => a.startYear)));
-  const lastYear = Math.min(span, Math.max(...visible.map((a) => a.endYear)));
+  const firstYear = Math.max(1, Math.min(...visible.map((a) => a.startYear), extension?.firstYear ?? Infinity));
+  const lastYear = Math.min(span, Math.max(...visible.map((a) => a.endYear), extension?.lastYear ?? -Infinity));
   if (lastYear < firstYear) return { firstYear: 1, lastYear: span, years: span, narrowed: false };
   const years = lastYear - firstYear + 1;
   return { firstYear, lastYear, years, narrowed: years < span };

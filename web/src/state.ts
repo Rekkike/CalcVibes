@@ -3,6 +3,8 @@ import type {
   TariffRow, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelinePhase, TimelineSource,
 } from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
+import { ganttWindow } from "./ganttLayout.js";
+import type { GanttWindow } from "./ganttLayout.js";
 import { authoredContext, fundingRowsOf, legacyFacilities, migrateLegacyFinancing } from "../../core/src/financing.js";
 import { percentOneForDisplay } from "./engine.js";
 
@@ -425,14 +427,24 @@ export function emptyTimeline(): TimelineBlock {
 
 // A normalized view of the (possibly partial) block: absent collections read as empty and the
 // scale defaults to "full".
+// v0.6.18 Task F: the carried window extension. The user confirms it through the out-of-window milestone guard
+// ("extend the window so the milestone shows"); absent = today's content-driven window. It is an additive optional
+// field INSIDE the timeline block (engine-blind, presentation-only); it is declared here, in the web layer, because
+// this pass opens no core file, and the project file carries it through (the container check judges only the known
+// keys). The decision to promote it into core/src/types.ts is the controller's (disclosed in the report).
+export interface TimelineWindowExtension { firstYear?: number; lastYear?: number }
+export type TimelineBlockExt = TimelineBlock & { windowExtension?: TimelineWindowExtension };
+
 // v0.6.13.2: an absent phases list reads as the curated defaults; the lane visibility rides through
 // untouched (an absent map stays absent: every lane is automatic).
-export function timelineOf(inputs: ModelInputs): TimelineBlock {
+export function timelineOf(inputs: ModelInputs): TimelineBlockExt {
   const t = inputs.timeline;
   return {
     // v0.6.18 Task E: an absent scale reads as EMPTY (no automatic population); "mini" and "full" populate the
     // decision-point gates of their set. The document contract is the existing one: the optional projectScale field.
     ...(t?.projectScale !== undefined ? { projectScale: t.projectScale } : {}),
+    // v0.6.18 Task F: the confirmed window extension rides through (a carried, engine-blind field)
+    ...((t as TimelineBlockExt | undefined)?.windowExtension !== undefined ? { windowExtension: (t as TimelineBlockExt).windowExtension } : {}),
     phases: t?.phases ?? TIMELINE_PHASES.map((p) => ({ ...p })),
     ...(t?.laneVisibility !== undefined ? { laneVisibility: t.laneVisibility } : {}),
     activities: t?.activities ?? [],
@@ -652,6 +664,12 @@ export function withScalePreset(tl: TimelineBlock, scale: "mini" | "full"): Time
   return out;
 }
 
+// v0.6.18 Task F: THE chart window of a timeline — composed once here and consumed by the deck model and the
+// Timeline section's guard (never recomputed): the extent of the visible activities, widened by the confirmed
+// extension, the program span when no activity is visible.
+export function timelineWindow(tl: TimelineBlockExt, spanYears: number): GanttWindow {
+  return ganttWindow(visibleLanes(tl).flatMap((l) => l.activities), spanYears, tl.windowExtension);
+}
 // The program span in years: the declared project length when declared, else the derived
 // horizon — the span the engine composes. Null while the model has no result.
 export function programSpanYears(inputs: ModelInputs, result: ModelResult | null): number | null {
