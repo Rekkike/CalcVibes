@@ -1,8 +1,10 @@
 import type {
-  ContractParams, CostLine, MaintenanceConfig, ModelInputs, ModelResult, OperatingLine,
+  ContractParams, CostLine, Facility, MaintenanceConfig, ModelInputs, ModelResult, OperatingLine,
   TariffRow, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelinePhase, TimelineSource,
 } from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
+import { authoredContext, fundingRowsOf, legacyFacilities, migrateLegacyFinancing } from "../../core/src/financing.js";
+import { percentOneForDisplay } from "./engine.js";
 
 export const CURRENCIES = ["EUR", "USD", "GBP", "SEK", "NOK", "DKK"] as const;
 
@@ -523,7 +525,7 @@ export function suggestActivitiesFromContracts(inputs: ModelInputs, takenIds: st
 export function suggestActivitiesFromFunding(inputs: ModelInputs, takenIds: string[] = []): TimelineActivity[] {
   const out: TimelineActivity[] = [];
   const nid = () => nextId("a", [...takenIds, ...out.map((a) => a.id)]);
-  for (const r of inputs.funding?.rows ?? []) {
+  for (const r of fundingRowsOf(inputs)) {
     const endYear = r.kind === "grant" ? r.year : Math.max(r.year, (r.repaymentStartYear ?? r.year) + wholeYears(r.termYears ?? 1) - 1);
     out.push({ id: nid(), label: r.label, startYear: r.year, endYear, phase: "funding", derivedFrom: "funding" });
   }
@@ -534,19 +536,31 @@ export function suggestActivitiesFromFunding(inputs: ModelInputs, takenIds: stri
 // serviceStartYear..serviceStartYear + termYears - 1; an undeclared one reads the solved model's
 // service start, ceil(serviceStartMonth / 12). Returns null while the facility is off or the start
 // needs a solved model that is not available (the caller disables the button with the reason).
+// v0.6.16: the debt facilities the suggestion reads — the authored list when the document carries
+// one (the migrated shape), else the legacy financing block through the adapter.
+const debtFacilitiesOf = (inputs: ModelInputs): Facility[] => {
+  const ctx = authoredContext(inputs);
+  if (ctx !== null) return ctx.debt;
+  return inputs.financing !== undefined && inputs.financing.enabled ? legacyFacilities(inputs.financing, []) : [];
+};
 export function financingSuggestionBlock(inputs: ModelInputs, result: ModelResult | null): string | null {
-  const f = inputs.financing;
-  if (f === undefined || !f.enabled) return "The debt facility is off: enable financing to derive its activity.";
-  if (f.serviceStartYear === null && (result === null || result.financing === null)) {
+  const debt = debtFacilitiesOf(inputs);
+  if (debt.length === 0) return "The debt facility is off: enable financing to derive its activity.";
+  if (debt.some((f) => f.serviceStartYear === null) && (result === null || result.financing === null)) {
     return "The service start is derived from the solved model: resolve the model's input issues first, or set a service start year.";
   }
   return null;
 }
 export function suggestActivitiesFromFinancing(inputs: ModelInputs, result: ModelResult | null, takenIds: string[] = []): TimelineActivity[] {
   if (financingSuggestionBlock(inputs, result) !== null) return [];
-  const f = inputs.financing!;
-  const start = f.serviceStartYear !== null ? f.serviceStartYear : Math.ceil(result!.financing!.serviceStartMonth / 12);
-  return [{ id: nextId("a", takenIds), label: "Debt facility", startYear: start, endYear: start + wholeYears(f.termYears) - 1, phase: "financing", derivedFrom: "financing" }];
+  const debt = debtFacilitiesOf(inputs);
+  const out: TimelineActivity[] = [];
+  for (const f of debt) {
+    const fr = result?.financing?.facilities?.find((x) => x.id === f.id);
+    const start = f.serviceStartYear !== null ? f.serviceStartYear : Math.ceil((fr !== undefined ? fr.serviceStartMonth : (result as ModelResult).financing!.serviceStartMonth) / 12);
+    out.push({ id: nextId("a", [...takenIds, ...out.map((a) => a.id)]), label: debt.length === 1 ? "Debt facility" : f.label, startYear: start, endYear: start + wholeYears(f.termYears) - 1, phase: "financing", derivedFrom: "financing" });
+  }
+  return out;
 }
 
 // v0.6.13.2 Task B.5: one activity per operating line (startYear..startYear + yearCount - 1);
@@ -754,5 +768,109 @@ export function composeInvestment(inputs: ModelInputs, result: ModelResult): Inv
     reinvestments: reinvestmentsTotal > 0 ? { id: "reinvestments", name: "Reinvestments", kind: "reinvestments", total: reinvestmentsTotal } : null,
     capitalSubtotal: result.lineTotals.reduce((a, l) => a + l.total, 0),
     totalCost: result.totalCost,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// v0.6.16 — the facility input surface: the load migration, the authoring seams and the amount-first
+// composition (the derived shares, the drawn total, the engine-exposed drift).
+// ---------------------------------------------------------------------------------------------
+
+// The web load path consumes the migration composed once in the core: a legacy document migrates in
+// memory to the authored shape (the files on disk stay legacy-shaped).
+export const migrateOnLoad = (inputs: ModelInputs): ModelInputs => migrateLegacyFinancing(inputs);
+
+export const facilitiesOf = (inputs: ModelInputs): Facility[] => inputs.facilities ?? [];
+
+export function blankFacility(existing: Facility[]): Facility {
+  return {
+    id: nextId("fac", existing.map((f) => f.id)),
+    label: "",
+    amount: 0,
+    ratePct: 6,
+    termYears: 7,
+    graceYears: 0,
+    amortization: "annuity",
+    serviceStartYear: null,
+    scope: { kind: "general" },
+  };
+}
+
+// An interest-free note is a facility at rate zero that lands as one dated lump.
+export function blankNoteFacility(existing: Facility[]): Facility {
+  return {
+    id: nextId("fac", existing.map((f) => f.id)),
+    label: "",
+    amount: 0,
+    ratePct: 0,
+    termYears: 1,
+    graceYears: 0,
+    amortization: "equal-principal",
+    serviceStartYear: 0,
+    scope: { kind: "general" },
+    paymentsPerYear: 1,
+    datedDraw: { year: 1 },
+  };
+}
+
+export function moveFacility(list: Facility[], id: string, delta: -1 | 1): Facility[] {
+  const i = list.findIndex((f) => f.id === id);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= list.length) return list;
+  const out = list.slice();
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+}
+
+export interface FacilityShareRow {
+  lineId: string;
+  name: string;
+  draw: number;
+  share: number;
+  display: string;
+}
+export interface FacilityComposition {
+  id: string;
+  rows: FacilityShareRow[];
+  shareTotalDisplay: string;
+  stated: number | null;
+  drawn: number;
+  drift: number | null;
+  drifts: boolean;
+}
+
+// The derived shares of one facility, from engine output only: each scoped line's draw (the engine's
+// share of the line's incurred cost times the line's total) over the facility's drawn total. The
+// one-decimal display uses the largest-remainder allocation in tenths so the displayed shares close
+// to exactly 100.0 (the percentOneForDisplay precedent for the form). Null while the facility has
+// no engine position (the model is refused, or the facility is switched off).
+export function composeFacility(inputs: ModelInputs, result: ModelResult | null, facilityId: string): FacilityComposition | null {
+  const fr = result?.financing?.facilities?.find((x) => x.id === facilityId);
+  if (result === null || fr === undefined) return null;
+  const draws: { lineId: string; name: string; draw: number }[] = [];
+  for (const l of result.lineTotals) {
+    const s = fr.shares[l.id];
+    if (s !== undefined && s > 0) draws.push({ lineId: l.id, name: l.name, draw: s * l.total });
+  }
+  const total = draws.reduce((a, d) => a + d.draw, 0);
+  const tenths = draws.map((d) => (total > 0 ? (d.draw / total) * 1000 : 0));
+  const floors = tenths.map((t) => Math.floor(t));
+  let short = (total > 0 ? 1000 : 0) - floors.reduce((a, b) => a + b, 0);
+  const order = tenths.map((t, i) => ({ i, rem: t - floors[i] })).sort((a, b) => b.rem - a.rem || a.i - b.i);
+  for (const o of order) {
+    if (short <= 0) break;
+    floors[o.i] += 1;
+    short -= 1;
+  }
+  const rows = draws.map((d, i) => ({ lineId: d.lineId, name: d.name, draw: d.draw, share: total > 0 ? d.draw / total : 0, display: percentOneForDisplay(floors[i] / 1000) }));
+  const drift = fr.drift;
+  return {
+    id: facilityId,
+    rows,
+    shareTotalDisplay: percentOneForDisplay(floors.reduce((a, b) => a + b, 0) / 1000),
+    stated: inputs.facilities?.find((f) => f.id === facilityId)?.amount ?? null,
+    drawn: fr.drawnTotal,
+    drift,
+    drifts: drift !== null && Math.abs(drift) > 1e-6 + 1e-9 * Math.abs(fr.amount),
   };
 }

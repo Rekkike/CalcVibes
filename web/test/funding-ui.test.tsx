@@ -27,23 +27,26 @@ async function loadProgramDemo() {
 }
 
 describe("v0.6.10 Task E.1: the funding worksuite surface", () => {
-  it("FUNDING-ROWS: the program fixture carries the three grants and the interest-free note; the loan row alone carries the term fields", async () => {
+  it("FUNDING-ROWS: the program fixture's funding block carries the three grants alone; the interest-free note retired into the financing facility list (v0.6.16 re-anchor)", async () => {
     await loadProgramDemo();
     fireEvent.click(byNav("funding"));
     const rows = Array.from(document.querySelectorAll("[data-funding-row]"));
-    expect(rows.map((r) => r.getAttribute("data-funding-row"))).toEqual(["g1", "g2", "g3", "l1"]);
-    // The grant rows carry label, kind, amount, and landing year — never the loan-only fields.
+    expect(rows.map((r) => r.getAttribute("data-funding-row"))).toEqual(["g1", "g2", "g3"]);
+    // The grant rows carry label, amount and landing year — no kind choice, never the loan-only fields.
     for (const id of ["g1", "g2", "g3"]) {
       const row = document.querySelector('[data-funding-row="' + id + '"]') as HTMLElement;
-      expect(row.querySelector('[data-field="fundingKind"]')).toBeTruthy();
-      expect((row.querySelector('[data-field="fundingKind"]') as HTMLSelectElement).value).toBe("grant");
+      expect(row.querySelector('[data-field="fundingKind"]')).toBeNull();
       expect(row.querySelector('[data-field="fundingTerm"]')).toBeNull();
       expect(row.querySelector('[data-field="fundingRepayStart"]')).toBeNull();
     }
-    const l1 = document.querySelector('[data-funding-row="l1"]') as HTMLElement;
-    expect((l1.querySelector('[data-field="fundingKind"]') as HTMLSelectElement).value).toBe("interest-free-loan");
-    expect((l1.querySelector('[data-field="fundingTerm"]') as HTMLInputElement).value).toBe("10");
-    expect((l1.querySelector('[data-field="fundingRepayStart"]') as HTMLInputElement).value).toBe("4");
+    // The note lives in the financing section as a zero-rate facility with its dated receipt.
+    fireEvent.click(byNav("financing"));
+    const l1 = document.querySelector('[data-facility="l1"]') as HTMLElement;
+    expect(l1.getAttribute("data-facility-kind")).toBe("note");
+    expect((l1.querySelector('[data-field="facRate"]') as HTMLInputElement).value).toBe("0");
+    expect((l1.querySelector('[data-field="facTerm"]') as HTMLInputElement).value).toBe("10");
+    expect((l1.querySelector('[data-field="facRepayStart"]') as HTMLInputElement).value).toBe("4");
+    expect((l1.querySelector('[data-field="facDatedYear"]') as HTMLInputElement).value).toBe("1");
   });
 
   it("FUNDING-VIEW: the engine-emitted funding view renders the grants total, the funding NPV, and the per-grant allocation with the capitalized-to-date shares", async () => {
@@ -100,25 +103,20 @@ describe("v0.6.10 Task E.1: the funding worksuite surface", () => {
     expect(document.querySelector('[data-allocation="g3"] tr[data-line="p6"] td:nth-child(3)')?.textContent).toBe("9.76%");
   });
 
-  it("FUNDING-EDITORS: the blank app adds and removes funding rows, the loan kind toggles the term fields, and a zero amount refuses through the issues summary (FND-AMOUNT)", async () => {
+  it("FUNDING-EDITORS: the blank app adds and removes grant rows and a zero amount refuses through the issues summary (FND-AMOUNT)", async () => {
     render(<App />);
     fireEvent.click(byNav("funding"));
     expect(document.querySelectorAll("[data-funding-row]").length).toBe(0);
     fireEvent.click(byAction("add-funding-row"));
     const f1 = document.querySelector('[data-funding-row="f1"]') as HTMLElement;
     expect(f1).toBeTruthy();
-    expect((f1.querySelector('[data-field="fundingKind"]') as HTMLSelectElement).value).toBe("grant");
+    // v0.6.16: the funding block keeps the grants alone — no kind choice, no loan fields.
+    expect(f1.querySelector('[data-field="fundingKind"]')).toBeNull();
     // A grant row lands with amount 0 — the engine's collect-all validation refuses it.
     await waitFor(() => {
       expect(byTestid("issues-summary")).toBeTruthy();
     });
     expect(byTestid("issues-summary").textContent).toContain("Funding row f1 must carry a positive amount (FND-AMOUNT).");
-    // The loan kind alone surfaces the term and repayment-start fields.
-    fireEvent.change(f1.querySelector('[data-field="fundingKind"]') as HTMLSelectElement, { target: { value: "interest-free-loan" } });
-    expect((document.querySelector('[data-funding-row="f1"] [data-field="fundingTerm"]') as HTMLInputElement).value).toBe("1");
-    expect((document.querySelector('[data-funding-row="f1"] [data-field="fundingRepayStart"]') as HTMLInputElement).value).toBe("1");
-    fireEvent.change(document.querySelector('[data-funding-row="f1"] [data-field="fundingKind"]') as HTMLSelectElement, { target: { value: "grant" } });
-    expect(document.querySelector('[data-funding-row="f1"] [data-field="fundingTerm"]')).toBeNull();
     // Removing the row clears the refusal — the blank project computes cleanly again.
     fireEvent.click(document.querySelector('[data-funding-row="f1"] [data-action="remove-funding-row"]') as HTMLElement);
     expect(document.querySelectorAll("[data-funding-row]").length).toBe(0);
