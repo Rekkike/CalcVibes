@@ -906,3 +906,55 @@ export function composeFacility(inputs: ModelInputs, result: ModelResult | null,
 export function yearMonthHeader(year: number, month: number | undefined, startYear: number | null): string {
   return month === undefined || !Number.isInteger(month) || month < 1 || month > 12 ? yearHeader(year, startYear) : `${yearHeader(year, startYear)}, month ${month}`;
 }
+
+// ---------------------------------------------------------------------------------------------
+// v0.6.18 Task C — the per-facility debt-service schedules (the FacilityResult monthly arrays the core
+// has carried since v0.6.14, summed to years the way the combined aggregate sums them). Composed once
+// here; the Results view and the XLSX audit route consume it. The note's payback installments are NAMED:
+// a funding-note facility's principal column reads "Installment" instead of riding unidentified inside
+// the combined principal.
+// ---------------------------------------------------------------------------------------------
+
+export interface FacilityScheduleRow { year: number; draws: number; interest: number; principal: number; service: number; balance: number }
+export interface FacilityScheduleView {
+  id: string;
+  label: string;
+  origin: "financing" | "funding-note";
+  // the heading of the principal column: "Principal", or "Installment" for the interest-free note
+  principalLabel: "Principal" | "Installment";
+  scopeText: string;
+  rows: FacilityScheduleRow[];
+  totals: { draws: number; interest: number; principal: number; service: number };
+}
+
+export function composeFacilitySchedules(result: ModelResult | null): FacilityScheduleView[] {
+  const facs = result?.financing?.facilities;
+  if (facs === undefined) return [];
+  return facs.map((fr) => {
+    const len = fr.monthly.service.length;
+    const years = Math.ceil(len / 12);
+    const rows: FacilityScheduleRow[] = [];
+    const totals = { draws: 0, interest: 0, principal: 0, service: 0 };
+    for (let y = 1; y <= years; y++) {
+      let draws = 0, interest = 0, principal = 0, service = 0;
+      for (let m = (y - 1) * 12 + 1; m <= y * 12 && m <= len; m++) {
+        draws += fr.monthly.draws[m - 1] ?? 0;
+        interest += fr.monthly.interest[m - 1];
+        principal += fr.monthly.principal[m - 1];
+        service += fr.monthly.service[m - 1];
+      }
+      if (draws === 0 && interest === 0 && principal === 0 && service === 0) continue;
+      totals.draws += draws; totals.interest += interest; totals.principal += principal; totals.service += service;
+      rows.push({ year: y, draws, interest, principal, service, balance: fr.monthly.balance[Math.min(y * 12, len) - 1] ?? 0 });
+    }
+    return {
+      id: fr.id,
+      label: fr.label,
+      origin: fr.origin,
+      principalLabel: fr.origin === "funding-note" ? "Installment" : "Principal",
+      scopeText: fr.scope.kind === "general" ? "general (the whole program)" : `attached to ${fr.scope.lineIds.length} cost ${fr.scope.lineIds.length === 1 ? "line" : "lines"}`,
+      rows,
+      totals,
+    };
+  });
+}

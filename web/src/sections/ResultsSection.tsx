@@ -1,6 +1,6 @@
 import type { ModelResult } from "../../../core/src/types.js";
 import { percentForDisplay, roundForDisplay } from "../engine.js";
-import { yearHeader } from "../state.js";
+import { composeFacilitySchedules, yearHeader } from "../state.js";
 import { SignedCashflowChart } from "../charts.js";
 import { deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } from "../engine.js";
 
@@ -116,6 +116,29 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
               ))}
             </tbody>
           </table>
+          {/* v0.6.18 Task C: the per-facility debt-service schedules beneath the combined aggregate; each
+              facility's yearly draws, interest, principal, service and closing balance, composed once in
+              state.ts from the engine's per-facility monthly arrays. The note's payback installments are named. */}
+          {composeFacilitySchedules(result).length > 0 && (
+            <div data-testid="facility-schedules">
+              <h3>Facility schedules (yearly, by facility)</h3>
+              <p className="muted" data-testid="facility-schedules-note">The combined debt schedule above is the sum of these facility rows, year by year. The interest-free note's payback appears as its own installments, not inside an unnamed principal.</p>
+              {composeFacilitySchedules(result).map((f) => (
+                <div key={f.id} data-facility-schedule={f.id} data-facility-origin={f.origin}>
+                  <h4 data-testid="facility-schedule-title">{f.label || f.id} — {f.origin === "funding-note" ? "interest-free note (payback installments)" : "facility"}, {f.scopeText}</h4>
+                  <table data-testid="facility-schedule">
+                    <thead><tr><th>Year</th><th>Draws</th><th>Interest</th><th>{f.principalLabel}</th><th>Service</th><th>Closing balance</th></tr></thead>
+                    <tbody>
+                      {f.rows.map((r) => (
+                        <tr key={r.year} data-facility-year={r.year}><td>{yearHeader(r.year, startYear)}</td><td>{roundForDisplay(r.draws)}</td><td>{roundForDisplay(r.interest)}</td><td>{roundForDisplay(r.principal)}</td><td>{roundForDisplay(r.service)}</td><td>{roundForDisplay(r.balance)}</td></tr>
+                      ))}
+                      <tr data-facility-total="true"><td>Total</td><td>{roundForDisplay(f.totals.draws)}</td><td>{roundForDisplay(f.totals.interest)}</td><td>{roundForDisplay(f.totals.principal)}</td><td>{roundForDisplay(f.totals.service)}</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
           <h3>DSCR (yearly)</h3>
           <table data-testid="dscr-table">
             <thead><tr><th>Year</th><th>Inflows</th><th>Debt service</th><th>DSCR</th></tr></thead>

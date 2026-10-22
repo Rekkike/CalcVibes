@@ -162,7 +162,7 @@ export function App() {
   const exportXlsx = async () => {
     if (result === null) return;
     const { buildWorkbook } = await import("./xlsx.js");
-    const buffer = await buildWorkbook(restoreLegacyFinancing(inputs), result, { startYear });
+    const buffer = await buildWorkbook(restoreLegacyFinancing(inputs), result, { startYear, ...(inputs.facilities !== undefined ? { facilities: inputs.facilities } : {}), ...(inputs.facilityOptions !== undefined ? { facilityOptions: inputs.facilityOptions } : {}) });
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
