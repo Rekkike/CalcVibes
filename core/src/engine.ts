@@ -139,6 +139,36 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       }
     }
   }
+  // v0.6.16: the authored facility list. Absent or empty leaves every legacy path below untouched.
+  const authoredCtx = authoredContext(inp);
+  if (authoredCtx) {
+    const derivedStart = lastCostYearOf(inp);
+    const preliminaryHorizon = Math.max(
+      Math.ceil(derivedStart * 12),
+      (inp.repayment.firstCollectionYear ?? derivedStart + inp.repayment.graceYears) * 12 + Math.round(Math.max(0, inp.repayment.termYears) * 12)
+    );
+    validateFacilities(
+      (inp.facilities ?? []).filter((f) => f.enabled !== false),
+      { costs: inp.costs, horizon: preliminaryHorizon, firstCollectionYear: inp.repayment.firstCollectionYear ?? derivedStart + inp.repayment.graceYears },
+      issues,
+      { legacySharesMessages: true },
+    );
+    // the share-sized facility keeps the legacy financing refusal texts of record
+    for (const f of authoredCtx.debt) {
+      if (f.sharePct === undefined) continue;
+      validateFinancing({
+        financing: { enabled: true, sharePct: f.sharePct, debtRatePct: f.ratePct, termYears: f.termYears, graceYears: f.graceYears, serviceStartYear: f.serviceStartYear, amortization: f.amortization, leveragedSolve: false, perLineSharePct: f.perLineSharePct ?? {} },
+        horizon: preliminaryHorizon,
+        lastCostMonth: derivedStart * 12,
+      }, issues);
+    }
+    if (authoredCtx.leveraged && authoredCtx.debt.length > 0) {
+      const t = inp.tariff;
+      if (t && (t.mode === "manual" || t.mode === "fixed")) {
+        issues.push("The leveraged solve does not apply to manual or fixed tariff modes (FIN-LEVERAGED-MODE).");
+      }
+    }
+  }
   if (issues.length > 0) throw new EngineInputError(issues);
   const appraisal = inp.appraisal ?? { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { amount: 0, year: 10 } };
   const residualPosturePre = appraisal.residual.posture
@@ -218,6 +248,11 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   if (finCfg0) {
     horizonConstituents.push({ label: "financing service", month: (finCfg0.serviceStartYear ?? repaymentStartYear) * 12 + finCfg0.termYears * 12 });
   }
+  if (authoredCtx) {
+    for (const f of authoredCtx.debt) {
+      horizonConstituents.push({ label: "financing service", month: (f.serviceStartYear ?? repaymentStartYear) * 12 + f.termYears * 12 });
+    }
+  }
   if (inp.projectLengthYears !== undefined && inp.projectLengthYears !== null) {
     horizonConstituents.push({ label: "project length", month: inp.projectLengthYears * 12 });
   }
@@ -256,7 +291,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   // v0.6.10 Task A/B: the funding block. Absent rows leave every downstream figure
   // byte-identical (the golden no-drift pin). The allocation runs before the book schedule so
   // both computeBookSchedule call sites receive the netting map.
-  const fundingRows = inp.funding?.rows ?? [];
+  const fundingRows = authoredCtx ? authoredCtx.fundingRows : (inp.funding?.rows ?? []);
   const fundingPresent = fundingRows.length > 0;
   const fundingAllocation: import("./types.js").FundingAllocation[] = [];
   const nettingByLine: Map<string, Map<number, number>> | undefined = fundingPresent ? new Map() : undefined;
@@ -425,6 +460,31 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       throw new EngineInputError([`A debt-funded fundable cost lands strictly after the service start month ${S} (FIN-FUNDABLE-AFTER-START).`]);
     }
   }
+  if (authoredCtx && authoredCtx.debt.length > 0) {
+    const ledger = resolveFacilityLedger(inp.costs, authoredCtx.all, totalMonths);
+    for (const f of authoredCtx.debt) {
+      const S = (f.serviceStartYear ?? repaymentStartYear) * 12;
+      const sharesPath = f.sharePct !== undefined;
+      if (S >= totalMonths) {
+        throw new EngineInputError([sharesPath
+          ? `Financing serviceStartYear ${f.serviceStartYear ?? repaymentStartYear} times 12 must be below the model horizon ${totalMonths}.`
+          : `Facility ${f.id} (${f.label}) has a service start year ${f.serviceStartYear ?? repaymentStartYear} whose month ${S} is not below the model horizon ${totalMonths} (FAC-SERVICE-START).`]);
+      }
+      let fundableAfterStart = false;
+      inp.costs.forEach((c) => {
+        if (c.category !== "recurring" && c.category !== "capex") return;
+        if (!((ledger.shares[f.id][c.id] ?? 0) > 0)) return;
+        let lastYear = 0;
+        for (const [y] of lineIncurred(c)) lastYear = Math.max(lastYear, y);
+        if (lastYear * 12 > S) fundableAfterStart = true;
+      });
+      if (fundableAfterStart) {
+        throw new EngineInputError([sharesPath
+          ? `A debt-funded fundable cost lands strictly after the service start month ${S} (FIN-FUNDABLE-AFTER-START).`
+          : `Facility ${f.id} (${f.label}) draws on a cost that lands strictly after its service start month ${S} (FAC-DRAW-AFTER-START).`]);
+      }
+    }
+  }
   const operatingLinesIn = inp.operatingLines ?? [];
   const maintenanceCfg = inp.maintenance ?? { mode: "off" };
   const tariffCfg = tariffCfg0;
@@ -509,12 +569,12 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       }
     }
   }
-  const leveraged = finCfg !== null && finCfg.leveragedSolve;
+  const leveraged = authoredCtx ? (authoredCtx.leveraged && authoredCtx.debt.length > 0) : (finCfg !== null && finCfg.leveragedSolve);
   let leveragedPayment: number | null = null;
   if (leveraged && !tariffCollectionMode) {
     // v0.6.14: the leveraged solve aggregates the facility set's draw and service streams (the
     // financing-layer facilities; the funding-block note stays in the funding NPV).
-    const { pvDraws, pvService } = leveragedStreams(inp.costs, legacyFacilities(finCfg, fundingRows), rM, totalMonths, repaymentStartYear);
+    const { pvDraws, pvService } = leveragedStreams(inp.costs, authoredCtx ? authoredCtx.all : legacyFacilities(finCfg, fundingRows), rM, totalMonths, repaymentStartYear);
     leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf - fundingNpv) / dfSumEsc;
   }
   const rawSolvedPayment = leveraged && leveragedPayment !== null
@@ -582,7 +642,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         }
         let netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf - fundingNpv;
         if (leveraged) {
-          const { pvDraws, pvService } = leveragedStreams(inp.costs, legacyFacilities(finCfg, fundingRows), rM, totalMonths, repaymentStartYear);
+          const { pvDraws, pvService } = leveragedStreams(inp.costs, authoredCtx ? authoredCtx.all : legacyFacilities(finCfg, fundingRows), rM, totalMonths, repaymentStartYear);
           netRequirement = netRequirement - pvDraws + pvService;
         }
         const base = netRequirement / volumeNpvWeight;
@@ -1038,10 +1098,10 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       })
     : [];
   let financing: import("./types.js").FinancingResult | null = null;
-  if (finCfg) {
+  if (finCfg || (authoredCtx && authoredCtx.debt.length > 0)) {
     const inflowsByMonth = monthly.map((row) => row.inflow);
     const netM = monthly.map((row) => row.net);
-    financing = computeFinancingOverlay({
+    const overlayCtx = {
       costM,
       inflowsByMonth,
       netM,
@@ -1056,7 +1116,8 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       // v0.6.11 Task D: the funding rows ride the context so the equity-view classifier
       // can strip the financing cash (receipts and interest-free installments).
       fundingRows: fundingRows,
-    }, finCfg);
+    };
+    financing = authoredCtx ? computeFacilityOverlay(overlayCtx, authoredCtx.all) : computeFinancingOverlay(overlayCtx, finCfg as import("./types.js").FinancingConfig);
   }
   return {
     leveragedSolve: leveraged,
@@ -1116,7 +1177,7 @@ import { normalizeContracts, allReinvestments, contractLastCollectionMonth } fro
 import type { NormalizedContract } from "./contracts.js";
 import { computeBookSchedule, lineIncurred } from "./depreciation.js";
 import type { PaymentSlot } from "./slots.js";
-import { computeFinancingOverlay, legacyFacilities, leveragedStreams, validateFinancing } from "./financing.js";
+import { authoredContext, computeFacilityOverlay, computeFinancingOverlay, fundingRowsOf, legacyFacilities, leveragedStreams, resolveFacilityLedger, validateFacilities, validateFinancing } from "./financing.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;
 type CostLine = import("./types.js").CostLine;
@@ -1298,7 +1359,7 @@ export function solveTerm(inp: ModelInputsLike, payment: number): SolveTermResul
   const esc = (solvedC !== null ? solvedC.escalationPerYear : inp.repayment.paymentEscalation) / 100;
   const hasOperating = (inp.operatingLines && inp.operatingLines.length > 0) || (inp.maintenance && inp.maintenance.mode !== "off");
   const df = (m: number) => 1 / Math.pow(1 + rM, m);
-  const fundingNpv = fundingNpvOf(inp.funding?.rows ?? [], rM);
+  const fundingNpv = fundingNpvOf(fundingRowsOf(inp), rM);
   // The contracts basis: the evaluated companions' balloons and inflows net the requirement; the
   // solved contract's balloon rides the solved end inside the loop; the window spans the contracts.
   let companionsPv = 0;

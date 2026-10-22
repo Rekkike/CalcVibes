@@ -8,8 +8,11 @@ import { serializeProject } from "../../core/src/fileio.js";
 // v0.6.7 re-anchor: the load-demo button now loads the port fixture, whose leveraged-solve
 // cash flow has a single sign change, so the FN-1 ambiguity case (56 sign changes) is
 // re-pointed to the internal Alpha template via the project-file route.
+// v0.6.16 re-anchor: the Alpha file carries the legacy financing block switched off (60% share, 6%, 7 years);
+// it migrates in memory to a disabled facility, which the tests switch on.
+const ALPHA_FINANCING_OFF = { enabled: false, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} };
 async function openAlpha() {
-  const text = serializeProject(demoProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  const text = serializeProject({ ...demoProject(), financing: ALPHA_FINANCING_OFF }, { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
   const file = new File([text], "project-alpha.calcvibes.json", { type: "application/json" });
   fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [file] } });
   await waitFor(() => {
@@ -36,26 +39,30 @@ describe("chunk 5 web task 1: financing section", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("financing"));
     // Enabled on arrival: the surface and the preset values render without any toggle.
-    expect((document.querySelector('[data-field="finEnabled"]') as HTMLInputElement).checked).toBe(true);
-    expect((document.querySelector('[data-field="finShare"]') as HTMLInputElement).value).toBe("0");
-    expect((document.querySelector('[data-field="finRate"]') as HTMLInputElement).value).toBe("3.5");
-    expect((document.querySelector('[data-field="finTerm"]') as HTMLInputElement).value).toBe("20");
-    expect((document.querySelector('[data-field="finGrace"]') as HTMLInputElement).value).toBe("3");
-    expect(document.querySelector('[data-field="finStart"]')).toBeTruthy();
-    expect(document.querySelector('[data-field="finAmortization"]')).toBeTruthy();
-    expect(document.querySelectorAll('[data-field="finLineShare"]').length).toBe(6);
+    expect((document.querySelector('[data-field="facEnabled"]') as HTMLInputElement).checked).toBe(true);
+    expect((document.querySelector('[data-field="facShare"]') as HTMLInputElement).value).toBe("0");
+    expect((document.querySelector('[data-field="facRate"]') as HTMLInputElement).value).toBe("3.5");
+    expect((document.querySelector('[data-field="facTerm"]') as HTMLInputElement).value).toBe("20");
+    expect((document.querySelector('[data-field="facGrace"]') as HTMLInputElement).value).toBe("3");
+    expect(document.querySelector('[data-field="facStart"]')).toBeTruthy();
+    expect(document.querySelector('[data-field="facAmortization"]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-field="facLineShare"]').length).toBe(6);
     expect(document.querySelector('[data-field="finLeveraged"]')).toBeTruthy();
-    // Toggling off removes the surface; toggling on restores it.
-    fireEvent.click(byField("finEnabled"));
-    expect(document.querySelector('[data-field="finShare"]')).toBeNull();
-    fireEvent.click(byField("finEnabled"));
-    expect(document.querySelector('[data-field="finShare"]')).toBeTruthy();
+    // v0.6.16 re-anchor: a facility switched off stays declared (its term sheet stays editable) and
+    // leaves the computation, so the engine-fed composition and the debt results vanish; toggling
+    // it on restores them.
+    expect(document.querySelector('[data-facility="financing"] [data-testid="facility-composition"]')).toBeTruthy();
+    fireEvent.click(byField("facEnabled"));
+    expect(document.querySelector('[data-facility="financing"] [data-testid="facility-composition"]')).toBeNull();
+    expect(document.querySelector('[data-field="facShare"]')).toBeTruthy();
+    fireEvent.click(byField("facEnabled"));
+    expect(document.querySelector('[data-facility="financing"] [data-testid="facility-composition"]')).toBeTruthy();
   });
 
   it("per-line overrides default to the project share and are editable (v0.6.10 re-anchor: the fixture presets 31.69 on p1)", () => {
     render(<App />);
     loadFinancing();
-    const p1 = document.querySelector('[data-field="finLineShare"][data-line="p1"]') as HTMLInputElement;
+    const p1 = document.querySelector('[data-field="facLineShare"][data-line="p1"]') as HTMLInputElement;
     expect(p1.value).toBe("31.69");
     fireEvent.change(p1, { target: { value: "80" } });
     expect(p1.value).toBe("80");
@@ -67,7 +74,7 @@ describe("chunk 5 web tasks 2-3: results panels and disclosures", () => {
     render(<App />);
     await openAlpha();
     fireEvent.click(byNav("financing"));
-    fireEvent.click(byField("finEnabled"));
+    fireEvent.click(byField("facEnabled"));
     fireEvent.click(byNav("results"));
     expect(byStat("equityOutlay").textContent).toBe("3139944");
     expect(byStat("equityNpvAtWacc").textContent).toBe("1593384.3");
@@ -101,13 +108,13 @@ describe("chunk 5 web tasks 2-3: results panels and disclosures", () => {
   it("the zero-outlay note renders in place of the null equity IRR (FN-5 class) (v0.6.10 re-anchor: a 100% share with the service start moved to year 6 keeps every debt-funded cost inside the service window on the program base)", () => {
     render(<App />);
     loadFinancing();
-    fireEvent.change(byField("finShare"), { target: { value: "100" } });
+    fireEvent.change(byField("facShare"), { target: { value: "100" } });
     // The fixture's per-line overrides (31.69 on p1–p3) would keep the container lines
     // partially equity-funded; raise them to the full share as well.
     for (const line of ["p1", "p2", "p3"]) {
-      fireEvent.change(document.querySelector('[data-field="finLineShare"][data-line="' + line + '"]') as HTMLElement, { target: { value: "100" } });
+      fireEvent.change(document.querySelector('[data-field="facLineShare"][data-line="' + line + '"]') as HTMLElement, { target: { value: "100" } });
     }
-    fireEvent.change(byField("finStart"), { target: { value: "6" } });
+    fireEvent.change(byField("facStart"), { target: { value: "6" } });
     fireEvent.click(byNav("results"));
     expect(byStat("equityIrr").textContent).toContain("Not applicable (zero equity outlay)");
   });

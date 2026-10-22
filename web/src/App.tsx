@@ -4,7 +4,8 @@ import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
 import { EngineInputError } from "../../core/src/validate.js";
-import { blankCostLine, blankProject, landNewbuildProject, nextCostId, shorePowerProgram, solarParkProject } from "./state.js";
+import { restoreLegacyFinancing } from "../../core/src/financing.js";
+import { blankCostLine, blankProject, migrateOnLoad, landNewbuildProject, nextCostId, shorePowerProgram, solarParkProject } from "./state.js";
 import type { CostLine } from "../../core/src/types.js";
 import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
@@ -127,8 +128,10 @@ export function App() {
     setInputs((p) => ({ ...p, maintenance: m }));
   const setTariff = (t: import("../../core/src/types.js").TariffConfig) =>
     setInputs((p) => ({ ...p, tariff: t }));
-  const setFinancing = (fc: import("../../core/src/types.js").FinancingConfig) =>
-    setInputs((p) => ({ ...p, financing: fc }));
+  const setFacilities = (list: import("../../core/src/types.js").Facility[]) =>
+    setInputs((p) => ({ ...p, facilities: list }));
+  const setFacilityOptions = (o: import("../../core/src/types.js").FacilityOptions | undefined) =>
+    setInputs((p) => ({ ...p, facilityOptions: o }));
   const setFunding = (fc: import("../../core/src/types.js").FundingConfig | null) =>
     setInputs((p) => ({ ...p, funding: fc }));
   const openProjectFile = (file: File) => {
@@ -136,7 +139,7 @@ export function App() {
     reader.onload = () => {
       try {
         const loaded = parseProject(String(reader.result));
-        setInputs(loaded.inputs);
+        setInputs(migrateOnLoad(loaded.inputs));
         setStartYear(loaded.settings.startYear);
         setEntryUnit(loaded.settings.entryUnit);
         setScenarioTargets(loaded.settings.scenarioTargets);
@@ -157,7 +160,7 @@ export function App() {
   const exportXlsx = async () => {
     if (result === null) return;
     const { buildWorkbook } = await import("./xlsx.js");
-    const buffer = await buildWorkbook(inputs, result, { startYear });
+    const buffer = await buildWorkbook(restoreLegacyFinancing(inputs), result, { startYear });
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -227,12 +230,12 @@ export function App() {
               presets the target axis only; the term and balloon axes are inert in contracts
               mode (finding F1), so presetting them would be dishonest. The entry-unit select is
               untouched: only project-file open syncs the unit. */}
-          <button data-action="load-demo" onClick={() => { setInputs(shorePowerProgram()); setStartYear(2026); setScenarioTargets([4, 6, 8]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 8, 16]); }}>Load shore-power program demo (Rotterdam)</button>
-          <button data-action="load-multi-lease-demo" onClick={() => { setInputs(landNewbuildProject()); setScenarioTargets([6, 8, 10]); }}>Load land newbuild demo (Mjøstårnet)</button>
+          <button data-action="load-demo" onClick={() => { setInputs(migrateOnLoad(shorePowerProgram())); setStartYear(2026); setScenarioTargets([4, 6, 8]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 8, 16]); }}>Load shore-power program demo (Rotterdam)</button>
+          <button data-action="load-multi-lease-demo" onClick={() => { setInputs(migrateOnLoad(landNewbuildProject())); setScenarioTargets([6, 8, 10]); }}>Load land newbuild demo (Mjøstårnet)</button>
           {/* v0.6.6 Task B: the third loader presets the scenario axes (the amendment of record: the balloon
               entries are entry-unit values; at unit thousands, 1000 and 2000 scale to raw balloons of
               1 000 000 and 2 000 000 at compute). The other two loaders are untouched: additive only. */}
-          <button data-action="load-solar-demo" onClick={() => { setInputs(solarParkProject()); setScenarioTargets([5, 7, 9]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 1000, 2000]); }}>Load solar park demo</button>
+          <button data-action="load-solar-demo" onClick={() => { setInputs(migrateOnLoad(solarParkProject())); setScenarioTargets([5, 7, 9]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 1000, 2000]); }}>Load solar park demo</button>
         </div>
         <div data-testid="header-controls" className="header-controls">
           <button data-action="present" onClick={() => setPresOpen(true)}>Present results</button>
@@ -354,7 +357,7 @@ export function App() {
           <TimelineSection inputs={inputs} result={result} setTimeline={setTimeline} startYear={startYear} />
         )}
         {view === "financing" && (
-          <FinancingSection inputs={inputs} setFinancing={setFinancing} />
+          <FinancingSection inputs={inputs} result={result} setFacilities={setFacilities} setFacilityOptions={setFacilityOptions} entryUnit={entryUnit} />
         )}
         {view === "appraisal" && (
           <AppraisalSection inputs={inputs} setAppraisal={setAppraisal} result={result} entryUnit={entryUnit} />

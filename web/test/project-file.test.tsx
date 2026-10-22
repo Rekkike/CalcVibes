@@ -3,7 +3,7 @@ import { render, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { projectFileName } from "../src/projectFile.js";
 import { parseProject, serializeProject } from "../../core/src/fileio.js";
-import { demoProject, shorePowerProgram } from "../src/state.js";
+import { demoProject, migrateOnLoad, shorePowerProgram } from "../src/state.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
@@ -97,7 +97,8 @@ describe("v0.6.3 project file save/load", () => {
         reader.readAsText(captured[0]);
       });
       const back = parseProject(text);
-      expect(JSON.stringify(back.inputs)).toBe(JSON.stringify(shorePowerProgram()));
+      // v0.6.16 re-anchor: the demo migrates in memory on load, so the save persists the authored shape
+      expect(JSON.stringify(back.inputs)).toBe(JSON.stringify(migrateOnLoad(shorePowerProgram())));
       expect(back.settings.entryUnit).toBe("thousands");
       expect(back.settings.startYear).toBe(2026); // the program loader presets the calendar start year
     } finally {

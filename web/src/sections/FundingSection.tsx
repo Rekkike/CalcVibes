@@ -20,18 +20,18 @@ export function FundingSection(props: {
   const { inputs, result, setFunding, startYear, entryUnit } = props;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
   const money = (v: number) => moneyForDisplay(v, currency, entryUnit);
-  const rows = inputs.funding?.rows ?? [];
+  const allRows = inputs.funding?.rows ?? [];
+  const rows = allRows.filter((r) => r.kind === "grant");
   const updateRow = (id: string, patch: Partial<FundingRow>) =>
-    setFunding({ rows: rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
+    setFunding({ rows: allRows.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
   const fv = result?.fundingView ?? null;
   return (
     <section data-testid="funding">
-      <h2>Funding — grants and the interest-free note</h2>
+      <h2>Funding — grants</h2>
       <p className="muted">
         The grant offsets the fee by default: the solve works against the grant-netted basis, and the book nets the
         depreciable base coherently. Grants ride as visible collections-side rows so the full circle stays reconciled.
-        The interest-free loan nets to zero over the horizon by construction (its subsidy element is its net present
-        value); it never joins the collections total.
+        An interest-free note is entered in Financing as a facility at rate zero.
       </p>
       <div data-testid="funding-rows">
         {rows.map((row) => (
@@ -39,32 +39,16 @@ export function FundingSection(props: {
             <label>Label{" "}
               <input data-field="fundingLabel" value={row.label} onChange={(e) => updateRow(row.id, { label: e.target.value })} />
             </label>
-            <label>Kind{" "}
-              <select data-field="fundingKind" value={row.kind} onChange={(e) => updateRow(row.id, { kind: e.target.value as FundingRow["kind"] })}>
-                <option value="grant">Grant</option>
-                <option value="interest-free-loan">Interest-free loan</option>
-              </select>
-            </label>
             <label>Amount{" "}
               <MoneyEditor dataField="fundingAmount" value={row.amount} entryUnit={entryUnit} onChange={(v) => updateRow(row.id, { amount: v })} />
             </label>
             <label>Landing year{" "}
               <input data-field="fundingYear" type="number" value={row.year} onChange={(e) => updateRow(row.id, { year: parseFloat(e.target.value) || 0 })} />
             </label>
-            {row.kind === "interest-free-loan" && (
-              <>
-                <label>Term years{" "}
-                  <input data-field="fundingTerm" type="number" value={row.termYears ?? 1} onChange={(e) => updateRow(row.id, { termYears: parseFloat(e.target.value) || 0 })} />
-                </label>
-                <label>Repayment start year{" "}
-                  <input data-field="fundingRepayStart" type="number" value={row.repaymentStartYear ?? 1} onChange={(e) => updateRow(row.id, { repaymentStartYear: parseFloat(e.target.value) || 0 })} />
-                </label>
-              </>
-            )}
-            <button data-action="remove-funding-row" onClick={() => setFunding({ rows: rows.filter((r) => r.id !== row.id) })}>Remove</button>
+            <button data-action="remove-funding-row" onClick={() => setFunding({ rows: allRows.filter((r) => r.id !== row.id) })}>Remove</button>
           </div>
         ))}
-        <button data-action="add-funding-row" onClick={() => setFunding({ rows: [...rows, { id: "f" + (rows.length + 1), label: "", kind: "grant", amount: 0, year: 1 }] })}>Add funding row</button>
+        <button data-action="add-funding-row" onClick={() => setFunding({ rows: [...allRows, { id: "f" + (allRows.length + 1), label: "", kind: "grant", amount: 0, year: 1 }] })}>Add funding row</button>
       </div>
       {fv !== null && (
         <div data-testid="funding-view">

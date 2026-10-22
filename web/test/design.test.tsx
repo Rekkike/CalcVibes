@@ -11,8 +11,11 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 // Alpha template, which the demo buttons no longer load (the port fixture's equity flow has one
 // sign change, so the ambiguity warning cannot arise from the demo button); open it through the
 // project-file route.
+// v0.6.16 re-anchor: the Alpha file carries the legacy financing block switched off (60% share, 6%, 7 years);
+// it migrates in memory to a disabled facility, which the tests switch on.
+const ALPHA_FINANCING_OFF = { enabled: false, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} };
 async function openAlpha() {
-  const text = serializeProject(demoProject(), { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
+  const text = serializeProject({ ...demoProject(), financing: ALPHA_FINANCING_OFF }, { startYear: null, entryUnit: "thousands", scenarioTargets: null, scenarioTerms: null, scenarioBalloons: null });
   fireEvent.change(document.querySelector('[data-testid="open-project-input"]') as HTMLInputElement, { target: { files: [new File([text], "project-alpha.calcvibes.json", { type: "application/json" })] } });
   await waitFor(() => {
     expect((document.querySelector('[data-field="projectName"]') as HTMLInputElement).value).toBe("Project Alpha");
@@ -91,7 +94,7 @@ describe("Task G: the deck design system (structural pins)", () => {
     // no ambiguity disclosure.
     await openAlpha();
     fireEvent.click(document.querySelector('[data-nav="financing"]') as HTMLElement);
-    fireEvent.click(document.querySelector('[data-field="finEnabled"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-field="facEnabled"]') as HTMLElement);
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 4; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const deal = document.querySelector('[data-slide-name="deal"]') as HTMLElement;
