@@ -88,8 +88,13 @@ describe("Task B — the tie select and the read-only computed month", () => {
     fireEvent.change(sel("milestone", mid, "milestoneMonth"), { target: { value: "" } });
     fireEvent.change(sel("milestone", mid, "milestoneTie"), { target: { value: "engine-event:first-collection-year" } });
     expect(sel("milestone", mid, "milestoneMonth").value).toBe("");
+    // the program demo's live schedule lands its first payment at month 12 of year 3
     const shown = row("milestone", mid).querySelector('[data-testid="computed-month"]');
-    if (shown !== null) expect(shown.textContent).toContain("read-only");
+    expect(shown).not.toBeNull();
+    expect(shown!.textContent).toContain("Computed month 12 of year 3");
+    expect(shown!.textContent).toContain("read-only");
+    // and it never authors: the saved milestone carries no month
+    expect(sel("milestone", mid, "milestoneMonth").value).toBe("");
   });
 });
 
