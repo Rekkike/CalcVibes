@@ -512,34 +512,9 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
   const leveraged = finCfg !== null && finCfg.leveragedSolve;
   let leveragedPayment: number | null = null;
   if (leveraged && !tariffCollectionMode) {
-    let pvDraws = 0;
-    const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
-    let bal = 0;
-    const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
-    // v0.6.12.1 (AUD-2): the draws derive from the profile-honoring incurred basis (fundableDraws).
-    const drawAt = fundableDraws(inp.costs, finCfg, totalMonths);
-    for (let m = 1; m <= S; m++) bal = (bal + drawAt[m - 1]) * (1 + rD);
-    for (let m = 1; m <= S; m++) pvDraws += drawAt[m - 1] / Math.pow(1 + rM, m);
-    const N = finCfg.termYears * 12;
-    const G = finCfg.graceYears * 12;
-    const amortMonths = N - G;
-    const annA = rD === 0 ? bal / amortMonths : (bal * rD) / (1 - Math.pow(1 + rD, -amortMonths));
-    const prinA = finCfg.amortization === "equal-principal" ? bal / amortMonths : null;
-    let pvService = 0;
-    let running = bal;
-    for (let m = S + 1; m <= S + N; m++) {
-      const int = running * rD;
-      let pay = 0;
-      let prin = 0;
-      if (m <= S + G) {
-        pay = int;
-      } else {
-        prin = finCfg.amortization === "annuity" ? annA - int : (prinA as number);
-        pay = prin + int;
-      }
-      pvService += pay / Math.pow(1 + rM, m);
-      running -= prin;
-    }
+    // v0.6.14: the leveraged solve aggregates the facility set's draw and service streams (the
+    // financing-layer facilities; the funding-block note stays in the funding NPV).
+    const { pvDraws, pvService } = leveragedStreams(inp.costs, legacyFacilities(finCfg, fundingRows), rM, totalMonths, repaymentStartYear);
     leveragedPayment = (costNpvWithOperating - pvDraws + pvService - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf - fundingNpv) / dfSumEsc;
   }
   const rawSolvedPayment = leveraged && leveragedPayment !== null
@@ -607,34 +582,7 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
         }
         let netRequirement = costNpvWithOperating - inp.repayment.balloon * balloonDf - residualAmountUsed * residualDf - fundingNpv;
         if (leveraged) {
-          let pvDraws = 0;
-          const rD = Math.pow(1 + finCfg.debtRatePct / 100, 1 / 12) - 1;
-          let bal = 0;
-          const S = (finCfg.serviceStartYear ?? repaymentStartYear) * 12;
-          // v0.6.12.1 (AUD-2): the draws derive from the profile-honoring incurred basis.
-          const drawAt = fundableDraws(inp.costs, finCfg, totalMonths);
-          for (let m = 1; m <= S; m++) bal = (bal + drawAt[m - 1]) * (1 + rD);
-          for (let m = 1; m <= S; m++) pvDraws += drawAt[m - 1] / Math.pow(1 + rM, m);
-          const N = finCfg.termYears * 12;
-          const G = finCfg.graceYears * 12;
-          const amortMonths = N - G;
-          const annA = rD === 0 ? bal / amortMonths : (bal * rD) / (1 - Math.pow(1 + rD, -amortMonths));
-          const prinA = finCfg.amortization === "equal-principal" ? bal / amortMonths : null;
-          let pvService = 0;
-          let running = bal;
-          for (let m = S + 1; m <= S + N; m++) {
-            const int = running * rD;
-            let pay = 0;
-            let prin = 0;
-            if (m <= S + G) {
-              pay = int;
-            } else {
-              prin = finCfg.amortization === "annuity" ? annA - int : (prinA as number);
-              pay = prin + int;
-            }
-            pvService += pay / Math.pow(1 + rM, m);
-            running -= prin;
-          }
+          const { pvDraws, pvService } = leveragedStreams(inp.costs, legacyFacilities(finCfg, fundingRows), rM, totalMonths, repaymentStartYear);
           netRequirement = netRequirement - pvDraws + pvService;
         }
         const base = netRequirement / volumeNpvWeight;
@@ -1168,7 +1116,7 @@ import { normalizeContracts, allReinvestments, contractLastCollectionMonth } fro
 import type { NormalizedContract } from "./contracts.js";
 import { computeBookSchedule, lineIncurred } from "./depreciation.js";
 import type { PaymentSlot } from "./slots.js";
-import { computeFinancingOverlay, fundableDraws, validateFinancing } from "./financing.js";
+import { computeFinancingOverlay, legacyFacilities, leveragedStreams, validateFinancing } from "./financing.js";
 
 type ModelInputsLike = import("./types.js").ModelInputs;
 type CostLine = import("./types.js").CostLine;

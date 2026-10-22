@@ -78,6 +78,41 @@ export interface FinancingConfig {
   perLineSharePct: Record<string, number>;
 }
 
+// v0.6.14: the facility model of record — the financing layer is a list of facilities, each
+// carrying its own term sheet plus ONE scope choice. GENERAL is attached to the whole program and
+// spreads across every cost line by the incurred calendar; ATTACHED is pinned to a named set of
+// cost lines. An interest-free loan is a facility at rate zero. The facility list is an engine
+// model (no save-format change this pass): the existing FinancingConfig and the funding-block note
+// map to it through the legacy adapter in financing.ts.
+export type FacilityScope = { kind: "general" } | { kind: "attached"; lineIds: string[] };
+
+export interface Facility {
+  id: string;
+  label: string;
+  // The commitment. Null when the facility is sized by explicit shares (the legacy and power-user
+  // path): the drawn total is then the amount, and no drift exists.
+  amount: number | null;
+  ratePct: number;
+  termYears: number;
+  graceYears: number;
+  amortization: "annuity" | "equal-principal";
+  // Null = the first collection year.
+  serviceStartYear: number | null;
+  scope: FacilityScope;
+  // Payments per year (1, 2, 4 or 12); absent = 12 (monthly service).
+  paymentsPerYear?: 1 | 2 | 4 | 12;
+  // The explicit per-line share path (percent): when sharePct is present the shares govern the draw
+  // and the amount is derived. perLineSharePct overrides the default per line id.
+  sharePct?: number;
+  perLineSharePct?: Record<string, number>;
+  // A dated lump draw at the end of the given program year (the legacy funding-block note keeps its
+  // receipt timing); the draw is not tied to the cost calendar.
+  datedDraw?: { year: number };
+  // Where the facility came from: the financing layer, or the funding-block note (an interest-free
+  // loan reclassified as a zero-rate facility).
+  origin?: "financing" | "funding-note";
+}
+
 export interface TariffSpan {
   startYear: number;
   termYears: number;
@@ -305,6 +340,31 @@ export interface EquityMetrics {
   zeroOutlay: boolean;
 }
 
+// v0.6.14: one facility's computed position. drift is the stated amount less the drawn total
+// (positive = an undrawn commitment); null when the facility is sized by shares.
+export interface FacilityResult {
+  id: string;
+  label: string;
+  origin: "financing" | "funding-note";
+  scope: FacilityScope;
+  amount: number;
+  drawnTotal: number;
+  drift: number | null;
+  shares: Record<string, number>;
+  idc: number;
+  serviceStartBalance: number;
+  serviceStartMonth: number;
+  termMonths: number;
+  graceMonths: number;
+  paymentsPerYear: number;
+  amortizationType: "annuity" | "equal-principal";
+  annuityPayment: number | null;
+  principalPayment: number | null;
+  totalInterest: number;
+  totalService: number;
+  monthly: { draws: number[]; interest: number[]; principal: number[]; service: number[]; balance: number[] };
+}
+
 export interface FinancingResult {
   drawnTotal: number;
   idc: number;
@@ -323,6 +383,10 @@ export interface FinancingResult {
   minDscr: { year: number; value: number } | null;
   equity: EquityMetrics;
   draws: number[];
+  // v0.6.14: the per-facility positions (the legacy financing layer is facility one; the funding
+  // note, when present, is a zero-rate facility after it). The aggregate fields above compose over
+  // the combined set; the single-facility scalars describe the primary (first financing) facility.
+  facilities?: FacilityResult[];
 }
 
 export interface HorizonConstituent {

@@ -77,7 +77,7 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     expect(statement).toContain("target achieved");
   });
 
-  it("KPI-ROW: each card value equals its engine field through the display formatters; the financing branch renders the minimum DSCR (v0.6.10 re-anchor: the program fixture arrives financed — min DSCR 4.31887090724161 in year 23 → 2048)", async () => {
+  it("KPI-ROW: each card value equals its engine field through the display formatters; the financing branch renders the minimum DSCR (v0.6.10 re-anchor: the program fixture arrives financed — min DSCR 4.31887090724161 in year 23 → 2048; v0.6.14 re-anchor, the note unification: the municipal note's installments join the combined service — min DSCR 4.13984696765291 in year 7 → 2032)", async () => {
     const { shorePowerProgram, yearHeader } = await import("../src/state.js");
     const { computeModel, percentForDisplay, roundForDisplay, deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } = await import("../src/engine.js");
     const program = shorePowerProgram();
@@ -96,9 +96,9 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     // The financing branch: the minimum DSCR through the two-decimal DSCR formatter with
     // its calendar chip at the preset start year 2026.
     expect(byLabel("Min DSCR").querySelector(".kpi-value")?.textContent).toBe(dscrTwoForDisplay(result.financing!.minDscr!.value));
-    expect(byLabel("Min DSCR").querySelector(".kpi-value")?.textContent).toBe("4.32");
+    expect(byLabel("Min DSCR").querySelector(".kpi-value")?.textContent).toBe("4.14");
     expect(byLabel("Min DSCR").querySelector(".kpi-chip")?.textContent).toBe(`in ${yearHeader(result.financing!.minDscr!.year, 2026)}`);
-    expect(byLabel("Min DSCR").querySelector(".kpi-chip")?.textContent).toBe("in 2048");
+    expect(byLabel("Min DSCR").querySelector(".kpi-chip")?.textContent).toBe("in 2032");
   });
 
   it("FIGURE-BAND: the three figures equal their engine fields through the deck money variant; the note renders verbatim", async () => {
