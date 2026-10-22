@@ -307,7 +307,9 @@ export function deckSlides(
     // v0.6.10 (disclosed): on the shore-power program fixture the one-decimal shares sum to
     // 100.1 (16.5+24.5+22.3+27.8+4.5+4.5) — the honest one-decimal rounding residue, disclosed
     // in the completion report, never smoothed; the capital-program basis stays stated.
-    disclosures: ["Composition shares are of the capital program."],
+    // v0.6.15: the slide carries ONE basis — the shares are of the total program cost (the full outflow);
+    // the capital-basis shares retired with the composition rows.
+    disclosures: ["Shares are of the total program cost, the full outflow: the capital lines, the operating lines and the reinvestments."],
     chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
     ...(fundingBlock !== undefined ? { funding: fundingBlock } : {}),
     waterfall: composeWaterfall(composeInvestment(inputs, result), money),

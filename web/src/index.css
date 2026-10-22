@@ -641,6 +641,7 @@
 /* v0.6.15: the repaired stepped columns (group level): a ground-standing total column in the neutral ink
    (the e2e8f0 outline, 12.9:1 on the stage), dotted 1 px connectors, direct value labels above the bars,
    the ground line, and the group names under it (a wrap, never an ellipsis). */
+[data-testid="presentation"] [data-testid="cost-waterfall"] {  margin-top: var(--space-3);}
 [data-testid="presentation"] .waterfall-total-column {  position: absolute;  box-sizing: border-box;  border: 2px solid #e2e8f0;  background: rgba(226, 232, 240, 0.12);  border-radius: 2px 2px 0 0;}
 [data-testid="presentation"] .waterfall-connector {  position: absolute;  height: 0;  border-top: 1px dotted rgba(226, 232, 240, 0.75);}
 [data-testid="presentation"] .waterfall-value {  position: absolute;  font-size: 12px;  line-height: 1.15;  color: #e2e8f0;  text-align: center;  font-variant-numeric: tabular-nums;}
@@ -1333,6 +1334,9 @@
   }
   [data-testid="presentation"] .waterfall-track {
     height: 180px;
+  }
+  [data-testid="presentation"] [data-testid="cost-waterfall"] {
+    margin-top: 3.4rem;
   }
   [data-testid="presentation"] .ledger-row {
     grid-template-columns: minmax(0, 1fr) 4em;

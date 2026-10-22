@@ -101,6 +101,14 @@ describe("the ledger waterfall (the upper section)", () => {
   });
 });
 
+describe("the two sections keep clear of each other (the walkthrough at phone width)", () => {
+  it("the lower section carries its own top margin; the phone rule widens it for the wrapped total label", () => {
+    const css = fs.readFileSync("src/index.css", "utf8");
+    expect(css).toMatch(/\[data-testid="presentation"\] \[data-testid="cost-waterfall"\]\s*\{[^}]*margin-top:\s*var\(--space-3\)/);
+    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\[data-testid="presentation"\] \[data-testid="cost-waterfall"\]\s*\{\s*margin-top:\s*3\.4rem/);
+  });
+});
+
 describe("the stepped columns (the lower section, at group level)", () => {
   it("n+1 slots: the group steps, the operating step, and the ground-standing total column of the same width", () => {
     const { cols, model } = openInvestment();

@@ -103,6 +103,14 @@ describe("the deck waterfall model: the ledger rows", () => {
   });
 });
 
+describe("the composition-share basis stays disclosed (one basis throughout)", () => {
+  it("the investment slide discloses the full-outflow basis; the capital-program basis disclosure is retired", () => {
+    const s = slideOf(withGroups());
+    expect(s.disclosures).toContain("Shares are of the total program cost, the full outflow: the capital lines, the operating lines and the reinvestments.");
+    expect(s.disclosures.some((d) => d.includes("of the capital program"))).toBe(false);
+  });
+});
+
 describe("the deck waterfall model: the stepped columns at group level", () => {
   it("n+1 columns: the groups, the operating segment, then the ground-standing total", () => {
     const inp = withGroups();
