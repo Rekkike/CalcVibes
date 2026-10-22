@@ -693,7 +693,12 @@ export function validateTimeline(inputs: ModelInputs, result: ModelResult | null
       }
     }
     if (a.startYear > a.endYear) {
-      out.push({ code: "TIMELINE-ACTIVITY-ORDER", message: `Activity ${a.id} (${a.label}) starts in year ${a.startYear}, after it ends in year ${a.endYear}: set the start year at or before the end year (TIMELINE-ACTIVITY-ORDER).` });
+      // the months are shown when present; the monthless message is exactly the year-only one
+      const at = (y: number, mo: number | undefined) => (monthOk(mo) && mo !== undefined ? `year ${y} month ${mo}` : `year ${y}`);
+      const withMonths = (monthOk(a.startMonth) && a.startMonth !== undefined) || (monthOk(a.endMonth) && a.endMonth !== undefined);
+      out.push({ code: "TIMELINE-ACTIVITY-ORDER", message: withMonths
+        ? `Activity ${a.id} (${a.label}) starts in ${at(a.startYear, a.startMonth)}, after it ends in ${at(a.endYear, a.endMonth)}: set the start at or before the end (TIMELINE-ACTIVITY-ORDER).`
+        : `Activity ${a.id} (${a.label}) starts in year ${a.startYear}, after it ends in year ${a.endYear}: set the start year at or before the end year (TIMELINE-ACTIVITY-ORDER).` });
     } else if (a.startYear === a.endYear && monthOk(a.startMonth) && monthOk(a.endMonth) && a.startMonth !== undefined && a.endMonth !== undefined && a.endMonth < a.startMonth) {
       // v0.6.17: the month-aware order — an end bound closes at its month's closing, a start bound opens at
       // its month's opening, so the same month is a valid one-month span and an earlier end month closes

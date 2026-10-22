@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeModel } from "../../core/src/engine.js";
 import { parseProject, serializeProject } from "../../core/src/fileio.js";
 import { deckSlides } from "../src/deck.js";
-import { barPosition, layoutGateLabels, layoutLane, markerPosition, monthClosing, monthOpening, ganttWindow } from "../src/ganttLayout.js";
+import { barPosition, layoutGateLabels, layoutMilestoneRows, layoutLane, markerPosition, monthClosing, monthOpening, ganttWindow } from "../src/ganttLayout.js";
 import { availableEngineEvents, demoProject, yearHeader, landNewbuildProject, shorePowerProgram, validateTimeline } from "../src/state.js";
 import type { ModelInputs, TimelineBlock } from "../../core/src/types.js";
 
@@ -197,5 +197,48 @@ describe("Task E — the year-grained default lock and the round trip", () => {
     const plain = base(tlOf({ activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 2, phase: "production" }] }));
     const monthed = base(tlOf({ activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 2, startMonth: 4, endMonth: 9, phase: "production" }] }));
     expect(JSON.stringify(computeModel(monthed))).toBe(JSON.stringify(computeModel(plain)));
+  });
+});
+
+describe("Supplement 1 — the month-aware year-order refusal text", () => {
+  const msgs = (a: object) => validateTimeline(base(tlOf({ activities: [{ id: "a1", label: "Build", startYear: 3, endYear: 2, phase: "production", ...a }] })), computeModel(base())).map((r) => r.message);
+  it("a monthless document keeps the year-only message exactly", () => {
+    expect(msgs({})).toEqual(["Activity a1 (Build) starts in year 3, after it ends in year 2: set the start year at or before the end year (TIMELINE-ACTIVITY-ORDER)."]);
+  });
+  it("the months are shown when present; the firing rule is unchanged", () => {
+    expect(msgs({ startMonth: 7, endMonth: 4 })).toEqual(["Activity a1 (Build) starts in year 3 month 7, after it ends in year 2 month 4: set the start at or before the end (TIMELINE-ACTIVITY-ORDER)."]);
+    expect(msgs({ endMonth: 4 })).toEqual(["Activity a1 (Build) starts in year 3, after it ends in year 2 month 4: set the start at or before the end (TIMELINE-ACTIVITY-ORDER)."]);
+  });
+});
+
+describe("Supplement 2 — the computed month as a muted Gantt marker (read-only, composed once)", () => {
+  const withTie = (tie: object | undefined, month?: number) => gantt(tlOf({ activities: [{ id: "a1", label: "Build", startYear: 3, endYear: 5, phase: "production" }], milestones: [{ id: "m1", label: "Collections start", year: 3, ...(month !== undefined ? { month } : {}), ...(tie !== undefined ? { tie: tie as never } : {}) }] })).milestones[0];
+  it("a milestone tied to the first-collection-year event carries the computed month and its composed position", () => {
+    const m = withTie({ kind: "engine-event", event: "first-collection-year" });
+    expect(m.computed).toEqual({ year: 3, month: 12, pos: markerPosition({ firstYear: 3 }, 3, 12) });
+    // authored month untouched: the computed position never overwrites it
+    expect(m.month).toBeNull();
+    expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).month).toBe(4);
+    expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).pos).toBe(markerPosition({ firstYear: 3 }, 3, 4));
+  });
+  it("untied and activity-tied milestones carry no computed marker", () => {
+    expect(withTie(undefined).computed).toBeNull();
+    expect(withTie({ kind: "activity", activityId: "a1" }).computed).toBeNull();
+  });
+});
+
+describe("Supplement 4 — the milestone proximity stacking", () => {
+  const ids = (ms: { id: string; year: number; month?: number; ordinal: number }[]) => layoutMilestoneRows(ms, ganttWindow([], 8));
+  it("month-bearing same-year milestones separate by position on one row", () => {
+    const r = ids([{ id: "a", year: 2, month: 2, ordinal: 1 }, { id: "b", year: 2, month: 10, ordinal: 2 }]);
+    expect(r.map((x) => x.row)).toEqual([0, 0]);
+    expect(r[0].pos).not.toBe(r[1].pos);
+  });
+  it("monthless same-year milestones keep today's rank rows; a shared month stacks by the ordinal", () => {
+    expect(ids([{ id: "a", year: 2, ordinal: 1 }, { id: "b", year: 2, ordinal: 2 }, { id: "c", year: 2, ordinal: 3 }]).map((x) => x.row)).toEqual([0, 1, 2]);
+    expect(ids([{ id: "b", year: 2, month: 5, ordinal: 2 }, { id: "a", year: 2, month: 5, ordinal: 1 }]).map((x) => [x.id, x.row])).toEqual([["b", 1], ["a", 0]]);
+  });
+  it("a milestone alone in its year keeps row 0", () => {
+    expect(ids([{ id: "a", year: 4, ordinal: 1 }])[0].row).toBe(0);
   });
 });

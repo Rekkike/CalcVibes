@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 // the print route draws through jsPDF instance methods: record the rect and line calls
-const rec = vi.hoisted(() => ({ rects: [] as number[][], lines: [] as number[][] }));
+const rec = vi.hoisted(() => ({ rects: [] as number[][], lines: [] as number[][], circles: [] as number[][] }));
 vi.mock("jspdf", async (orig) => {
   const m = (await orig()) as { jsPDF: new (...a: unknown[]) => Record<string, (...x: unknown[]) => unknown> };
   class Rec extends m.jsPDF {
@@ -9,8 +9,10 @@ vi.mock("jspdf", async (orig) => {
       super(...a);
       const rect = this.rect.bind(this);
       const line = this.line.bind(this);
+      const circle = this.circle.bind(this);
       this.rect = (...x: unknown[]) => { rec.rects.push(x as number[]); return rect(...x); };
       this.line = (...x: unknown[]) => { rec.lines.push(x as number[]); return line(...x); };
+      this.circle = (...x: unknown[]) => { rec.circles.push(x as number[]); return circle(...x); };
     }
   }
   return { ...m, jsPDF: Rec };
@@ -159,5 +161,24 @@ describe("Task C — the sub-year positions in both renderers", () => {
     const g = deckSlides(inp, computeModel(inp), { startYear: null }).slides.find((s) => s.name === "timeline")?.gantt;
     if (g === undefined) return;
     for (const b of g.lanes.flatMap((l) => l.bars)) expect(b.right - b.left).toBe(b.endYear - b.startYear + 1);
+  });
+
+  it("the computed engine-event month draws as a muted ring in the SVG and the PDF (read-only, never authored)", () => {
+    const tied: TimelineBlock = { projectScale: "full", activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 5, phase: "production" }], decisionPoints: [], milestones: [{ id: "m1", label: "Collections", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } }] };
+    const inp = { ...demoProject(), projectLengthYears: 5, timeline: tied };
+    rec.circles.length = 0;
+    const model = deckSlides(inp, computeModel(inp), { startYear: null });
+    const g = model.slides.find((s) => s.name === "timeline")!.gantt!;
+    const m = g.milestones[0];
+    expect(m.computed).not.toBeNull();
+    const { container } = render(<GanttChart gantt={g} />);
+    const ring = container.querySelector('[data-gantt-computed="m1"]') as SVGCircleElement;
+    const { labelW, plotW } = GANTT_SVG;
+    expect(parseFloat(ring.getAttribute("cx") as string)).toBeCloseTo(labelW + m.computed!.pos * (plotW / (g.window.lastYear - g.window.firstYear + 1)), 6);
+    expect(ring.querySelector("title")!.textContent).toContain("read-only");
+    expect(ring.getAttribute("fill")).toBe("none");
+    buildDeckPdf(model, "Computed month");
+    const colW = (257 - 32) / (g.window.lastYear - g.window.firstYear + 1);
+    expect(rec.circles.some((c) => Math.abs(c[0] - (52 + m.computed!.pos * colW)) < 1e-9)).toBe(true);
   });
 });

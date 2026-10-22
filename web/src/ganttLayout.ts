@@ -72,6 +72,30 @@ export function layoutGateLabels(gates: { id: string; code: string | null; year:
   return gates.map((g) => out.get(g.id) as { id: string; pos: number; row: number });
 }
 
+// The milestone-row stacking (the proximity rule, as the gates): milestones sharing a year band take rows by
+// proximity — greedy first-fit by position, a footprint of the ordinal's width centred on the marker; ties
+// on position break by the ordinal (the chronological rank), so monthless same-year milestones, which
+// share the band's centre, keep today's rank rows exactly, and month-bearing milestones separate by their
+// composed positions. A milestone alone in its year keeps row 0.
+export function layoutMilestoneRows(ms: { id: string; year: number; month?: number; ordinal: number }[], win: GanttWindow): { id: string; pos: number; row: number }[] {
+  const perChar = win.years / GANTT_CHARS_ACROSS_PLOT;
+  const out = new Map<string, { id: string; pos: number; row: number }>();
+  const byYear = new Map<number, typeof ms>();
+  for (const m of ms) byYear.set(m.year, [...(byYear.get(m.year) ?? []), m]);
+  for (const group of byYear.values()) {
+    const placed = group.map((m) => ({ m, pos: markerPosition(win, m.year, m.month) })).sort((a, b) => a.pos - b.pos || a.m.ordinal - b.m.ordinal);
+    const rowEnd: number[] = [];
+    for (const p of placed) {
+      const w = (String(p.m.ordinal).length + 1) * perChar;
+      let row = rowEnd.findIndex((end) => p.pos - w / 2 >= end);
+      if (row === -1) { row = rowEnd.length; rowEnd.push(0); }
+      rowEnd[row] = p.pos + w / 2;
+      out.set(p.m.id, { id: p.m.id, pos: p.pos, row });
+    }
+  }
+  return ms.map((m) => out.get(m.id) as { id: string; pos: number; row: number });
+}
+
 export interface GanttBarIn { id: string; label: string; startYear: number; endYear: number; startMonth?: number; endMonth?: number }
 export interface GanttBarLaid extends GanttBarIn {
   // v0.6.17: the composed sub-year edges, in year columns from the window start

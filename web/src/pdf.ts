@@ -296,6 +296,12 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
     for (const m of g.milestones) {
       const cx = xAt(m.pos);
       const cy = lanesBottom + 11 + Math.max(0, g.gateRows - 1) * GATE_ROW_PDF + m.row * 9;
+      if (m.computed !== null) {
+        // the computed engine-event month: a muted ring (read-only exposure, never authored)
+        doc.setDrawColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+        doc.circle(xAt(m.computed.pos), cy, 3.6, "S");
+        doc.setDrawColor(0, 0, 0);
+      }
       doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
       doc.lines([[2.5, 2.5], [-2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]], cx, cy - 2.5, [1, 1], "F", true);
       // the ordinal, centered beneath its diamond (7 pt; below the gate-code line, above the caption)

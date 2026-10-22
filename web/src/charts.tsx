@@ -490,6 +490,11 @@ export function GanttChart(props: { gantt: DeckGantt }) {
           const cy = lanesBottom + 34 + gateShift + m.row * 30;
           return (
             <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
+              {m.computed !== null && (
+                <circle data-gantt-computed={m.id} cx={xAt(m.computed.pos)} cy={cy} r={10} fill="none" stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1.5}>
+                  <title>{`Computed month ${m.computed.month} of year ${m.computed.year} (read-only, from the live schedule)`}</title>
+                </circle>
+              )}
               <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />
               <text data-gantt-milestone-number={m.ordinal} x={cx} y={cy + 19} textAnchor="middle" fontSize={12} fontWeight={700} fill={STAGE_CHART_COLORS.axisText}>{m.ordinal}</text>
               <title>{`Milestone ${m.ordinal}: ${m.label}`}</title>
