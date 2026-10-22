@@ -1,10 +1,10 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
-import { GANTT_LANE_LABEL_CHARS, ganttWindow, layoutLane, wrapLabel } from "./ganttLayout.js";
+import { GANTT_LANE_LABEL_CHARS, ganttWindow, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, composeInvestment, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader } from "./state.js";
+import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -93,11 +93,17 @@ export interface DeckFundingBlock {
 // here once (web/src/ganttLayout.ts); the renderers consume them and never recompute.
 export type DeckGanttBar = GanttBarLaid;
 export interface DeckGanttLane { phase: TimelinePhase; label: string; labelLines: string[]; rowCount: number; rowLines: number[]; bars: DeckGanttBar[] }
-export interface DeckGanttGate { id: string; code: string | null; title: string; year: number; outcome: string | null }
+// v0.6.17: a gate and a milestone carry their optional month, the composed sub-year position (year
+// columns from the window start, composed once) and, for a gate, its label row (the same-year stacking).
+export interface DeckGanttGate { id: string; code: string | null; title: string; year: number; month: number | null; pos: number; row: number; outcome: string | null }
 // v0.6.13.4: the ordinal is the milestone's rank in the chronological order of the FULL milestone set
 // (composed once, stable under the year window, never derived from the authored id); the row is the
 // stack position among the drawn milestones sharing a year (0 = the first).
-export interface DeckGanttMilestone { id: string; label: string; year: number; tie: string | null; ordinal: number; row: number }
+// v0.6.17 supplement: a milestone tied to an engine event whose live schedule carries a month also carries the
+// COMPUTED position (read-only exposure, never authored): drawn as a muted ring, composed once here.
+// from is the authored diamond's position: the renderers draw the thin muted connector from it to pos.
+export interface DeckGanttComputed { year: number; month: number; pos: number; from: number }
+export interface DeckGanttMilestone { id: string; label: string; year: number; month: number | null; pos: number; tie: string | null; ordinal: number; row: number; computed: DeckGanttComputed | null }
 export interface DeckGantt {
   // the program span; the axis and the plot cover the year window only
   spanYears: number;
@@ -108,6 +114,12 @@ export interface DeckGantt {
   omittedMarkers: number;
   caption: string | null;
   gates: DeckGanttGate[];
+  // v0.6.17 supplement: the month gridline positions (year columns from the window start; the eleven
+  // interior month boundaries of every year band), composed once and present ONLY while the view-state
+  // toggle stands on; absent = the default rendering, untouched. Never a document field.
+  monthGrid?: number[];
+  // the number of gate-label rows the drawn gates stack on (0 with no gate drawn)
+  gateRows: number;
   milestones: DeckGanttMilestone[];
 }
 
@@ -182,7 +194,7 @@ export interface DeckModel {
 export function deckSlides(
   inputs: ModelInputs,
   result: ModelResult,
-  opts: { startYear: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null } = { startYear: null },
+  opts: { startYear: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean } = { startYear: null },
 ): DeckModel {
   const currency = (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK";
   const unit = opts.entryUnit ?? "ones";
@@ -324,7 +336,7 @@ export function deckSlides(
   } else if (validateTimeline(inputs, result).length > 0) {
     timelineProvenance = "Timeline: refused — see the Timeline tab.";
   } else {
-    slides.push(ganttSlide(inputs, result, startYearOf(opts)));
+    slides.push(ganttSlide(inputs, result, startYearOf(opts), opts.monthGrid === true));
   }
 
   // Slide 3 — recovery
@@ -712,11 +724,13 @@ export function ganttTitle(spanYears: number, gateCount: number, startYear: numb
   return `The program runs years ${first}–${last} with ${count} decision ${gateCount === 1 ? "gate" : "gates"}`;
 }
 
-function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number | null): DeckSlide {
+function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number | null, monthGrid: boolean): DeckSlide {
   const tl = timelineOf(inputs);
   const spanYears = programSpanYears(inputs, result) as number;
-  const gates = [...tl.decisionPoints].sort((a, b) => a.year - b.year).map((d) => ({
-    id: d.id, code: d.code ?? null, title: d.title, year: d.year, outcome: d.outcome ?? null,
+  // v0.6.17: within a year the gates order by their month (a gate without a month keeps its authored place
+  // at the year's centre); the sort is stable, so the year-grained order is exactly today's
+  const gates = [...tl.decisionPoints].sort((a, b) => a.year - b.year || markerPosition({ firstYear: 0 }, 0, a.month) - markerPosition({ firstYear: 0 }, 0, b.month)).map((d) => ({
+    id: d.id, code: d.code ?? null, title: d.title, year: d.year, month: d.month ?? null, outcome: d.outcome ?? null,
   }));
   // v0.6.13.2: the lanes are the visible vocabulary lanes; the year window is the extent of their
   // activities (the program span when none); the bars stack on sub-rows; markers outside the window
@@ -727,7 +741,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   // so same-year milestones keep their authored order) and BEFORE the window filter: a milestone the
   // window omits never renumbers the others, and the authored id plays no part.
   const allMilestones = [...tl.milestones].sort((a, b) => a.year - b.year).map((m, i) => ({
-    id: m.id, label: m.label, year: m.year,
+    id: m.id, label: m.label, year: m.year, month: m.month ?? null,
     tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity ${m.tie.activityId}` : m.tie.event,
     ordinal: i + 1,
   }));
@@ -740,22 +754,33 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   if (omittedMarkers > 0) {
     captionParts.push(`${omittedMarkers} ${omittedMarkers === 1 ? "marker falls" : "markers fall"} outside this window and ${omittedMarkers === 1 ? "is" : "are"} not drawn; the gates and milestones listed on this slide name ${omittedMarkers === 1 ? "it" : "them"}.`);
   }
-  // The drawn milestones stack on rows within a shared year so two diamonds never share a position.
-  const rowOfYear = new Map<number, number>();
-  const drawnMilestones: DeckGanttMilestone[] = allMilestones.filter((m) => inWindow(m.year)).map((m) => {
-    const row = rowOfYear.get(m.year) ?? 0;
-    rowOfYear.set(m.year, row + 1);
-    return { ...m, row };
+  // The drawn milestones stack on rows within a shared year by proximity (the ordinal breaks ties), so two
+  // diamonds never share a position; the computed engine-event month rides read-only beside the authored one.
+  const events = availableEngineEvents(inputs, result);
+  const drawn = allMilestones.filter((m) => inWindow(m.year));
+  const stacked = layoutMilestoneRows(drawn.map((m) => ({ id: m.id, year: m.year, month: m.month ?? undefined, ordinal: m.ordinal })), win);
+  const tieOf = new Map(tl.milestones.map((m) => [m.id, m.tie]));
+  const drawnMilestones: DeckGanttMilestone[] = drawn.map((m, i) => {
+    const tie = tieOf.get(m.id);
+    const ev = tie !== undefined && tie.kind === "engine-event" ? events.find((e) => e.event === tie.event) : undefined;
+    const computed = ev !== undefined && ev.month !== undefined && inWindow(ev.year)
+      ? { year: ev.year, month: ev.month, pos: markerPosition(win, ev.year, ev.month), from: stacked[i].pos }
+      : null;
+    return { ...m, pos: stacked[i].pos, row: stacked[i].row, computed };
   });
+  const drawnGates = gates.filter((g) => inWindow(g.year));
+  const gateLabels = layoutGateLabels(drawnGates.map((g) => ({ id: g.id, code: g.code, year: g.year, month: g.month ?? undefined })), win);
   const gantt: DeckGantt = {
     spanYears,
     window: { firstYear: win.firstYear, lastYear: win.lastYear },
     axis: Array.from({ length: win.years }, (_, k) => ({ year: win.firstYear + k, label: yearHeader(win.firstYear + k, startYear) })),
     lanes: lanes.map((l) => {
-      const laid = layoutLane(l.activities.map((a) => ({ id: a.id, label: a.label, startYear: a.startYear, endYear: a.endYear })), win);
+      const laid = layoutLane(l.activities.map((a) => ({ id: a.id, label: a.label, startYear: a.startYear, endYear: a.endYear, ...(a.startMonth !== undefined ? { startMonth: a.startMonth } : {}), ...(a.endMonth !== undefined ? { endMonth: a.endMonth } : {}) })), win);
       return { phase: l.id, label: l.label, labelLines: wrapLabel(l.label, GANTT_LANE_LABEL_CHARS), rowCount: laid.rowCount, rowLines: laid.rowLines, bars: laid.bars };
     }),
-    gates: gates.filter((g) => inWindow(g.year)),
+    gates: drawnGates.map((g, i) => ({ ...g, pos: gateLabels[i].pos, row: gateLabels[i].row })),
+    gateRows: gateLabels.reduce((a, g) => Math.max(a, g.row + 1), 0),
+    ...(monthGrid ? { monthGrid: Array.from({ length: win.years }, (_, k) => Array.from({ length: 11 }, (_, m) => k + (m + 1) / 12)).flat() } : {}),
     milestones: drawnMilestones,
     omittedMarkers,
     caption: captionParts.length > 0 ? captionParts.join(" ") : null,
@@ -765,11 +790,11 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     { label: "Activities", value: String(tl.activities.length), kind: "count", rawValue: tl.activities.length },
     ...gates.map((g) => ({
       label: g.code ?? "Gate",
-      value: `${g.title} — ${yearHeader(g.year, startYear)}${g.outcome !== null ? ` (${g.outcome})` : ""}`,
+      value: `${g.title} — ${yearMonthHeader(g.year, g.month ?? undefined, startYear)}${g.outcome !== null ? ` (${g.outcome})` : ""}`,
       kind: "text" as const,
       rawValue: g.year,
     })),
-    ...allMilestones.map((m) => ({ label: `Milestone ${m.ordinal}`, value: `${m.label} — ${yearHeader(m.year, startYear)}`, kind: "text" as const, rawValue: m.year })),
+    ...allMilestones.map((m) => ({ label: `Milestone ${m.ordinal}`, value: `${m.label} — ${yearMonthHeader(m.year, m.month ?? undefined, startYear)}`, kind: "text" as const, rawValue: m.year })),
   ];
   return {
     name: "timeline",

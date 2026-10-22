@@ -33,8 +33,74 @@ export function ganttWindow(visible: { startYear: number; endYear: number }[], s
   return { firstYear, lastYear, years, narrowed: years < span };
 }
 
-export interface GanttBarIn { id: string; label: string; startYear: number; endYear: number }
+// v0.6.17 — the sub-year positions, composed ONCE here (the month fields are positions, never money and
+// never time value). A start bound opens at its month's opening, (month - 1) / 12; an end bound closes
+// at its month's closing, month / 12; an absent start composes at the year's left edge (0) and an absent
+// end at the year's right edge (1), so the year-grained rendering survives exactly. A marker (a gate or a
+// milestone) stands at the year band's centre when it carries no month and at the centre of its month
+// otherwise. All positions are in year columns from the window's left edge; the axis stays year-labeled.
+export const monthOpening = (month?: number): number => (month === undefined ? 0 : (month - 1) / 12);
+export const monthClosing = (month?: number): number => (month === undefined ? 1 : month / 12);
+export function barPosition(win: { firstYear: number }, a: { startYear: number; endYear: number; startMonth?: number; endMonth?: number }): { left: number; right: number } {
+  return { left: a.startYear - win.firstYear + monthOpening(a.startMonth), right: a.endYear - win.firstYear + monthClosing(a.endMonth) };
+}
+export function markerPosition(win: { firstYear: number }, year: number, month?: number): number {
+  return year - win.firstYear + (month === undefined ? 0.5 : (month - 0.5) / 12);
+}
+
+// The gate-label stacking (the same-year overlap retirement): gates sharing a year band take label rows
+// by proximity — greedy first-fit by position, a label spanning its text width centred on the gate line —
+// so two gates differing by month stand at distinct positions and gates that still collide (the same
+// month, or months too close for their labels) stack on successive rows. A gate alone in its year keeps
+// row 0. No refusal: the stacking is the discipline.
+export function layoutGateLabels(gates: { id: string; code: string | null; year: number; month?: number }[], win: GanttWindow): { id: string; pos: number; row: number }[] {
+  const perChar = win.years / GANTT_CHARS_ACROSS_PLOT;
+  const out = new Map<string, { id: string; pos: number; row: number }>();
+  const byYear = new Map<number, typeof gates>();
+  for (const g of gates) byYear.set(g.year, [...(byYear.get(g.year) ?? []), g]);
+  for (const group of byYear.values()) {
+    const placed = group.map((g, i) => ({ g, i, pos: markerPosition(win, g.year, g.month) })).sort((a, b) => a.pos - b.pos || a.i - b.i);
+    const rowEnd: number[] = [];
+    for (const p of placed) {
+      const w = ((p.g.code ?? "Gate").length + 1) * perChar;
+      let row = rowEnd.findIndex((end) => p.pos - w / 2 >= end);
+      if (row === -1) { row = rowEnd.length; rowEnd.push(0); }
+      rowEnd[row] = p.pos + w / 2;
+      out.set(p.g.id, { id: p.g.id, pos: p.pos, row });
+    }
+  }
+  return gates.map((g) => out.get(g.id) as { id: string; pos: number; row: number });
+}
+
+// The milestone-row stacking (the proximity rule, as the gates): milestones sharing a year band take rows by
+// proximity — greedy first-fit by position, a footprint of the ordinal's width centred on the marker; ties
+// on position break by the ordinal (the chronological rank), so monthless same-year milestones, which
+// share the band's centre, keep today's rank rows exactly, and month-bearing milestones separate by their
+// composed positions. A milestone alone in its year keeps row 0.
+export function layoutMilestoneRows(ms: { id: string; year: number; month?: number; ordinal: number }[], win: GanttWindow): { id: string; pos: number; row: number }[] {
+  const perChar = win.years / GANTT_CHARS_ACROSS_PLOT;
+  const out = new Map<string, { id: string; pos: number; row: number }>();
+  const byYear = new Map<number, typeof ms>();
+  for (const m of ms) byYear.set(m.year, [...(byYear.get(m.year) ?? []), m]);
+  for (const group of byYear.values()) {
+    const placed = group.map((m) => ({ m, pos: markerPosition(win, m.year, m.month) })).sort((a, b) => a.pos - b.pos || a.m.ordinal - b.m.ordinal);
+    const rowEnd: number[] = [];
+    for (const p of placed) {
+      const w = (String(p.m.ordinal).length + 1) * perChar;
+      let row = rowEnd.findIndex((end) => p.pos - w / 2 >= end);
+      if (row === -1) { row = rowEnd.length; rowEnd.push(0); }
+      rowEnd[row] = p.pos + w / 2;
+      out.set(p.m.id, { id: p.m.id, pos: p.pos, row });
+    }
+  }
+  return ms.map((m) => out.get(m.id) as { id: string; pos: number; row: number });
+}
+
+export interface GanttBarIn { id: string; label: string; startYear: number; endYear: number; startMonth?: number; endMonth?: number }
 export interface GanttBarLaid extends GanttBarIn {
+  // v0.6.17: the composed sub-year edges, in year columns from the window start
+  left: number;
+  right: number;
   // the sub-row within the lane (0-based)
   row: number;
   // "inside": the label fits within its bar; "above": it renders on lines above the bar
@@ -81,13 +147,13 @@ export function wrapLabel(label: string, max: number): string[] {
 export function layoutLane(bars: GanttBarIn[], win: GanttWindow): GanttLaneLaid {
   const years = win.years;
   const perChar = years / GANTT_CHARS_ACROSS_PLOT;
-  const sorted = [...bars].sort((a, b) => a.startYear - b.startYear || a.endYear - b.endYear || a.id.localeCompare(b.id));
+  const pos = new Map(bars.map((b) => [b.id, barPosition(win, b)]));
+  const sorted = [...bars].sort((a, b) => (pos.get(a.id) as { left: number }).left - (pos.get(b.id) as { left: number }).left || (pos.get(a.id) as { right: number }).right - (pos.get(b.id) as { right: number }).right || a.id.localeCompare(b.id));
   const rowEnd: number[] = [];
   const rowLines: number[] = [];
   const laid: GanttBarLaid[] = [];
   for (const b of sorted) {
-    const left = b.startYear - win.firstYear;
-    const right = b.endYear - win.firstYear + 1;
+    const { left, right } = pos.get(b.id) as { left: number; right: number };
     const insideCapacity = Math.floor((right - left) / perChar) - 2;
     let mode: "inside" | "above" = "inside";
     let lines = [b.label];
@@ -111,7 +177,7 @@ export function layoutLane(bars: GanttBarIn[], win: GanttWindow): GanttLaneLaid 
     }
     rowEnd[row] = footRight;
     rowLines[row] = Math.max(rowLines[row], mode === "above" ? lines.length : 0);
-    laid.push({ ...b, row, labelMode: mode, lines, labelLeft, labelWidth });
+    laid.push({ ...b, left, right, row, labelMode: mode, lines, labelLeft, labelWidth });
   }
   return { rowCount: rowEnd.length, rowLines, bars: laid };
 }

@@ -87,10 +87,10 @@ function ScenarioTargetBars(props: { chart: ScenarioTargetChart; currency: Curre
   );
 }
 
-export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null }) {
-  const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null } = props;
+export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean }) {
+  const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null, monthGrid = false } = props;
   const [slide, setSlide] = useState(0);
-  const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons }) : null;
+  const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, monthGrid }) : null;
   const totalSlides = deck?.slides.length ?? 7;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
 

@@ -4,7 +4,7 @@ import {
   DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
   phaseVocabularyIssues, phasesOf, programSpanYears, replaceSourceActivities, sourceHasActivities, suggestActivitiesFromContracts,
   suggestActivitiesFromCosts, suggestActivitiesFromFinancing, suggestActivitiesFromFunding, suggestActivitiesFromOperating,
-  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, yearHeader,
+  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, yearMonthHeader,
 } from "../state.js";
 
 // v0.6.13.2 Task B: the per-source suggestion buttons. Each derives one source of the project into
@@ -60,8 +60,10 @@ export function TimelineSection(props: {
   result: ModelResult | null;
   setTimeline: (tl: TimelineBlock) => void;
   startYear: number | null;
+  monthGrid?: boolean;
+  setMonthGrid?: (on: boolean) => void;
 }) {
-  const { inputs, result, setTimeline, startYear } = props;
+  const { inputs, result, setTimeline, startYear, monthGrid = false, setMonthGrid } = props;
   const tl = timelineOf(inputs);
   const span = programSpanYears(inputs, result);
   const events = availableEngineEvents(inputs, result);
@@ -123,14 +125,28 @@ export function TimelineSection(props: {
     commit({ phases: phases.filter((p) => p.id !== id), laneVisibility: Object.keys(vis).length > 0 ? vis : undefined });
     setPhaseNote(null);
   };
+  // v0.6.17: a patch value of undefined clears the key (the empty month selector is the year-grained default)
+  const merged = <T extends object>(base: T, patch: Partial<T>): T => {
+    const next = { ...base, ...patch } as Record<string, unknown>;
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    return next as T;
+  };
   const updateActivity = (id: string, patch: Partial<TimelineActivity>) =>
-    commit({ activities: tl.activities.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
+    commit({ activities: tl.activities.map((a) => (a.id === id ? merged(a, patch) : a)) });
   const updateGate = (id: string, patch: Partial<TimelineDecisionPoint>) =>
-    commit({ decisionPoints: tl.decisionPoints.map((d) => (d.id === id ? { ...d, ...patch } : d)) });
+    commit({ decisionPoints: tl.decisionPoints.map((d) => (d.id === id ? merged(d, patch) : d)) });
   const updateMilestone = (id: string, patch: Partial<TimelineMilestone>) =>
-    commit({ milestones: tl.milestones.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
+    commit({ milestones: tl.milestones.map((m) => (m.id === id ? merged(m, patch) : m)) });
+  // v0.6.17: the optional month selector — the empty state is the year-grained default
+  const monthSelect = (field: string, value: number | undefined, onPick: (m: number | undefined) => void) => (
+    <select data-field={field} value={value === undefined ? "" : String(value)} onChange={(e) => onPick(e.target.value === "" ? undefined : parseInt(e.target.value, 10))}>
+      <option value="">Year only</option>
+      {Array.from({ length: 12 }, (_, i) => i + 1).map((mo) => <option key={mo} value={String(mo)}>Month {mo}</option>)}
+      {value !== undefined && !(Number.isInteger(value) && value >= 1 && value <= 12) && <option value={String(value)}>{value} (outside 1–12)</option>}
+    </select>
+  );
+  const monthNote = (y: number, mo: number | undefined) => (Number.isInteger(y) && y >= 1 ? yearMonthHeader(y, mo, startYear) : "—");
   const num = (v: string) => parseFloat(v) || 0;
-  const yearsNote = (y: number) => (Number.isInteger(y) && y >= 1 ? yearHeader(y, startYear) : "—");
 
   // The tie select: a chosen tie sets the marker to the tied target's program year once (the stored
   // year stays editable); a tie never alters the model.
@@ -141,7 +157,9 @@ export function TimelineSection(props: {
     } else if (value.startsWith("activity:")) {
       const activityId = value.slice("activity:".length);
       const target = tl.activities.find((a) => a.id === activityId);
-      updateMilestone(m.id, { tie: { kind: "activity", activityId }, ...(target !== undefined ? { year: target.endYear } : {}) });
+      // v0.6.17: where the tied activity carries an end month the tie sets the month too; a computed
+      // engine-event month is read-only exposure and is never written here
+      updateMilestone(m.id, { tie: { kind: "activity", activityId }, ...(target !== undefined ? { year: target.endYear } : {}), ...(target !== undefined && target.endMonth !== undefined ? { month: target.endMonth } : {}) });
     } else {
       const event = value.slice("engine-event:".length) as TimelineEngineEvent;
       const target = events.find((e) => e.event === event);
@@ -157,6 +175,11 @@ export function TimelineSection(props: {
         A planning and presentation layer: the timeline never alters the cash flows, the solver or the horizon.{" "}
         {span !== null ? `The program span is years 1–${span}.` : "The program span appears once the model solves."}
       </p>
+      {setMonthGrid !== undefined && (
+        <label>Month gridlines on the Gantt (a view setting; not saved with the project){" "}
+          <input data-field="monthGrid" type="checkbox" checked={monthGrid} onChange={(e) => setMonthGrid(e.target.checked)} />
+        </label>
+      )}
       <label>Project scale{" "}
         <select data-field="projectScale" value={tl.projectScale ?? "full"} onChange={(e) => commit({ projectScale: e.target.value as "mini" | "full" })}>
           <option value="full">Full (DP1–DP8)</option>
@@ -230,8 +253,8 @@ export function TimelineSection(props: {
             {tl.activities.map((a) => (
               <tr key={a.id} data-kind="activity" data-line={a.id}>
                 <td><input data-field="activityLabel" value={a.label} onChange={(e) => updateActivity(a.id, { label: e.target.value })} /></td>
-                <td><input data-field="activityStart" type="number" value={a.startYear} onChange={(e) => updateActivity(a.id, { startYear: num(e.target.value) })} /><span className="muted"> {yearsNote(a.startYear)}</span></td>
-                <td><input data-field="activityEnd" type="number" value={a.endYear} onChange={(e) => updateActivity(a.id, { endYear: num(e.target.value) })} /><span className="muted"> {yearsNote(a.endYear)}</span></td>
+                <td><input data-field="activityStart" type="number" value={a.startYear} onChange={(e) => updateActivity(a.id, { startYear: num(e.target.value) })} /> {monthSelect("activityStartMonth", a.startMonth, (mo) => updateActivity(a.id, { startMonth: mo }))}<span className="muted" data-span-note="start"> {monthNote(a.startYear, a.startMonth)}</span></td>
+                <td><input data-field="activityEnd" type="number" value={a.endYear} onChange={(e) => updateActivity(a.id, { endYear: num(e.target.value) })} /> {monthSelect("activityEndMonth", a.endMonth, (mo) => updateActivity(a.id, { endMonth: mo }))}<span className="muted" data-span-note="end"> {monthNote(a.endYear, a.endMonth)}</span></td>
                 <td>
                   <select data-field="activityPhase" value={a.phase} onChange={(e) => updateActivity(a.id, { phase: e.target.value as TimelinePhase })}>
                     {phases.map((p, i) => <option key={p.id + ":" + i} value={p.id}>{p.label}</option>)}
@@ -254,7 +277,7 @@ export function TimelineSection(props: {
               <tr key={d.id} data-kind="gate" data-line={d.id}>
                 <td><input data-field="gateTitle" value={d.title} onChange={(e) => updateGate(d.id, { title: e.target.value })} /></td>
                 <td data-field="gateCode">{d.code ?? "—"}</td>
-                <td><input data-field="gateYear" type="number" value={d.year} onChange={(e) => updateGate(d.id, { year: num(e.target.value) })} /><span className="muted"> {yearsNote(d.year)}</span></td>
+                <td><input data-field="gateYear" type="number" value={d.year} onChange={(e) => updateGate(d.id, { year: num(e.target.value) })} /> {monthSelect("gateMonth", d.month, (mo) => updateGate(d.id, { month: mo }))}<span className="muted" data-span-note="gate"> {monthNote(d.year, d.month)}</span></td>
                 <td>
                   <select data-field="gateOutcome" value={d.outcome ?? ""} onChange={(e) => {
                     if (e.target.value === "") {
@@ -291,7 +314,7 @@ export function TimelineSection(props: {
               return (
                 <tr key={m.id} data-kind="milestone" data-line={m.id}>
                   <td><input data-field="milestoneLabel" value={m.label} onChange={(e) => updateMilestone(m.id, { label: e.target.value })} /></td>
-                  <td><input data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} /><span className="muted"> {yearsNote(m.year)}</span></td>
+                  <td><input data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} /> {monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}<span className="muted" data-span-note="milestone"> {monthNote(m.year, m.month)}</span></td>
                   <td>
                     <select data-field="milestoneTie" value={current} onChange={(e) => chooseTie(m, e.target.value)}>
                       <option value="">No tie</option>
@@ -299,6 +322,13 @@ export function TimelineSection(props: {
                       {events.map((e) => <option key={e.event} value={"engine-event:" + e.event}>{TIMELINE_EVENT_LABELS[e.event]} (year {e.year})</option>)}
                       {!known.has(current) && <option value={current}>{current} (not available)</option>}
                     </select>
+                    {m.tie !== undefined && m.tie.kind === "engine-event" && (() => {
+                      const ev = (m.tie as { event: TimelineEngineEvent }).event;
+                      const computed = events.find((e) => e.event === ev)?.month;
+                      return computed === undefined ? null : (
+                        <span className="muted" data-testid="computed-month" data-milestone={m.id}> Computed month {computed} of year {events.find((e) => e.event === ev)?.year} (read-only, from the live schedule)</span>
+                      );
+                    })()}
                   </td>
                   <td><button data-action="remove-milestone" onClick={() => commit({ milestones: tl.milestones.filter((x) => x.id !== m.id) })}>Remove</button></td>
                 </tr>

@@ -248,6 +248,11 @@ export interface TimelineActivity {
   label: string;
   startYear: number;
   endYear: number;
+  // v0.6.17: the optional month bounds (integers 1-12, each independently optional). A start bound opens
+  // at its month's opening, an end bound closes at its month's closing; absent = the year's edge.
+  // Timeline layer only: the engine never reads them.
+  startMonth?: number;
+  endMonth?: number;
   phase: TimelinePhase;
   // v0.6.13.2: the source marker of a suggested activity; hand-authored activities carry none.
   derivedFrom?: TimelineSource;
@@ -257,6 +262,8 @@ export interface TimelineDecisionPoint {
   id: string;
   title: string;
   year: number;
+  // v0.6.17: the optional month (integer 1-12) within the gate's year.
+  month?: number;
   outcome?: TimelineOutcome;
   // The PPS-aligned decision-point code (BP1..BP8) the gate was seeded with; the deck renders it
   // with the title. Optional: a gate added beyond the scale's set carries none.
@@ -269,6 +276,8 @@ export interface TimelineMilestone {
   id: string;
   label: string;
   year: number;
+  // v0.6.17: the optional month (integer 1-12) within the milestone's year.
+  month?: number;
   tie?: TimelineTie;
 }
 
