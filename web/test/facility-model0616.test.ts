@@ -110,6 +110,7 @@ describe("Task C — the amount-first composition (derived shares, cap, drift)",
     const f = r.financing!.facilities![0];
     expect(c.rows.reduce((a, x) => a + x.draw, 0)).toBeCloseTo(f.drawnTotal, 4);
     expect(c.drawn).toBe(f.drawnTotal);
+    expect(c.rows.reduce((a, x) => a + x.share, 0)).toBeCloseTo(1, 12);
   });
 
   it("an ATTACHED facility spreads across its scoped lines alone", () => {
