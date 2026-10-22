@@ -48,12 +48,12 @@ describe("Task A: application-wide design system (structural pins)", () => {
     expect(css).toMatch(/@media \(max-width:\s*480px\)[\s\S]*?flex-direction:\s*column/);
   });
 
-  it("deck content lock: the deck's nine slides and the design conventions are untouched (v0.6.7 re-anchor: the port loader presets the scenario axes, so the deck carries eight slides; v0.6.13.1 re-anchor: the demo carries an authored timeline, so the Gantt slide mounts as the ninth)", () => {
+  it("deck content lock: the deck's ten slides and the design conventions are untouched (v0.6.7 re-anchor: the port loader presets the scenario axes, so the deck carries eight slides; v0.6.13.1 re-anchor: the demo carries an authored timeline, so the Gantt slide mounts as the ninth; v0.6.18 re-anchor: the demo carries operating lines, so the conditional operations slide mounts, a tenth)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slides = document.querySelectorAll('[data-testid="presentation"] .deck-slide');
-    expect(slides.length).toBe(9);
+    expect(slides.length).toBe(10);
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\[data-testid="presentation"\] \.deck-figure-value\s*\{\s*[^}]*text-align:\s*right/);
   });

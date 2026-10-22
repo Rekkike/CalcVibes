@@ -291,7 +291,8 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    const peak = Array.from(document.querySelectorAll('[data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
+    // v0.6.18: scoped to the recovery slide (the operations slide also draws a per-year bar chart)
+    const peak = Array.from(document.querySelectorAll('[data-slide-name="recovery"] [data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
     const rawInflows = result.collectionsGrid.reduce((acc, row) => {
       for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
       return acc;

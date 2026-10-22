@@ -52,80 +52,94 @@ describe("the group aggregation (composed once)", () => {
   });
 });
 
-describe("the deck waterfall model: the ledger rows", () => {
-  it("rows: every line with its full name, the subtotal, the operating row, the total; closure at 100 percent", () => {
+describe("the deck waterfall model: the ledger rows (v0.6.18: the capital program only)", () => {
+  it("rows: every capital line with its full name, then the Capital program total; closure at 100 percent of the capital program", () => {
     const inp = withGroups();
     const r = computeModel(inp);
     const w = slideOf(inp).waterfall!;
-    expect(w.rows.map((x) => x.kind)).toEqual(["capital", "capital", "capital", "capital", "capital", "capital", "subtotal", "operating", "total"]);
+    expect(w.rows.map((x) => x.kind)).toEqual(["capital", "capital", "capital", "capital", "capital", "capital", "total"]);
     expect(w.rows.slice(0, 6).map((x) => x.name)).toEqual(r.lineTotals.map((l) => l.name));
     expect(w.rows[0].name).toBe("Container shore power — engineering & studies (RSP JV)");
+    const cap = 449000000;
     // percent left and width on the shared scale; each bar starts where the previous ended
     let acc = 0;
-    for (const row of w.rows.filter((x) => x.kind === "capital" || x.kind === "operating")) {
-      expect(row.startPct).toBeCloseTo((acc / r.totalCost) * 100, 9);
-      expect(row.widthPct).toBeCloseTo((row.raw / r.totalCost) * 100, 9);
+    for (const row of w.rows.filter((x) => x.kind === "capital")) {
+      expect(row.startPct).toBeCloseTo((acc / cap) * 100, 9);
+      expect(row.widthPct).toBeCloseTo((row.raw / cap) * 100, 9);
       acc += row.raw;
     }
-    const last = w.rows.find((x) => x.kind === "operating")!;
+    const last = w.rows[5];
     expect(last.startPct + last.widthPct).toBeCloseTo(100, 6);
     const total = w.rows[w.rows.length - 1];
-    expect(total).toMatchObject({ startPct: 0, widthPct: 100, name: "Total program cost", value: deckMoneyForDisplay(r.totalCost, "EUR", "thousands") });
+    expect(total).toMatchObject({ startPct: 0, widthPct: 100, name: "Capital program", raw: cap, value: deckMoneyForDisplay(cap, "EUR", "thousands") });
+    expect(w.totalRaw).toBe(cap);
+    // the operating lines and the reinvestments never draw as steps
+    expect(w.rows.some((x) => (x.kind as string) === "operating" || (x.kind as string) === "reinvestments" || (x.kind as string) === "subtotal")).toBe(false);
   });
 
-  it("the full-outflow percentages: each row's share of the total program cost; no capital-basis share anywhere", () => {
+  it("the shares are of the capital program: each row's share of the capital subtotal, closing at 100,0%; the one-decimal residue is disclosed, never smoothed", () => {
     const inp = withGroups();
     const r = computeModel(inp);
     const w = slideOf(inp).waterfall!;
     const first = w.rows[0];
-    expect(first.share).toBe(percentOneForDisplay(r.lineTotals[0].total / r.totalCost));
-    expect(first.share).toBe("11,8%");
-    expect(w.rows.find((x) => x.kind === "operating")!.share).toBe("28,5%");
+    expect(first.share).toBe(percentOneForDisplay(r.lineTotals[0].total / 449000000));
+    expect(first.share).toBe("16,5%");
     expect(w.rows.find((x) => x.kind === "total")!.share).toBe("100,0%");
-    expect(w.rows.some((x) => x.share === "16,5%" || x.share === "4,5%")).toBe(false);
+    expect(w.rows.slice(0, 6).map((x) => x.share)).toEqual(["16,5%", "24,5%", "22,3%", "27,8%", "4,5%", "4,5%"]);
+    // the shore-power one-decimal shares sum to 100.1 (the v0.6.10 honest residue)
+    expect(w.rows.slice(0, 6).reduce((a, x) => a + Number(x.share.replace(",", ".").replace("%", "")), 0)).toBeCloseTo(100.1, 6);
+    expect(w.rows.some((x) => x.share === "11,8%" || x.share === "28,5%")).toBe(false);
   });
 
-  it("the subtotal row carries the gross capital the funding block emits, at the capital share position", () => {
+  it("the total row carries the gross capital the funding block emits", () => {
     const inp = withGroups();
-    const r = computeModel(inp);
     const s = slideOf(inp);
-    const sub = s.waterfall!.rows.find((x) => x.kind === "subtotal")!;
-    expect(sub.raw).toBe(449000000);
-    expect(sub.raw).toBe(s.funding!.grossRaw);
-    expect(sub.value).toBe(deckMoneyForDisplay(449000000, "EUR", "thousands"));
-    expect(sub.startPct).toBeCloseTo((449000000 / r.totalCost) * 100, 9);
+    const total = s.waterfall!.rows.find((x) => x.kind === "total")!;
+    expect(total.raw).toBe(449000000);
+    expect(total.raw).toBe(s.funding!.grossRaw);
+    expect(total.value).toBe(deckMoneyForDisplay(449000000, "EUR", "thousands"));
   });
 
-  it("a capital-only project carries no subtotal row (it would equal the total)", () => {
+  it("a capital-only project closes the same way: its lines, then the Capital program total", () => {
     const w = slideOf(demoProject()).waterfall!;
-    expect(w.rows.some((x) => x.kind === "subtotal")).toBe(false);
     expect(w.rows.map((x) => x.kind)).toEqual(["capital", "capital", "capital", "total"]);
+    expect(w.rows[3].name).toBe("Capital program");
   });
 });
 
 describe("the composition-share basis stays disclosed (one basis throughout)", () => {
-  it("the investment slide discloses the full-outflow basis; the capital-program basis disclosure is retired", () => {
+  it("the investment slide discloses the capital-program basis and names the segments of the total program cost beyond it", () => {
     const s = slideOf(withGroups());
-    expect(s.disclosures).toContain("Shares are of the total program cost, the full outflow: the capital lines, the operating lines and the reinvestments.");
-    expect(s.disclosures.some((d) => d.includes("of the capital program"))).toBe(false);
+    expect(s.disclosures).toEqual(["Shares are of the capital program: the capital lines, closing at the Capital program step. The total program cost also includes the operating lines (the operations slide shows the operating lines)."]);
+    const land = slideOf(landNewbuildProject());
+    expect(land.disclosures[0]).toContain("The total program cost also includes");
+    const plain = slideOf(demoProject());
+    expect(plain.disclosures).toEqual(["Shares are of the capital program: the capital lines, closing at the Capital program step."]);
+    // the total program cost stays a labeled figure of the slide
+    expect(s.body.map((f) => f.label)).toEqual(["Total cost (nominal)", "Cost NPV at target (discounted)"]);
+    expect(s.body[0].rawValue).toBe(computeModel(withGroups()).totalCost);
+  });
+
+  it("J.1: the dead rows-chart field of the investment slide model is retired", () => {
+    expect(slideOf(withGroups()).chart).toBeUndefined();
   });
 });
 
 describe("the deck waterfall model: the stepped columns at group level", () => {
-  it("n+1 columns: the groups, the operating segment, then the ground-standing total", () => {
+  it("n+1 columns: the groups, then the ground-standing Capital program total", () => {
     const inp = withGroups();
-    const r = computeModel(inp);
     const w = slideOf(inp).waterfall!;
-    expect(w.columns.map((c) => c.name)).toEqual(["Container shore power", "Market pillar", "Cruise terminal", "Inland & public berths", "Operating lines", "Total program cost"]);
-    expect(w.columns.map((c) => c.kind)).toEqual(["capital", "capital", "capital", "capital", "operating", "total"]);
+    const cap = 449000000;
+    expect(w.columns.map((c) => c.name)).toEqual(["Container shore power", "Market pillar", "Cruise terminal", "Inland & public berths", "Capital program"]);
+    expect(w.columns.map((c) => c.kind)).toEqual(["capital", "capital", "capital", "capital", "total"]);
     let acc = 0;
-    for (const c of w.columns.slice(0, 5)) {
-      expect(c.bottomPct).toBeCloseTo((acc / r.totalCost) * 100, 9);
-      expect(c.heightPct).toBeCloseTo((c.raw / r.totalCost) * 100, 9);
+    for (const c of w.columns.slice(0, 4)) {
+      expect(c.bottomPct).toBeCloseTo((acc / cap) * 100, 9);
+      expect(c.heightPct).toBeCloseTo((c.raw / cap) * 100, 9);
       acc += c.raw;
     }
-    const total = w.columns[5];
-    expect(total).toMatchObject({ bottomPct: 0, heightPct: 100, value: deckMoneyForDisplay(r.totalCost, "EUR", "thousands") });
-    expect(w.columns[4].bottomPct + w.columns[4].heightPct).toBeCloseTo(100, 6);
+    const total = w.columns[4];
+    expect(total).toMatchObject({ bottomPct: 0, heightPct: 100, value: deckMoneyForDisplay(cap, "EUR", "thousands") });
+    expect(w.columns[3].bottomPct + w.columns[3].heightPct).toBeCloseTo(100, 6);
   });
 });

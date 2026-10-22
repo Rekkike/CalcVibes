@@ -34,12 +34,12 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
       expect(row.querySelector("[data-ledger-value]")?.textContent).toBe(deckMoneyForDisplay(lt.total, "EUR", unit));
     });
     const shares = Array.from(rowEls).map((r) => r.querySelector("[data-ledger-share]")?.textContent);
-    expect(shares).toEqual(["11,8%", "17,5%", "15,9%", "19,9%", "3,2%", "3,2%"]);
-    // the six capital shares plus the operating share close the full-outflow basis at 100.0
-    const opShare = rows.querySelector('[data-ledger-kind="operating"] [data-ledger-share]')?.textContent;
-    expect(opShare).toBe("28,5%");
-    const sum = [...shares, opShare].reduce((a, s) => a + Number((s as string).replace(",", ".").replace("%", "")), 0);
-    expect(sum).toBeCloseTo(100, 6);
+    // v0.6.18 re-anchor: the shares are of the capital program (the operating row retired); the six
+    // one-decimal shares close at 100.1, the honest one-decimal residue, never smoothed
+    expect(shares).toEqual(["16,5%", "24,5%", "22,3%", "27,8%", "4,5%", "4,5%"]);
+    expect(rows.querySelector('[data-ledger-kind="operating"]')).toBeNull();
+    const sum = shares.reduce((a, s) => a + Number((s as string).replace(",", ".").replace("%", "")), 0);
+    expect(sum).toBeCloseTo(100.1, 6);
     expect(fs.readFileSync("src/index.css", "utf8")).toMatch(/\.ledger-bar\s*\{[^}]*background:\s*#38bdf8/);
     expect(document.querySelector('[data-slide-name="investment"] [data-testid="composition-donut"]')).toBeNull();
     const deckDonuts = document.querySelectorAll('[data-testid="presentation"] [data-testid="composition-donut"]');

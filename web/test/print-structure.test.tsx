@@ -6,16 +6,16 @@ import * as fs from "fs";
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
 
 describe("Task B: full-deck print rendering", () => {
-  it("all nine slide sections are mounted in the presentation DOM with active flags (v0.6.7 re-anchor: the port loader presets the scenario axes, so the deck carries eight slides; v0.6.13.1 re-anchor: the demo carries an authored timeline, so the Gantt slide mounts as the ninth)", () => {
+  it("all ten slide sections are mounted in the presentation DOM with active flags (v0.6.7 re-anchor: the port loader presets the scenario axes, so the deck carries eight slides; v0.6.13.1 re-anchor: the demo carries an authored timeline, so the Gantt slide mounts as the ninth; v0.6.18 re-anchor: the demo carries operating lines, so the conditional operations slide mounts, a tenth)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const slides = document.querySelectorAll('[data-testid="presentation"] .deck-slide');
-    expect(slides.length).toBe(9);
+    expect(slides.length).toBe(10);
     const names = Array.from(slides).map((s) => (s as HTMLElement).getAttribute("data-slide-name"));
-    expect(names).toEqual(["title", "summary", "investment", "timeline", "recovery", "coverage", "returns", "deal", "scenarios"]);
+    expect(names).toEqual(["title", "summary", "investment", "timeline", "operations", "recovery", "coverage", "returns", "deal", "scenarios"]);
     const active = Array.from(slides).map((s) => (s as HTMLElement).getAttribute("data-slide-active"));
-    expect(active).toEqual(["true", "false", "false", "false", "false", "false", "false", "false", "false"]);
+    expect(active).toEqual(["true", "false", "false", "false", "false", "false", "false", "false", "false", "false"]);
     // navigation chrome per slide: header and footer
     for (const s of slides) {
       expect((s as HTMLElement).querySelector(".deck-slide-header")).toBeTruthy();

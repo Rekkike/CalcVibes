@@ -200,7 +200,6 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
       { name: "Market pillar", total: group(["p4"]), kind: "capital" as const },
       { name: "Cruise terminal", total: group(["p5"]), kind: "capital" as const },
       { name: "Inland & public berths", total: group(["p6"]), kind: "capital" as const },
-      { name: "Operating lines", total: result.operatingTotal, kind: "operating" as const },
     ];
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -210,7 +209,8 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     const waterfall = slide.querySelector('[data-testid="cost-waterfall"]') as HTMLElement;
     const segments = waterfall.querySelectorAll("[data-waterfall-segment]");
     expect(segments.length).toBe(expectedSegments.length);
-    const cap = Math.max(1e-12, result.totalCost);
+    // v0.6.18 Task A re-anchor: the waterfall closes at the Capital program step (the capital groups only)
+    const cap = Math.max(1e-12, result.lineTotals.reduce((a, l) => a + l.total, 0));
     let accShare = 0;
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i] as HTMLElement;
@@ -226,11 +226,11 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(parseFloat(totalEl.style.height)).toBe(100);
     const totalLabel = waterfall.querySelector('[data-testid="waterfall-total-label"]') as HTMLElement;
     expect(totalLabel.getAttribute("data-waterfall-kind")).toBe("total");
-    expect(totalLabel.textContent).toBe(`Total program cost ${deckMoneyForDisplay(result.totalCost, "EUR", "thousands")}`);
-    expect(totalLabel.textContent).toBe("Total program cost €628 250 k");
+    expect(totalLabel.textContent).toBe(`Capital program ${deckMoneyForDisplay(cap, "EUR", "thousands")}`);
+    expect(totalLabel.textContent).toBe("Capital program €449 000 k");
     // the stepped geometry on n+1 slots: each column owns an equal slot, fills 60 percent of it; adjacent never overlap
     const stepEls = waterfall.querySelectorAll("[data-waterfall-step]");
-    expect(stepEls.length).toBe(6);
+    expect(stepEls.length).toBe(5);
     const slot = 100 / (expectedSegments.length + 1);
     for (let i = 0; i < stepEls.length; i++) {
       const seg = stepEls[i] as HTMLElement;

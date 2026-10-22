@@ -201,7 +201,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 {sl.donuts.map((d) => (
                   <div key={d.id} data-donut={d.id} className="summary-donut">
                     <p data-testid="chart-kicker" className="chart-kicker">{d.title}</p>
-                    <CompositionDonut lineTotals={d.segments.map((s) => ({ id: s.id, name: s.label, total: s.value }))} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
+                    <CompositionDonut lineTotals={d.segments.map((s) => ({ id: s.id, name: s.label, total: s.value, ...(s.share !== undefined ? { share: s.share } : {}) }))} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
                     {d.disclosure !== undefined && <span className="deck-disclosure">{d.disclosure}</span>}
                   </div>
                 ))}
@@ -250,6 +250,13 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             {sl.name === "timeline" && sl.gantt !== undefined && (
               <div data-testid="deck-chart-slot" data-slide-chart="timeline">
                 <GanttChart gantt={sl.gantt} />
+              </div>
+            )}
+            {sl.name === "operations" && sl.chart !== undefined && sl.chart.data.length > 0 && (
+              <div data-testid="deck-chart-slot" data-slide-chart="operations">
+                {/* v0.6.18 Task A: the yearly operating burn — the deck model's own series (the engine's
+                    per-year operating amounts), rendered as bars at the entry unit; nothing is recomputed. */}
+                <RecoveryBars collectionsGrid={[{ id: "operating", name: "Operating lines", kind: "operating", amounts: sl.chart.data.map((d) => d.value) }]} years={sl.chart.data.length} labelFor={(y) => sl.chart?.data[y - 1]?.label ?? ""} peakFor={peakFor} kicker={sl.chart.kicker} cap={15} />
               </div>
             )}
             {sl.name === "recovery" && result !== null && (

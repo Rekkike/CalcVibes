@@ -66,7 +66,7 @@ describe("Task C: PRINT-DESIGN / PDF-DESIGN", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
     expect(doc.getNumberOfPages()).toBe(7);
-    expect(model.slides[2].chart?.data.length).toBe(3);
+    expect(model.slides[2].waterfall?.rows.filter((r) => r.kind === "capital").length).toBe(3); // v0.6.18 Task J.1: the dead rows-chart field retired
     expect(model.slides[3].chart?.data.length).toBe(10);
   });
 });

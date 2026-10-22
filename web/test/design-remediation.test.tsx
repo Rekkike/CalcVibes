@@ -108,7 +108,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const kickers = document.querySelectorAll('[data-testid="slide-kicker"]');
-    expect(kickers.length).toBe(8);
+    expect(kickers.length).toBe(9); // v0.6.18 re-anchor: the operations slide adds a ninth numbered kicker
     expect(kickers[0].textContent).toMatch(/^01 — /);
     const titleMetrics = document.querySelector('[data-testid="title-metrics"]') as HTMLElement;
     expect(titleMetrics).toBeTruthy();

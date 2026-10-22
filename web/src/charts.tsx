@@ -1,5 +1,6 @@
 import type { GridRow, LineTotal, YearlyRow } from "../../core/src/types.js";
 import type { DeckGantt, DeckWaterfall } from "./deck.js";
+import { percentOneForDisplay } from "./engine.js";
 
 export const CHART_COLORS = {
   costBar: "#fb7185",
@@ -156,8 +157,11 @@ export function bucketSeries(values: number[], cap: number): { buckets: number[]
 
 export const DONUT_COLORS = ["#0074ba", "#059669", "#b45309", "#7c3aed", "#db2777", "#0891b2", "#65a30d", "#c2410c"];
 
+// v0.6.18 Task B: each label carries its share of the ring's OWN total, one decimal. The deck passes the
+// share composed in the deck model; the workspace ring (no deck model) formats the same fraction the arc
+// draws through the same percentOneForDisplay formatter.
 export function CompositionDonut(props: {
-  lineTotals: LineTotal[];
+  lineTotals: (LineTotal & { share?: string })[];
   valueFor: (total: number) => string;
 }) {
   const { lineTotals, valueFor } = props;
@@ -175,7 +179,7 @@ export function CompositionDonut(props: {
     const d = frac >= 0.9999
       ? `M ${cx + rMid} ${cy} A ${rMid} ${rMid} 0 1 1 ${cx - rMid - 0.01} ${cy} A ${rMid} ${rMid} 0 1 1 ${cx + rMid} ${cy}`
       : `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${rMid} ${rMid} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
-    return { id: l.id, name: l.name, total: l.total, frac, d, color: DONUT_COLORS[i % DONUT_COLORS.length] };
+    return { id: l.id, name: l.name, total: l.total, frac, d, color: DONUT_COLORS[i % DONUT_COLORS.length], share: l.share ?? percentOneForDisplay(frac) };
   });
   return (
     <div data-testid="composition-donut" className="chart-block composition-donut">
@@ -192,7 +196,7 @@ export function CompositionDonut(props: {
         {arcs.map((a) => (
           <li key={a.id} data-testid="donut-label" data-donut-label={a.id} className="donut-label">
             <span data-testid="donut-swatch" className="donut-swatch" style={{ background: a.color }} />
-            <span className="row-name">{a.name} {valueFor(a.total)}</span>
+            <span className="row-name">{a.name} {valueFor(a.total)} <span data-donut-share={a.id} className="donut-share">{a.share}</span></span>
           </li>
         ))}
       </ul>
@@ -322,7 +326,7 @@ export function CostWaterfall(props: { waterfall: DeckWaterfall }) {
         {steps.map((c, i) => (
           <span key={"val-" + c.id} data-testid="waterfall-label" data-waterfall-kind={c.kind} className="waterfall-label waterfall-value" style={{ bottom: `calc(${c.bottomPct + c.heightPct}% + 4px)`, left: `${i * slot}%`, width: `${0.6 * slot}%` }}>{c.value}</span>
         ))}
-        <span data-testid="waterfall-total-label" data-waterfall-kind="total" className="waterfall-label waterfall-value" style={{ bottom: "calc(100% + 4px)", left: `${steps.length * slot}%`, width: `${slot}%` }}>Total program cost {total.value}</span>
+        <span data-testid="waterfall-total-label" data-waterfall-kind="total" className="waterfall-label waterfall-value" style={{ bottom: "calc(100% + 4px)", left: `${steps.length * slot}%`, width: `${slot}%` }}>{total.name} {total.value}</span>
       </div>
       <div data-waterfall-ground="true" className="waterfall-ground" />
       <div className="waterfall-names">
@@ -352,13 +356,9 @@ export function LedgerWaterfall(props: { waterfall: DeckWaterfall; kicker?: stri
           <span data-ledger-label="name" className="ledger-name">{r.name}</span>
           <div className="ledger-track">
             <div data-ledger-edge="true" className="ledger-scale">
-              {r.kind === "subtotal" ? (
-                <span data-ledger-tick="true" className="ledger-tick" style={{ left: `${r.startPct}%` }} />
-              ) : (
-                <span data-ledger-bar={r.id} data-ledger-kind={r.kind} className={"ledger-bar ledger-bar-" + r.kind} style={{ left: `${r.startPct}%`, width: `${r.widthPct}%` }} />
-              )}
-              <span data-ledger-value="true" className="ledger-value" style={{ left: `calc(${r.kind === "subtotal" ? r.startPct : r.startPct + r.widthPct}% + 6px)` }}>{r.value}</span>
-              {r.kind !== "subtotal" && r.kind !== "total" && (
+              <span data-ledger-bar={r.id} data-ledger-kind={r.kind} className={"ledger-bar ledger-bar-" + r.kind} style={{ left: `${r.startPct}%`, width: `${r.widthPct}%` }} />
+              <span data-ledger-value="true" className="ledger-value" style={{ left: `calc(${r.startPct + r.widthPct}% + 6px)` }}>{r.value}</span>
+              {r.kind !== "total" && (
                 <span data-ledger-connector={r.id} className="ledger-connector" style={{ left: `${r.startPct + r.widthPct}%` }} />
               )}
             </div>

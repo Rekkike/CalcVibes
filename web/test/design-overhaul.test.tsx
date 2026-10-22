@@ -194,10 +194,11 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
-    const donutData = deck.slides[2].chart?.data;
-    expect(donutData?.length).toBe(result.lineTotals.length);
-    for (let i = 0; i < (donutData?.length ?? 0); i++) {
-      expect(donutData?.[i].value).toBe(result.lineTotals[i].total);
+    // v0.6.18 Task J.1: the investment slide's dead rows-chart field is retired; the ledger rows trace the engine
+    const donutData = deck.slides[2].waterfall!.rows.filter((r) => r.kind === "capital");
+    expect(donutData.length).toBe(result.lineTotals.length);
+    for (let i = 0; i < donutData.length; i++) {
+      expect(donutData[i].raw).toBe(result.lineTotals[i].total);
     }
     const barsData = deck.slides[3].chart?.data;
     expect(barsData?.length).toBe(result.yearly.length);
@@ -213,7 +214,7 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     const { buildDeckPdf } = await import("../src/pdf.js");
     const result = computeModel(demoProject());
     const model = deckSlides(demoProject(), result, { startYear: null });
-    expect(model.slides[2].chart?.kind).toBe("rows");
+    expect(model.slides[2].chart).toBeUndefined(); // v0.6.18 Task J.1
     expect(model.slides[3].chart?.kind).toBe("bars");
     const doc = buildDeckPdf(model, "Project Alpha");
     expect(doc.getNumberOfPages()).toBe(7);

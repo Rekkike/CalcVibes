@@ -95,9 +95,12 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
     doc.rect(x + 46, labY - 2.5, 3, 3, "F");
     doc.setFontSize(7);
     doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-    doc.text(`${s.label} ${deckMoneyForDisplay(s.value, currency, unit)}`, x + 51, labY);
+    // v0.6.18 Task B: the label carries the segment's share of the ring's own total (the deck model's
+    // one-decimal string; the print route never recomputes it)
+    const labelText = `${s.label} ${deckMoneyForDisplay(s.value, currency, unit)}${s.share !== undefined ? ` · ${s.share}` : ""}`;
+    doc.text(labelText, x + 51, labY);
     doc.setTextColor(0, 0, 0);
-    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${s.label} ${deckMoneyForDisplay(s.value, currency, unit)}`);
+    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(labelText);
     labY += 5;
   });
   if (donut.disclosure !== undefined) {
@@ -107,8 +110,9 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
     doc.text(dLines, x, y + 48);
     doc.setTextColor(0, 0, 0);
     if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(donut.disclosure);
+    return Math.max(58, 48 + dLines.length * 3 + 4);
   }
-  return donut.disclosure !== undefined ? 58 : 52;
+  return 52;
 }
 
 // v0.6.5 Task B/W11: the scenarios target chart on the print route — zero-based bars, verdict
@@ -343,25 +347,7 @@ const PRINT_CAPITAL: [number, number, number] = [0, 116, 186]; // #0074ba
 const PRINT_TOTAL: [number, number, number] = [16, 53, 88]; // the deck navy
 
 function printBarColor(kind: DeckLedgerRow["kind"] | DeckStepColumn["kind"]): [number, number, number] {
-  return kind === "operating" ? PRINT_OK : kind === "reinvestments" ? PRINT_GOLD : kind === "total" ? PRINT_TOTAL : PRINT_CAPITAL;
-}
-
-// diagonal hatch over a bar so the operating and reinvestments segments differ in grayscale too:
-// 45 degree strokes from the bottom edge, clipped to the bar rectangle
-function hatchBar(doc: jsPDF, x: number, y: number, w: number, h: number): void {
-  doc.setDrawColor(255, 255, 255);
-  doc.setLineWidth(0.25);
-  for (let t = -h; t < w; t += 1.6) {
-    let sx = x + t;
-    let sy = y + h;
-    let ex = sx + h;
-    let ey = y;
-    if (sx < x) { sy -= x - sx; sx = x; }
-    if (ex > x + w) { ey += ex - (x + w); ex = x + w; }
-    if (ex > sx) doc.line(sx, sy, ex, ey);
-  }
-  doc.setLineWidth(0.2);
-  doc.setDrawColor(0, 0, 0);
+  return kind === "total" ? PRINT_TOTAL : PRINT_CAPITAL;
 }
 
 function ledgerNameLines(doc: jsPDF, name: string): string[] {
@@ -381,26 +367,19 @@ function drawPrintLedgerRow(doc: jsPDF, r: DeckLedgerRow, y: number, trace?: Dec
   const mid = y + h / 2;
   doc.setFontSize(7);
   doc.setTextColor(0, 0, 0);
-  if (r.kind === "total" || r.kind === "subtotal") doc.setFont("helvetica", "bold");
+  if (r.kind === "total") doc.setFont("helvetica", "bold");
   doc.text(lines, 20, y + 3.4);
   doc.setFont("helvetica", "normal");
-  if (r.kind === "subtotal") {
-    doc.setDrawColor(150, 150, 150);
-    doc.line(20, y, 277, y);
-    doc.setDrawColor(0, 0, 0);
-    doc.setFillColor(PRINT_TOTAL[0], PRINT_TOTAL[1], PRINT_TOTAL[2]);
-    doc.rect(x0 + (r.startPct / 100) * plotW - 0.4, y + 0.6, 0.8, h - 1.2, "F");
-  } else {
+  {
     const bx = x0 + (r.startPct / 100) * plotW;
     const bw = Math.max(0.35, (r.widthPct / 100) * plotW);
     const bh = r.kind === "total" ? 4.4 : 3.2;
     const c = printBarColor(r.kind);
     doc.setFillColor(c[0], c[1], c[2]);
     doc.rect(bx, mid - bh / 2, bw, bh, "F");
-    if (r.kind === "operating" || r.kind === "reinvestments") hatchBar(doc, bx, mid - bh / 2, bw, bh);
   }
-  const endPct = r.kind === "subtotal" ? r.startPct : r.startPct + r.widthPct;
-  if (r.kind === "capital" || r.kind === "operating" || r.kind === "reinvestments") {
+  const endPct = r.startPct + r.widthPct;
+  if (r.kind === "capital") {
     // the hairline connector from this bar's end to the next row's start
     doc.setDrawColor(170, 170, 170);
     doc.line(x0 + (endPct / 100) * plotW, mid + 1.6, x0 + (endPct / 100) * plotW, y + h + 1.6);
@@ -445,7 +424,6 @@ function drawPrintColumns(doc: jsPDF, columns: DeckStepColumn[], y: number, trac
       const col = printBarColor(c.kind);
       doc.setFillColor(col[0], col[1], col[2]);
       doc.rect(bx, by, bw, bh, "F");
-      if (c.kind === "operating" || c.kind === "reinvestments") hatchBar(doc, bx, by, bw, bh);
       // the dotted connector from this step's top to the next base (or the total's top)
       doc.setDrawColor(120, 120, 120);
       doc.setLineDashPattern([0.6, 0.8], 0);
@@ -455,7 +433,7 @@ function drawPrintColumns(doc: jsPDF, columns: DeckStepColumn[], y: number, trac
     }
     doc.setFontSize(7);
     doc.setTextColor(0, 0, 0);
-    const label = c.kind === "total" ? `Total program cost ${c.value}` : c.value;
+    const label = c.kind === "total" ? `${c.name} ${c.value}` : c.value;
     doc.text(doc.splitTextToSize(label, slot * 0.95) as string[], bx + bw / 2, by - 1.6 - (c.kind === "total" ? 3 : 0), { align: "center" });
     if (trace) {
       const f = trace.drawnFigures[trace.drawnFigures.length - 1];
@@ -809,14 +787,42 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
     } else if (slide.chart && slide.chart.kind === "bars" && slide.chart.data.length > 0) {
-      const chartMax = Math.max(1, ...slide.chart.data.map((d) => d.value));
-      const barW = Math.min(12, 220 / slide.chart.data.length);
-      slide.chart.data.forEach((d, di) => {
+      // v0.6.18: the per-year bars carry their year labels (thinned on a long span) and the peak figure, drawn
+      // from the deck model's series (the operations slide's yearly burn rides the same branch)
+      const bars = slide.chart.data;
+      const chartMax = Math.max(1, ...bars.map((d) => d.value));
+      const barW = Math.min(12, 220 / bars.length);
+      const labelStep = Math.max(1, Math.ceil(bars.length / 14));
+      const peakIdx = bars.findIndex((d) => d.value === chartMax);
+      if (slide.chart.kicker !== undefined) {
+        doc.setFontSize(8);
+        doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+        doc.text(slide.chart.kicker, 20, y);
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.chart.kicker);
+        doc.setTextColor(0, 0, 0);
+        y += 5;
+      }
+      bars.forEach((d, di) => {
         const h = (d.value / chartMax) * 40;
         doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
         doc.rect(20 + di * (barW + 3), y + 44 - h, barW, h, "F");
       });
-      y += 50;
+      doc.setFontSize(6);
+      doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+      bars.forEach((d, di) => {
+        if (di % labelStep !== 0) return;
+        doc.text(d.label, 20 + di * (barW + 3) + barW / 2, y + 48, { align: "center" });
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
+      });
+      if (chartMax > 1 || bars.some((d) => d.value > 0)) {
+        const peakText = deckMoneyForDisplay(chartMax, model.currency ?? "SEK", model.unit ?? "ones");
+        doc.setFontSize(7);
+        doc.setTextColor(0, 0, 0);
+        doc.text(peakText, 20 + peakIdx * (barW + 3) + barW / 2, y + 44 - 40 - 1.5, { align: "center" });
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(peakText);
+      }
+      doc.setFontSize(10);
+      y += 54;
     }
     // v0.6.15 Task D: the investment waterfall — the ledger rows, then the stepped columns.
     if (slide.waterfall !== undefined) {

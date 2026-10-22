@@ -30,6 +30,8 @@ export interface DeckDonutSegment {
   id: string;
   label: string;
   value: number;
+  // v0.6.18 Task B: the share of the ring's OWN total, one decimal (percentOneForDisplay), composed once here
+  share?: string;
 }
 
 export interface DeckDonut {
@@ -131,10 +133,11 @@ export interface DeckGantt {
 export interface DeckLedgerRow {
   id: string;
   name: string;
-  kind: "capital" | "subtotal" | "operating" | "reinvestments" | "total";
+  // v0.6.18 Task A: the waterfall composes the capital program only and closes at the Capital program step
+  kind: "capital" | "total";
   raw: number;
   value: string;
-  // the share of the total program cost (the full-outflow basis), one decimal
+  // the share of the capital program (the v0.6.18 basis), one decimal
   share: string;
   startPct: number;
   widthPct: number;
@@ -142,7 +145,7 @@ export interface DeckLedgerRow {
 export interface DeckStepColumn {
   id: string;
   name: string;
-  kind: "capital" | "operating" | "reinvestments" | "total";
+  kind: "capital" | "total";
   raw: number;
   value: string;
   bottomPct: number;
@@ -249,16 +252,20 @@ export function deckSlides(
       if (rowTotal > 0) inflowSegments.push({ id: row.id, label: row.name, value: rowTotal });
     }
   }
+  // v0.6.18 Task B: the percentages are shares of each ring's OWN total (the geometry the arcs draw), one
+  // decimal, composed here once; the one-decimal residue is disclosed, never smoothed. The outflow
+  // disclosure names the ring's basis — the capital lines plus the reinvestments, the operating lines
+  // excluded (the v0.6.8 "shown separately" wording retired with the v0.6.10 reinvestments segment) — and
+  // the percentages' basis.
+  const withShares = (segs: DeckDonutSegment[]): DeckDonutSegment[] => {
+    const ringTotal = Math.max(1e-12, segs.reduce((a, s) => a + s.value, 0));
+    return segs.map((s) => ({ ...s, share: percentOneForDisplay(s.value / ringTotal) }));
+  };
+  const SHARE_BASIS = "Percentages are shares of the ring's own total.";
+  const outflowDisclosure = `The outflow ring shows the capital lines${reinvestmentsTotal > 0 ? " plus the reinvestments" : ""}${result.operatingTotal > 0 ? "; the operating lines are excluded (they are part of the total cost and appear on the operations slide)" : ""}. ${SHARE_BASIS}`;
   const summaryDonuts: DeckDonut[] = [
-    {
-      id: "outflows",
-      title: "Outflows — the investment",
-      segments: outflowSegments,
-      // v0.6.8 Task A.4: the donut shows the capital program; the wording no longer contradicts
-      // the waterfall arithmetic (operating lines and reinvestments are part of the total cost).
-      ...(result.operatingTotal > 0 ? { disclosure: "The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately." } : {}),
-    },
-    { id: "inflows", title: "Inflows — the collections", segments: inflowSegments, ...(inflowDisclosure !== undefined ? { disclosure: inflowDisclosure } : {}) },
+    { id: "outflows", title: "Outflows — the investment", segments: withShares(outflowSegments), disclosure: outflowDisclosure },
+    { id: "inflows", title: "Inflows — the collections", segments: withShares(inflowSegments), disclosure: inflowDisclosure !== undefined ? `${inflowDisclosure} ${SHARE_BASIS}` : SHARE_BASIS },
   ];
   slides.push({
     name: "summary",
@@ -281,9 +288,6 @@ export function deckSlides(
     { label: "Total cost (nominal)", value: money(result.totalCost), kind: "money", rawValue: result.totalCost },
     { label: "Cost NPV at target (discounted)", value: money(result.costNpv), kind: "money", rawValue: result.costNpv, disclosure: "discounted at the target rate" },
   ];
-  if (result.operatingTotal > 0) {
-    investmentBody.push({ label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "expensed as incurred; part of the total cost, not depreciated" });
-  }
   // v0.6.10 Task G.1: the funding breakdown block — gross capital program, grants, net private
   // capital (each at one decimal in the entry unit, the honest halves), the grant intensity,
   // and the funding rows listed with their kinds and years. The grants figure renders through
@@ -321,8 +325,10 @@ export function deckSlides(
     // in the completion report, never smoothed; the capital-program basis stays stated.
     // v0.6.15: the slide carries ONE basis — the shares are of the total program cost (the full outflow);
     // the capital-basis shares retired with the composition rows.
-    disclosures: ["Shares are of the total program cost, the full outflow: the capital lines, the operating lines and the reinvestments."],
-    chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
+    // v0.6.18 Task A: the waterfall and its shares are of the capital program; the disclosure names the
+    // segments of the total program cost that lie beyond it (only the segments that exist). v0.6.18 Task J.1:
+    // the dead rows-chart field of the slide model retired (the waterfall is the investment chart).
+    disclosures: [investmentDisclosure(result.operatingTotal > 0, reinvestmentsTotal > 0)],
     ...(fundingBlock !== undefined ? { funding: fundingBlock } : {}),
     waterfall: composeWaterfall(composeInvestment(inputs, result), money),
   });
@@ -338,6 +344,13 @@ export function deckSlides(
   } else {
     slides.push(ganttSlide(inputs, result, startYearOf(opts), opts.monthGrid === true));
   }
+
+  // v0.6.18 Task A: the conditional operations slide — composed ONLY when operating lines exist. The
+  // operating lines are running costs (what happens after the investment): the engine classification
+  // stands (expensed as incurred, part of the total cost, never depreciated); this slide only seats them.
+  // The yearly burn is the engine's own per-year operating series (the book view), shown from the first to
+  // the last operating year. No income is attributable to the operating lines alone, so none is paired.
+  if (result.operatingTotal > 0) slides.push(operationsSlide(result, money, startYear));
 
   // Slide 3 — recovery
   let recoveryTitle: string;
@@ -655,12 +668,13 @@ export function deckSlides(
     });
   }
 
-  const kickerNumbers = ["01", "02", "03", "04", "05", "06", "07", "08"];
+  // v0.6.18 Task A: the numbering adapts to the slide count (the conditional timeline, operations and
+  // scenarios slides): two digits, no fixed array.
   let kickerIdx = 0;
   for (const sl of slides) {
     if (sl.name !== "title") {
-      sl.kickerNumber = kickerNumbers[kickerIdx] ?? "";
       kickerIdx++;
+      sl.kickerNumber = String(kickerIdx).padStart(2, "0");
     }
   }
   const provenance: string[] = anyScenarioSet
@@ -681,37 +695,56 @@ export function deckSlides(
   return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
 }
 
+// v0.6.18 Task A: the waterfall composes the capital program only — the capital lines (the ledger) and
+// the capital groups (the stepped columns) — and closes at the Capital program step; the shares are of
+// the capital program. The operating lines and the reinvestments no longer draw as steps: the total
+// program cost stays a labeled figure of the slide, and its disclosure names the segments beyond.
 function composeWaterfall(c: ReturnType<typeof composeInvestment>, money: (v: number) => string): DeckWaterfall {
-  const cap = Math.max(1e-12, c.totalCost);
+  const cap = Math.max(1e-12, c.capitalSubtotal);
   const share = (v: number) => percentOneForDisplay(v / cap);
   const rows: DeckLedgerRow[] = [];
   let acc = 0;
-  const push = (id: string, name: string, kind: DeckLedgerRow["kind"], raw: number) => {
-    rows.push({ id, name, kind, raw, value: money(raw), share: share(raw), startPct: (acc / cap) * 100, widthPct: (raw / cap) * 100 });
-    acc += raw;
-  };
-  for (const l of c.lines) push(l.id, l.name, "capital", l.total);
-  // the capital subtotal marks the end of the capital program; it exists only when a segment
-  // follows (otherwise it would equal the total and encode nothing)
-  if (c.operating !== null || c.reinvestments !== null) {
-    rows.push({ id: "subtotal", name: "Capital program", kind: "subtotal", raw: c.capitalSubtotal, value: money(c.capitalSubtotal), share: share(c.capitalSubtotal), startPct: (c.capitalSubtotal / cap) * 100, widthPct: 0 });
+  for (const l of c.lines) {
+    rows.push({ id: l.id, name: l.name, kind: "capital", raw: l.total, value: money(l.total), share: share(l.total), startPct: (acc / cap) * 100, widthPct: (l.total / cap) * 100 });
+    acc += l.total;
   }
-  if (c.operating !== null) push(c.operating.id, c.operating.name, "operating", c.operating.total);
-  if (c.reinvestments !== null) push(c.reinvestments.id, c.reinvestments.name, "reinvestments", c.reinvestments.total);
-  rows.push({ id: "total", name: "Total program cost", kind: "total", raw: c.totalCost, value: money(c.totalCost), share: share(c.totalCost), startPct: 0, widthPct: 100 });
+  rows.push({ id: "total", name: "Capital program", kind: "total", raw: c.capitalSubtotal, value: money(c.capitalSubtotal), share: share(c.capitalSubtotal), startPct: 0, widthPct: 100 });
   const columns: DeckStepColumn[] = [];
   let colAcc = 0;
-  const pushCol = (id: string, name: string, kind: DeckStepColumn["kind"], raw: number) => {
-    columns.push({ id, name, kind, raw, value: money(raw), bottomPct: (colAcc / cap) * 100, heightPct: (raw / cap) * 100 });
-    colAcc += raw;
-  };
-  for (const g of c.groups) pushCol(g.id, g.name, "capital", g.total);
-  if (c.operating !== null) pushCol(c.operating.id, c.operating.name, "operating", c.operating.total);
-  if (c.reinvestments !== null) pushCol(c.reinvestments.id, c.reinvestments.name, "reinvestments", c.reinvestments.total);
-  columns.push({ id: "total", name: "Total program cost", kind: "total", raw: c.totalCost, value: money(c.totalCost), bottomPct: 0, heightPct: 100 });
-  return { totalRaw: c.totalCost, rows, columns };
+  for (const g of c.groups) {
+    columns.push({ id: g.id, name: g.name, kind: "capital", raw: g.total, value: money(g.total), bottomPct: (colAcc / cap) * 100, heightPct: (g.total / cap) * 100 });
+    colAcc += g.total;
+  }
+  columns.push({ id: "total", name: "Capital program", kind: "total", raw: c.capitalSubtotal, value: money(c.capitalSubtotal), bottomPct: 0, heightPct: 100 });
+  return { totalRaw: c.capitalSubtotal, rows, columns };
 }
 
+function investmentDisclosure(hasOperating: boolean, hasReinvestments: boolean): string {
+  const beyond = [hasOperating ? "the operating lines" : null, hasReinvestments ? "the reinvestments" : null].filter((x): x is string => x !== null);
+  const tail = beyond.length === 0 ? "" : ` The total program cost also includes ${beyond.join(" and ")}${hasOperating ? " (the operations slide shows the operating lines)" : ""}.`;
+  return `Shares are of the capital program: the capital lines, closing at the Capital program step.${tail}`;
+}
+
+function operationsSlide(result: ModelResult, money: (v: number) => string, startYear: number | null): DeckSlide {
+  const series = (result.bookView?.combined ?? []).map((r) => ({ year: r.year, value: r.operating }));
+  const active = series.filter((s) => s.value > 0);
+  const firstYear = active.length > 0 ? active[0].year : 1;
+  const lastYear = active.length > 0 ? active[active.length - 1].year : 1;
+  const burn = series.filter((s) => s.year >= firstYear && s.year <= lastYear).map((s) => ({ label: yearHeader(s.year, startYear), value: s.value }));
+  const years = lastYear - firstYear + 1;
+  const body: DeckFigure[] = [
+    { label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "expensed as incurred; part of the total cost, not depreciated" },
+    { label: "Share of the total program cost", value: percentOneForDisplay(result.operatingTotal / Math.max(1e-12, result.totalCost)), kind: "percent", rawValue: result.operatingTotal / Math.max(1e-12, result.totalCost) },
+    ...result.operatingLines.map((o) => ({ label: `Operating line — ${o.label}`, value: money(o.total), kind: "money" as const, rawValue: o.total })),
+  ];
+  return {
+    name: "operations",
+    title: `The operating lines add ${money(result.operatingTotal)} of running cost over ${years} ${years === 1 ? "year" : "years"}`,
+    body,
+    disclosures: ["The tariff recovers the total program cost, capital and operating together; no income is attributable to the operating lines alone, so no income is paired with them on this slide."],
+    chart: { kind: "bars", data: burn, kicker: "The operating cost per year" },
+  };
+}
 const startYearOf = (opts: { startYear: number | null }): number | null => opts.startYear;
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];

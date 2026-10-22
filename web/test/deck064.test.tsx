@@ -107,8 +107,10 @@ describe("v0.6.4 Part A: the board-room simplification", () => {
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
     expect(deck.slides[2].body.map((f) => f.label)).toEqual(["Total cost (nominal)", "Cost NPV at target (discounted)"]);
+    // v0.6.18 Task J.1: the dead rows-chart field is retired; the per-line rows live in the waterfall ledger
+    expect(deck.slides[2].chart).toBeUndefined();
     for (const lt of result.lineTotals) {
-      expect(deck.slides[2].chart?.data.find((d) => d.label === lt.name)?.value).toBe(lt.total);
+      expect(deck.slides[2].waterfall!.rows.find((r) => r.name === lt.name)?.raw).toBe(lt.total);
     }
   });
 

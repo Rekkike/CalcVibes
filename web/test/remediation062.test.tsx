@@ -348,7 +348,7 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     fireEvent.click(byAction("present"));
     expect(document.querySelectorAll('[data-slide-name="scenarios"]').length).toBe(0);
     expect(document.querySelector('[data-testid="deck-provenance"]')?.textContent).toContain("no scenarios set");
-    expect(document.querySelectorAll("[data-dot]").length).toBe(7);
+    expect(document.querySelectorAll("[data-dot]").length).toBe(8); // v0.6.18 re-anchor: the operations slide
   });
 
   it("DECK-SCE-1 (app): setting axis values mounts the eighth slide, the kicker, the deck chart, and eight dots (v0.6.7 re-anchor: the port project opened via the file route with null axes)", async () => {
@@ -360,9 +360,9 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     fireEvent.click(byAction("present"));
     expect(document.querySelectorAll('[data-slide-name="scenarios"]').length).toBe(1);
     const scenariosSlide = document.querySelector('[data-slide-name="scenarios"]') as HTMLElement;
-    expect(scenariosSlide.querySelector('[data-testid="slide-kicker"]')?.textContent).toMatch(/^07 — /);
+    expect(scenariosSlide.querySelector('[data-testid="slide-kicker"]')?.textContent).toMatch(/^08 — /); // v0.6.18 re-anchor: the operations slide shifts the scenarios kicker
     expect(scenariosSlide.querySelector('[data-slide-chart="scenarios"]')).toBeTruthy();
-    expect(document.querySelectorAll("[data-dot]").length).toBe(8);
+    expect(document.querySelectorAll("[data-dot]").length).toBe(9); // v0.6.18 re-anchor: the operations slide
     expect(document.querySelector('[data-testid="deck-provenance"]')?.textContent).toContain("present");
   });
 
