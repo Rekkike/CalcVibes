@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { GanttChart } from "../charts.js";
+import { workspaceGantt } from "../deck.js";
 import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineSource, TimelineTie } from "../../../core/src/types.js";
 import {
   DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
@@ -208,6 +210,18 @@ export function TimelineSection(props: {
         A planning and presentation layer: the timeline never alters the cash flows, the solver or the horizon.{" "}
         {span !== null ? `The program span is years 1–${span}.` : "The program span appears once the model solves."}
       </p>
+      {/* v0.6.18 Task I.1: the program Gantt in the workspace — the deck's composed-once model, rendered here by the same
+          chart; the month gridlines follow the deck's view-state toggle below (never a document field). */}
+      {(() => {
+        const gantt = result !== null ? workspaceGantt(inputs, result, startYear, monthGrid) : null;
+        return gantt !== null ? (
+          <div data-testid="workspace-gantt" className="workspace-gantt">
+            <GanttChart gantt={gantt} />
+          </div>
+        ) : (
+          <p data-testid="workspace-gantt-note" className="muted">The program Gantt appears here once the timeline is authored and refusal-free.</p>
+        );
+      })()}
       {setMonthGrid !== undefined && (
         <label>Month gridlines on the Gantt (a view setting; not saved with the project){" "}
           <input data-field="monthGrid" type="checkbox" checked={monthGrid} onChange={(e) => setMonthGrid(e.target.checked)} />

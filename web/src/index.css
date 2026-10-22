@@ -1404,3 +1404,27 @@
 [data-testid="presentation"] .recovery-column { max-width: 7rem; }
 [data-testid="presentation"] .recovery-grid { justify-content: center; }
 [data-testid="presentation"] .recovery-period-note { font-size: 12px; margin: 0 0 var(--space-1); }
+
+/* v0.6.18 Task I.1 — the workspace Gantt: the chart is drawn for the deck's dark stage (light ink, stage navy), so the
+   workspace seats it on its own stage panel — legible in both app themes. */
+.app-root .workspace-gantt {
+  background: #0b2a4a;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: var(--space-3);
+  margin: var(--space-2) 0 var(--space-3);
+  overflow-x: auto;
+}
+.app-root .workspace-gantt .gantt-chart p { color: #cce9ff; }
+
+/* v0.6.18 Task I.2 — the section rhythm (the SECTION_RHYTHM constant of web/src/rhythm.ts is the single source; the pin
+   compares them). Every app section reads the same allocation: a heading hugs its content and breaks from the block
+   above, prose hugs the block it explains, an action hugs the table it acts on. */
+.app-root section > h2 { margin: 0 0 var(--space-2); }
+.app-root section > h3 { margin: var(--space-4) 0 var(--space-2); }
+.app-root section > h4 { margin: var(--space-3) 0 var(--space-2); }
+.app-root section > h3:first-child, .app-root section > h4:first-child { margin-top: 0; }
+.app-root section > p.muted, .app-root section > p.caveat { margin: 0 0 var(--space-2); line-height: 1.45; }
+.app-root section > .editor-scroll { margin-bottom: var(--space-2); }
+.app-root section > .editor-scroll + button[data-action^="add-"] { margin-top: var(--space-1); }
+.app-root section > label { margin-top: var(--space-2); margin-bottom: var(--space-2); }

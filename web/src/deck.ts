@@ -1,5 +1,5 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
-import { GANTT_LANE_LABEL_CHARS, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
+import { GANTT_LANE_LABEL_CHARS, GANTT_PLOT_EM, labelEm, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
@@ -750,6 +750,20 @@ function composeRecoverySeries(result: ModelResult, startYear: number | null, mo
     noteAdvance,
   };
 }
+
+// v0.6.18 Task H2: the computed ring and its label, composed once. The label sits on the side of the ring with the
+// room: the right by default (away from an authored diamond to the left), the left when the label would cross the
+// window's right edge; where neither side has room the larger one is taken. The label width is MEASURED (em).
+function computedRing(win: { firstYear: number; years: number }, year: number, month: number, authoredPos: number): DeckGanttComputed {
+  const pos = markerPosition(win, year, month);
+  const label = `computed: month ${month}`;
+  const need = ((labelEm(label) + 1.6) * win.years) / GANTT_PLOT_EM;
+  const rightRoom = win.years - pos;
+  const leftRoom = pos - Math.max(0, authoredPos < pos ? authoredPos : 0);
+  const preferRight = authoredPos <= pos;
+  const side: "left" | "right" = preferRight ? (rightRoom >= need || rightRoom >= leftRoom ? "right" : "left") : (leftRoom >= need || leftRoom >= rightRoom ? "left" : "right");
+  return { year, month, pos, label, side };
+}
 function composeWaterfall(c: ReturnType<typeof composeInvestment>, money: (v: number) => string): DeckWaterfall {
   const cap = Math.max(1e-12, c.capitalSubtotal);
   const share = (v: number) => percentOneForDisplay(v / cap);
@@ -848,7 +862,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     const tie = tieOf.get(m.id);
     const ev = tie !== undefined && tie.kind === "engine-event" ? events.find((e) => e.event === tie.event) : undefined;
     const computed = ev !== undefined && ev.month !== undefined && inWindow(ev.year)
-      ? { year: ev.year, month: ev.month, pos: markerPosition(win, ev.year, ev.month), label: `computed: month ${ev.month}`, side: markerPosition(win, ev.year, ev.month) >= stacked[i].pos ? "right" as const : "left" as const }
+      ? computedRing(win, ev.year, ev.month, stacked[i].pos)
       : null;
     return { ...m, pos: stacked[i].pos, row: stacked[i].row, computed };
   });
@@ -887,6 +901,14 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     disclosures: [DECISION_DISCLOSURE],
     gantt,
   };
+}
+
+// v0.6.18 Task I.1: the inline workspace Gantt reuses THE deck model — the very ganttSlide composition (the window, the
+// sub-rows, the label placement, the month positions, the markers, the caption), composed once; the workspace renders
+// it and never recomputes it. Null while the timeline is not authored or is refused (as the deck omits the slide).
+export function workspaceGantt(inputs: ModelInputs, result: ModelResult, startYear: number | null, monthGrid: boolean): DeckGantt | null {
+  if (!timelineAuthored(inputs) || validateTimeline(inputs, result).length > 0) return null;
+  return ganttSlide(inputs, result, startYear, monthGrid).gantt ?? null;
 }
 
 export type { TariffRow };
