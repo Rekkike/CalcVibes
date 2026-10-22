@@ -84,16 +84,18 @@ describe("chunk 5 web tasks 2-3: results panels and disclosures", () => {
     const debt = document.querySelector('[data-testid="debt-schedule"]');
     // The grace years 4–6 are interest-only at 3 206 705.47 per year; the annuity
     // service from year 7 is 7 241 944.09 with the final-year interest 133 349.53
-    // (engine-emitted, script-verified).
-    expect(debt && debt.textContent).toContain("3206705.47");
-    expect(debt && debt.textContent).toContain("4099568.51");
+    // (engine-emitted, script-verified). v0.6.14 re-anchor (the note unification): the municipal
+    // note's annual installment of 1 000 000 (years 4–13) joins the combined service, so the
+    // year-4 service reads 4 206 705.47; the final-year interest is the EIB facility's, unchanged.
+    expect(debt && debt.textContent).toContain("4206705.47");
+    expect(debt && debt.textContent).toContain("5099568.51"); // v0.6.14: the EIB principal 4 099 568.51 plus the note installment 1 000 000
     expect(debt && debt.textContent).toContain("133349.53");
     const dscr = document.querySelector('[data-testid="dscr-table"]');
-    expect(dscr && dscr.textContent).toContain("4.5734");
+    expect(dscr && dscr.textContent).toContain("4.1398");
     const minRow = dscr && dscr.querySelector('[data-dscr-min="true"]');
     expect(minRow).toBeTruthy();
-    expect(document.querySelector('[data-testid="min-dscr"]')?.textContent).toContain("4.3189");
-    expect(document.querySelector('[data-testid="min-dscr"]')?.textContent).toContain("2048");
+    expect(document.querySelector('[data-testid="min-dscr"]')?.textContent).toContain("4.1398");
+    expect(document.querySelector('[data-testid="min-dscr"]')?.textContent).toContain("2032");
   });
 
   it("the zero-outlay note renders in place of the null equity IRR (FN-5 class) (v0.6.10 re-anchor: a 100% share with the service start moved to year 6 keeps every debt-funded cost inside the service window on the program base)", () => {
