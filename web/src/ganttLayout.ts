@@ -121,6 +121,53 @@ export interface GanttLaneLaid {
   bars: GanttBarLaid[];
 }
 
+// v0.6.18 Task H3 (the builder proposal, applied): the bar-label placement MEASURES its labels instead of counting
+// characters. The advance widths below are the Helvetica widths (per 1000 em, ASCII 32-126; the dashes and the
+// middle dot by name; any other glyph at 0.6 em), so a label's width in em is the same on every surface - a width
+// scales with the type size. The plot is GANTT_PLOT_EM em wide: the SVG's 840 px at 11 px type (76.4 em) is the
+// TIGHTER surface (the print plot is 225 mm at 6 pt, 106 em), so one figure - the SVG's - serves both and a label
+// composed to fit it fits the print route with room to spare. The old 110-character budget, against the SVG's real
+// ~147 and the print route's ~190, was the deliberately conservative guess this retires. The layout stays composed
+// ONCE (one story, one source); a surface-aware budget - a second composition - would revise that contract and is
+// left to the controller (halt-and-ask), not taken here.
+const HELVETICA_ADVANCE = [280,280,350,550,550,890,660,190,330,330,390,580,280,330,280,280,550,550,550,550,550,550,550,550,550,550,280,280,580,580,580,550,1010,660,660,720,720,660,610,780,720,280,500,660,550,830,720,780,660,780,720,660,610,720,660,940,660,660,610,280,280,280,470,550,330,550,550,500,550,550,280,550,550,220,220,500,220,830,550,550,550,550,330,500,280,550,500,720,500,500,500,330,260,330,580];
+export const GANTT_PLOT_EM = 76;
+export function labelEm(label: string): number {
+  let w = 0;
+  for (const ch of label) {
+    const c = ch.codePointAt(0) as number;
+    if (c >= 32 && c <= 126) w += HELVETICA_ADVANCE[c - 32] / 1000;
+    else if (ch === "\u2013") w += 0.55;
+    else if (ch === "\u2014") w += 1;
+    else if (ch === "\u00b7") w += 0.28;
+    else w += 0.6;
+  }
+  return w;
+}
+
+// Wrap a label by its measured width (em), breaking at spaces and hard-splitting a word wider than the line.
+// Never truncates: the joined lines carry every character of the label.
+export function wrapLabelEm(label: string, maxEm: number): string[] {
+  const words = label.split(/\s+/).filter((w) => w !== "");
+  if (words.length === 0) return [""];
+  const lines: string[] = [];
+  let cur = "";
+  for (let w of words) {
+    while (labelEm(w) > maxEm) {
+      if (cur !== "") { lines.push(cur); cur = ""; }
+      let k = 1;
+      while (k < w.length && labelEm(w.slice(0, k + 1)) <= maxEm) k++;
+      lines.push(w.slice(0, k));
+      w = w.slice(k);
+    }
+    if (cur === "") cur = w;
+    else if (labelEm(cur + " " + w) <= maxEm) cur += " " + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur !== "") lines.push(cur);
+  return lines;
+}
+
 // Wrap a label into lines of at most max characters, breaking at spaces and hard-splitting a word
 // longer than the line. Never truncates: the joined lines carry every character of the label.
 export function wrapLabel(label: string, max: number): string[] {
@@ -149,7 +196,7 @@ export function wrapLabel(label: string, max: number): string[] {
 // no bar and no label ever overlaps or touches another.
 export function layoutLane(bars: GanttBarIn[], win: GanttWindow): GanttLaneLaid {
   const years = win.years;
-  const perChar = years / GANTT_CHARS_ACROSS_PLOT;
+  const perEm = years / GANTT_PLOT_EM;
   const pos = new Map(bars.map((b) => [b.id, barPosition(win, b)]));
   const sorted = [...bars].sort((a, b) => (pos.get(a.id) as { left: number }).left - (pos.get(b.id) as { left: number }).left || (pos.get(a.id) as { right: number }).right - (pos.get(b.id) as { right: number }).right || a.id.localeCompare(b.id));
   const rowEnd: number[] = [];
@@ -157,17 +204,18 @@ export function layoutLane(bars: GanttBarIn[], win: GanttWindow): GanttLaneLaid 
   const laid: GanttBarLaid[] = [];
   for (const b of sorted) {
     const { left, right } = pos.get(b.id) as { left: number; right: number };
-    const insideCapacity = Math.floor((right - left) / perChar) - 2;
+    // the bar's room in em, less the label's inset and right gap (about 1.6 em at the SVG's 11 px)
+    const insideCapacity = (right - left) / perEm - 1.6;
     let mode: "inside" | "above" = "inside";
     let lines = [b.label];
     let labelLeft = left;
     let labelWidth = 0;
     let footLeft = left;
     let footRight = right;
-    if (b.label.length > insideCapacity) {
+    if (labelEm(b.label) > insideCapacity) {
       mode = "above";
-      lines = wrapLabel(b.label, Math.max(12, Math.floor(GANTT_CHARS_ACROSS_PLOT * GANTT_LABEL_WRAP_SHARE)));
-      labelWidth = (Math.max(...lines.map((l) => l.length)) + 1) * perChar;
+      lines = wrapLabelEm(b.label, GANTT_PLOT_EM * GANTT_LABEL_WRAP_SHARE);
+      labelWidth = (Math.max(...lines.map((l) => labelEm(l))) + 1) * perEm;
       labelLeft = Math.max(0, Math.min(left, years - labelWidth));
       footLeft = Math.min(left, labelLeft);
       footRight = Math.max(right, labelLeft + labelWidth);
