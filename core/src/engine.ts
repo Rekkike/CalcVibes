@@ -151,7 +151,17 @@ export function computeModel(inp: ModelInputsLike, opts?: { fixedPayment?: numbe
       (inp.facilities ?? []).filter((f) => f.enabled !== false),
       { costs: inp.costs, horizon: preliminaryHorizon, firstCollectionYear: inp.repayment.firstCollectionYear ?? derivedStart + inp.repayment.graceYears },
       issues,
+      { legacySharesMessages: true },
     );
+    // the share-sized facility keeps the legacy financing refusal texts of record
+    for (const f of authoredCtx.debt) {
+      if (f.sharePct === undefined) continue;
+      validateFinancing({
+        financing: { enabled: true, sharePct: f.sharePct, debtRatePct: f.ratePct, termYears: f.termYears, graceYears: f.graceYears, serviceStartYear: f.serviceStartYear, amortization: f.amortization, leveragedSolve: false, perLineSharePct: f.perLineSharePct ?? {} },
+        horizon: preliminaryHorizon,
+        lastCostMonth: derivedStart * 12,
+      }, issues);
+    }
     if (authoredCtx.leveraged && authoredCtx.debt.length > 0) {
       const t = inp.tariff;
       if (t && (t.mode === "manual" || t.mode === "fixed")) {

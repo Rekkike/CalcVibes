@@ -205,6 +205,9 @@ export function validateFacilities(
   facilities: Facility[],
   span: { costs: CostLine[]; horizon: number; firstCollectionYear: number },
   issues: string[],
+  // v0.6.16: a facility sized by explicit shares (the migrated legacy overlay) keeps the legacy
+  // financing refusal texts of record; the caller runs validateFinancing for it
+  opts?: { legacySharesMessages?: boolean },
 ): void {
   const seen = new Set<string>();
   const dup = new Set<string>();
@@ -216,18 +219,19 @@ export function validateFacilities(
     }
     seen.add(f.id);
     const tag = `Facility ${f.id} (${f.label})`;
+    const legacyText = opts?.legacySharesMessages === true && f.sharePct !== undefined;
     if (f.sharePct === undefined && !(f.amount !== null && f.amount > 0 && Number.isFinite(f.amount))) {
       issues.push(`${tag} must carry a positive amount (FAC-AMOUNT).`);
     }
-    if (f.sharePct !== undefined) {
+    if (f.sharePct !== undefined && !legacyText) {
       if (f.sharePct < 0 || f.sharePct > 100) issues.push(`${tag} must carry a share within [0, 100]; got ${f.sharePct} (FAC-SHARE).`);
       for (const [id, share] of Object.entries(f.perLineSharePct ?? {})) {
         if (share < 0 || share > 100) issues.push(`${tag} must carry a per-line share within [0, 100] for line ${id}; got ${share} (FAC-SHARE).`);
       }
     }
-    if (!(f.termYears > 0)) issues.push(`${tag} must carry a positive term (FAC-TERM).`);
-    if (!(f.ratePct > -100)) issues.push(`${tag} must carry a rate above -100 percent (FAC-RATE).`);
-    if (f.termYears > 0 && f.graceYears >= f.termYears) {
+    if (!legacyText && !(f.termYears > 0)) issues.push(`${tag} must carry a positive term (FAC-TERM).`);
+    if (!legacyText && !(f.ratePct > -100)) issues.push(`${tag} must carry a rate above -100 percent (FAC-RATE).`);
+    if (!legacyText && f.termYears > 0 && f.graceYears >= f.termYears) {
       issues.push(`${tag} must carry a grace period strictly less than its term; got grace ${f.graceYears} against term ${f.termYears} (FAC-GRACE).`);
     }
     if (f.datedDraw !== undefined) {
@@ -235,12 +239,13 @@ export function validateFacilities(
       if (!Number.isInteger(f.datedDraw.year) || f.datedDraw.year < 1) {
         issues.push(`${tag} lands as a dated lump in a model year of at least 1 (FAC-DATED-YEAR).`);
       }
-      if (!Number.isInteger(f.termYears) || (f.serviceStartYear !== null && !Number.isInteger(f.serviceStartYear))) {
+      if (!Number.isInteger(f.termYears) || (f.serviceStartYear !== null && (!Number.isInteger(f.serviceStartYear) || f.serviceStartYear < 0))) {
         issues.push(`${tag} lands as a dated lump and must carry a whole-year term and service start (FAC-DATED-TERM).`);
       }
     }
     const startYear = f.serviceStartYear ?? span.firstCollectionYear;
-    if (startYear * 12 >= span.horizon) {
+    // a dated lump repays under the funding horizon refusals (FND-LOAN-HORIZON, at the final horizon)
+    if (!legacyText && f.datedDraw === undefined && startYear * 12 >= span.horizon) {
       issues.push(`${tag} has a service start year ${startYear} whose month ${startYear * 12} is not below the model horizon ${span.horizon} (FAC-SERVICE-START).`);
     }
     if (f.scope.kind === "attached") {
