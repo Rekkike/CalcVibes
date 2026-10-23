@@ -3,7 +3,7 @@ import { GanttChart } from "../charts.js";
 import { workspaceGantt } from "../deck.js";
 import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineSource, TimelineTie } from "../../../core/src/types.js";
 import {
-  DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
+  DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, resolveMilestone, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
   phaseVocabularyIssues, phasesOf, programSpanYears, replaceSourceActivities, sourceHasActivities, suggestActivitiesFromContracts,
   suggestActivitiesFromCosts, suggestActivitiesFromFinancing, suggestActivitiesFromFunding, suggestActivitiesFromOperating,
   suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, timelineWindow, validateTimeline, withScalePreset, yearHeader, yearMonthHeader,
@@ -61,7 +61,7 @@ const OUTCOMES: { id: TimelineOutcome; label: string }[] = [
 ];
 
 const tieValue = (t: TimelineTie | undefined): string =>
-  t === undefined ? "" : t.kind === "activity" ? "activity:" + t.activityId : "engine-event:" + t.event;
+  t === undefined ? "" : t.kind === "activity" ? (t.anchor === "start" ? "activity-start:" : "activity:") + t.activityId : "engine-event:" + t.event;
 
 // v0.6.13: the Timeline section — the decision-point planning layer. It edits the optional timeline
 // block only; the engine never reads it, and its refusals are section-local (they never join the
@@ -183,22 +183,19 @@ export function TimelineSection(props: {
   const monthNote = (y: number, mo: number | undefined) => (Number.isInteger(y) && y >= 1 ? yearMonthHeader(y, mo, startYear) : "—");
   const num = (v: string) => parseFloat(v) || 0;
 
-  // The tie select: a chosen tie sets the marker to the tied target's program year once (the stored
-  // year stays editable); a tie never alters the model.
+  // v0.6.19: the tie is a REFERENCE, not a copy. Choosing a tie sets the tie alone: the milestone's authored year and
+  // month stay exactly what they were (never silently rewritten); the drawn position composes live from the target
+  // (resolveMilestone), and the authored fields are the fallback when the tie is removed or unresolvable.
   const chooseTie = (m: TimelineMilestone, value: string) => {
     if (value === "") {
       const { tie: _drop, ...rest } = m;
       commit({ milestones: tl.milestones.map((x) => (x.id === m.id ? rest : x)) });
+    } else if (value.startsWith("activity-start:")) {
+      updateMilestone(m.id, { tie: { kind: "activity", activityId: value.slice("activity-start:".length), anchor: "start" } });
     } else if (value.startsWith("activity:")) {
-      const activityId = value.slice("activity:".length);
-      const target = tl.activities.find((a) => a.id === activityId);
-      // v0.6.17: where the tied activity carries an end month the tie sets the month too; a computed
-      // engine-event month is read-only exposure and is never written here
-      updateMilestone(m.id, { tie: { kind: "activity", activityId }, ...(target !== undefined ? { year: target.endYear } : {}), ...(target !== undefined && target.endMonth !== undefined ? { month: target.endMonth } : {}) });
+      updateMilestone(m.id, { tie: { kind: "activity", activityId: value.slice("activity:".length) } });
     } else {
-      const event = value.slice("engine-event:".length) as TimelineEngineEvent;
-      const target = events.find((e) => e.event === event);
-      updateMilestone(m.id, { tie: { kind: "engine-event", event }, ...(target !== undefined ? { year: target.year } : {}) });
+      updateMilestone(m.id, { tie: { kind: "engine-event", event: value.slice("engine-event:".length) as TimelineEngineEvent } });
     }
   };
 
@@ -365,23 +362,30 @@ export function TimelineSection(props: {
           <tbody>
             {tl.milestones.map((m) => {
               const current = tieValue(m.tie);
-              const known = new Set(["", ...tl.activities.map((a) => "activity:" + a.id), ...events.map((e) => "engine-event:" + e.event)]);
+              // v0.6.19: while a tie resolves the authored year and month are only the fallback: muted, still editable
+              const fallback = m.tie !== undefined && resolveMilestone(tl, m, events).source !== "authored";
+              const known = new Set(["", ...tl.activities.flatMap((a) => ["activity:" + a.id, "activity-start:" + a.id]), ...events.map((e) => "engine-event:" + e.event)]);
               return (
                 <tr key={m.id} data-kind="milestone" data-line={m.id}>
                   <td className="tl-grow"><input data-field="milestoneLabel" value={m.label} onChange={(e) => updateMilestone(m.id, { label: e.target.value })} /></td>
-                  <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} />{monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="milestone">{monthNote(m.year, m.month)}</span></td>
+                  <td className="tl-when"><span className="tl-pair" data-fallback={fallback ? "muted" : "live"} style={fallback ? { opacity: 0.5 } : undefined} title={fallback ? "Holds the fallback: while the tie resolves, the milestone draws at the tie's live position (still editable)." : undefined}><input className="tl-year" data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} />{monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="milestone">{monthNote(m.year, m.month)}</span></td>
                   <td className="tl-pick-tie">
                     <select data-field="milestoneTie" value={current} onChange={(e) => chooseTie(m, e.target.value)}>
                       <option value="">No tie</option>
                       {tl.activities.map((a) => <option key={a.id} value={"activity:" + a.id}>Activity {a.id} ({a.label || "unnamed"})</option>)}
+                      {tl.activities.map((a) => <option key={"s" + a.id} value={"activity-start:" + a.id}>Activity start {a.id} ({a.label || "unnamed"})</option>)}
                       {events.map((e) => <option key={e.event} value={"engine-event:" + e.event}>{TIMELINE_EVENT_LABELS[e.event]} (year {e.year})</option>)}
                       {!known.has(current) && <option value={current}>{current} (not available)</option>}
                     </select>
-                    {m.tie !== undefined && m.tie.kind === "engine-event" && (() => {
-                      const ev = (m.tie as { event: TimelineEngineEvent }).event;
-                      const computed = events.find((e) => e.event === ev)?.month;
-                      return computed === undefined ? null : (
-                        <span className="muted" data-testid="computed-month" data-milestone={m.id}> Computed month {computed} of year {events.find((e) => e.event === ev)?.year} (read-only, from the live schedule)</span>
+                    {m.tie !== undefined && (() => {
+                      // v0.6.19: the read-only exposure of the live-composed position (never authored, never written)
+                      const r = resolveMilestone(tl, m, events);
+                      const at = r.month === undefined ? `year ${r.year}` : `year ${r.year}, month ${r.month}`;
+                      const from = r.source === "activity-finish" ? "the finish of its activity" : r.source === "activity-start" ? "the start of its activity" : "the live engine event";
+                      return r.source === "authored" ? (
+                        <span className="muted" data-testid="tie-position" data-milestone={m.id}> The tie does not resolve (the model has not solved or the target is missing): drawn at the authored position, {at}.</span>
+                      ) : (
+                        <span className="muted" data-testid="tie-position" data-milestone={m.id}> Drawn at the live position: {at} (from {from}; read-only). The year and month above hold the fallback.</span>
                       );
                     })()}
                   </td>

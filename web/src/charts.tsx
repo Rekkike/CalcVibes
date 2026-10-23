@@ -495,18 +495,9 @@ export function GanttChart(props: { gantt: DeckGantt }) {
           const cy = lanesBottom + 34 + gateShift + m.row * 30;
           return (
             <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
-              {m.computed !== null && (
-                <>
-                  <circle data-gantt-computed={m.id} cx={xAt(m.computed.pos)} cy={cy} r={10} fill="none" stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1.5}>
-                    <title>{`Computed month ${m.computed.month} of year ${m.computed.year} (read-only, from the live schedule)`}</title>
-                  </circle>
-                  {/* v0.6.18 Task H2: the ring is named in place of the retired connector */}
-                  <text data-gantt-computed-label={m.id} x={xAt(m.computed.pos) + (m.computed.side === "right" ? 14 : -14)} y={cy + 4} textAnchor={m.computed.side === "right" ? "start" : "end"} fontSize={11} fill={STAGE_CHART_COLORS.axisText} fillOpacity={0.85}>{m.computed.label}</text>
-                </>
-              )}
               <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />
               <text data-gantt-milestone-number={m.ordinal} x={cx} y={cy + 19} textAnchor="middle" fontSize={12} fontWeight={700} fill={STAGE_CHART_COLORS.axisText}>{m.ordinal}</text>
-              <title>{`Milestone ${m.ordinal}: ${m.label}`}</title>
+              <title>{m.tooltip}</title>
             </g>
           );
         })}

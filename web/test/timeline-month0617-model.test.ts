@@ -167,7 +167,8 @@ describe("Task E — the year-grained default lock and the round trip", () => {
         expect(b.right).toBe(b.endYear - g.window.firstYear + 1);
       }
       for (const x of g.gates) expect(x.pos).toBe(x.year - g.window.firstYear + 0.5);
-      for (const x of g.milestones) expect(x.pos).toBe(x.year - g.window.firstYear + 0.5);
+      // v0.6.19: a tied milestone draws at its live position; the untied and the month-free tied sit at the year centre
+      for (const x of g.milestones) if (x.month === null) expect(x.pos).toBe(x.year - g.window.firstYear + 0.5);
     }
   });
 
@@ -213,25 +214,8 @@ describe("Supplement 1 — the month-aware year-order refusal text", () => {
   });
 });
 
-describe("Supplement 2 — the computed month as a muted Gantt marker (read-only, composed once)", () => {
-  const withTie = (tie: object | undefined, month?: number) => gantt(tlOf({ activities: [{ id: "a1", label: "Build", startYear: 3, endYear: 5, phase: "production" }], milestones: [{ id: "m1", label: "Collections start", year: 3, ...(month !== undefined ? { month } : {}), ...(tie !== undefined ? { tie: tie as never } : {}) }] })).milestones[0];
-  it("a milestone tied to the first-collection-year event carries the computed month and its composed position", () => {
-    const m = withTie({ kind: "engine-event", event: "first-collection-year" });
-    // v0.6.18 Task H2 re-anchor: the connector's `from` is retired; the ring carries its own label and the side away from the diamond
-    expect(m.computed).toEqual({ year: 3, month: 12, pos: markerPosition({ firstYear: 3 }, 3, 12), label: "computed: month 12", side: "right" });
-    // authored month untouched: the computed position never overwrites it
-    expect(m.month).toBeNull();
-    expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).month).toBe(4);
-    expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).pos).toBe(markerPosition({ firstYear: 3 }, 3, 4));
-    // the ring is named in place of the retired connector; the computed ring is right of the authored diamond here
-    expect(withTie({ kind: "engine-event", event: "first-collection-year" }, 4).computed!.side).toBe("right");
-    expect((withTie({ kind: "engine-event", event: "first-collection-year" }, 4).computed as unknown as Record<string, unknown>).from).toBeUndefined();
-  });
-  it("untied and activity-tied milestones carry no computed marker", () => {
-    expect(withTie(undefined).computed).toBeNull();
-    expect(withTie({ kind: "activity", activityId: "a1" }).computed).toBeNull();
-  });
-});
+// v0.6.19: the Supplement 2 pins (the computed ring beside the authored diamond) are SUPERSEDED by the live-tie contract and
+// re-anchored in milestone-ties0619-model.test.ts (the ring retired; a tied milestone draws once, at its live position).
 
 describe("Supplement 4 — the milestone proximity stacking", () => {
   const ids = (ms: { id: string; year: number; month?: number; ordinal: number }[]) => layoutMilestoneRows(ms, ganttWindow([], 8));

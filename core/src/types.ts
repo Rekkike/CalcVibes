@@ -270,7 +270,9 @@ export interface TimelineDecisionPoint {
   code?: string;
 }
 
-export type TimelineTie = { kind: "activity"; activityId: string } | { kind: "engine-event"; event: TimelineEngineEvent };
+// v0.6.19: an activity tie follows the activity's FINISH by default (the anchor absent: exactly the shape of record) or its START
+// (anchor "start"). Types only, additive-optional: a document without the anchor round-trips byte-identically.
+export type TimelineTie = { kind: "activity"; activityId: string; anchor?: "start" } | { kind: "engine-event"; event: TimelineEngineEvent };
 
 export interface TimelineMilestone {
   id: string;

@@ -84,7 +84,10 @@ describe("v0.6.13 the Timeline section", () => {
     expect(values).toContain("engine-event:first-collection-year");
     expect(values).not.toContain("engine-event:funding-received");
     fireEvent.change(sel, { target: { value: "activity:a1" } });
-    expect(field(all('[data-kind="milestone"]')[0], "milestoneYear").value).toBe("2");
+    // v0.6.19 re-anchor (the live tie supersedes the copy-once fill): the tie writes nothing; the authored year stays,
+    // and the section names the live position the milestone draws at
+    expect(field(all('[data-kind="milestone"]')[0], "milestoneYear").value).toBe("1");
+    expect(document.querySelector('[data-testid="tie-position"]')!.textContent).toContain("year 2");
     expect(document.querySelector('[data-testid="timeline-refusals"]')).toBeNull();
   });
 
