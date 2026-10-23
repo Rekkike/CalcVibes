@@ -822,10 +822,11 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   // so same-year milestones keep their authored order) and BEFORE the window filter: a milestone the
   // window omits never renumbers the others, and the authored id plays no part.
   // v0.6.19: the position is the LIVE one (the tie's target, the authored fields the fallback); the order is the
-  // chronological order over those drawn positions, stable for equal positions.
+  // chronological order over those drawn years, stable within a year (authored order, exactly as before, so an untied
+  // milestone's numbering never moves; the drawn month separates positions, not the numbering).
   const events = availableEngineEvents(inputs, result);
   const allMilestones = tl.milestones.map((m) => ({ m, r: resolveMilestone(tl, m, events) }))
-    .sort((a, b) => a.r.year - b.r.year || markerPosition({ firstYear: 0 }, 0, a.r.month) - markerPosition({ firstYear: 0 }, 0, b.r.month))
+    .sort((a, b) => a.r.year - b.r.year)
     .map(({ m, r }, i) => ({
       id: m.id, label: m.label, year: r.year, month: r.month ?? null,
       tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity${m.tie.anchor === "start" ? " start" : ""} ${m.tie.activityId}` : m.tie.event,
