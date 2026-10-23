@@ -77,29 +77,7 @@ describe("Task B — the month authoring surface", () => {
   });
 });
 
-describe("Task B — the tie select and the read-only computed month", () => {
-  it("an activity tie sets the marker's month from the activity's end month; an engine-event tie never authors a month and displays the computed one read-only", () => {
-    openTimeline();
-    fireEvent.click(byAction("add-activity"));
-    const aid = (document.querySelector('tr[data-kind="activity"]') as HTMLElement).getAttribute("data-line") as string;
-    fireEvent.change(sel("activity", aid, "activityEndMonth"), { target: { value: "9" } });
-    fireEvent.click(byAction("add-milestone"));
-    const mid = (document.querySelector('tr[data-kind="milestone"]') as HTMLElement).getAttribute("data-line") as string;
-    fireEvent.change(sel("milestone", mid, "milestoneTie"), { target: { value: "activity:" + aid } });
-    expect(sel("milestone", mid, "milestoneMonth").value).toBe("9");
-    // the engine-event tie: no authored month is written, and the computed month (where the engine carries one) is display only
-    fireEvent.change(sel("milestone", mid, "milestoneMonth"), { target: { value: "" } });
-    fireEvent.change(sel("milestone", mid, "milestoneTie"), { target: { value: "engine-event:first-collection-year" } });
-    expect(sel("milestone", mid, "milestoneMonth").value).toBe("");
-    // the program demo's live schedule lands its first payment at month 12 of year 3
-    const shown = row("milestone", mid).querySelector('[data-testid="computed-month"]');
-    expect(shown).not.toBeNull();
-    expect(shown!.textContent).toContain("Computed month 12 of year 3");
-    expect(shown!.textContent).toContain("read-only");
-    // and it never authors: the saved milestone carries no month
-    expect(sel("milestone", mid, "milestoneMonth").value).toBe("");
-  });
-});
+// v0.6.19: the copy-once tie fill is SUPERSEDED (the tie is a live reference); re-anchored in milestone-ties0619-ui.test.tsx.
 
 describe("Task C — the sub-year positions in both renderers", () => {
   const tl = (): TimelineBlock => ({
@@ -162,49 +140,6 @@ describe("Task C — the sub-year positions in both renderers", () => {
     const g = deckSlides(inp, computeModel(inp), { startYear: null }).slides.find((s) => s.name === "timeline")?.gantt;
     if (g === undefined) return;
     for (const b of g.lanes.flatMap((l) => l.bars)) expect(b.right - b.left).toBe(b.endYear - b.startYear + 1);
-  });
-
-  it("the computed engine-event month draws as a muted ring in the SVG and the PDF (read-only, never authored)", () => {
-    const tied: TimelineBlock = { projectScale: "full", activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 5, phase: "production" }], decisionPoints: [], milestones: [{ id: "m1", label: "Collections", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } }] };
-    const inp = { ...demoProject(), projectLengthYears: 5, timeline: tied };
-    rec.circles.length = 0;
-    const model = deckSlides(inp, computeModel(inp), { startYear: null });
-    const g = model.slides.find((s) => s.name === "timeline")!.gantt!;
-    const m = g.milestones[0];
-    expect(m.computed).not.toBeNull();
-    const { container } = render(<GanttChart gantt={g} />);
-    const ring = container.querySelector('[data-gantt-computed="m1"]') as SVGCircleElement;
-    const { labelW, plotW } = GANTT_SVG;
-    expect(parseFloat(ring.getAttribute("cx") as string)).toBeCloseTo(labelW + m.computed!.pos * (plotW / (g.window.lastYear - g.window.firstYear + 1)), 6);
-    expect(ring.querySelector("title")!.textContent).toContain("read-only");
-    expect(ring.getAttribute("fill")).toBe("none");
-    buildDeckPdf(model, "Computed month");
-    const colW = (257 - 32) / (g.window.lastYear - g.window.firstYear + 1);
-    expect(rec.circles.some((c) => Math.abs(c[0] - (52 + m.computed!.pos * colW)) < 1e-9)).toBe(true);
-  });
-
-  it("v0.6.18 Task H2: the computed ring is NAMED in place of the retired connector, in the SVG and the PDF", () => {
-    const tied: TimelineBlock = { projectScale: "full", activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 5, phase: "production" }], decisionPoints: [], milestones: [{ id: "m1", label: "Collections", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } }] };
-    const inp = { ...demoProject(), projectLengthYears: 5, timeline: tied };
-    const model = deckSlides(inp, computeModel(inp), { startYear: null });
-    const g = model.slides.find((s) => s.name === "timeline")!.gantt!;
-    const c = g.milestones[0].computed!;
-    const { container } = render(<GanttChart gantt={g} />);
-    // the connector is gone from the SVG; the ring carries its label beside it, on the side away from the diamond
-    expect(container.querySelector('[data-gantt-computed-link]')).toBeNull();
-    const label = container.querySelector('[data-gantt-computed-label="m1"]') as SVGTextElement;
-    const { labelW, plotW } = GANTT_SVG;
-    const colW = plotW / (g.window.lastYear - g.window.firstYear + 1);
-    expect(label.textContent).toBe("computed: month 12");
-    expect(parseFloat(label.getAttribute("x") as string)).toBeCloseTo(labelW + c.pos * colW + 14, 6);
-    expect(label.getAttribute("text-anchor")).toBe("start");
-    // the PDF draws no connecting line and draws the label
-    rec.lines.length = 0;
-    const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
-    buildDeckPdf(model, "Connector", trace);
-    const pc = (257 - 32) / (g.window.lastYear - g.window.firstYear + 1);
-    expect(rec.lines.some((q) => q[1] === q[3] && Math.abs(q[2] - (52 + c.pos * pc)) < 1e-9)).toBe(false);
-    expect(trace.drawnFigures.flat()).toContain("computed: month 12");
   });
 });
 

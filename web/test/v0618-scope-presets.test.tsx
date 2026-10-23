@@ -181,7 +181,7 @@ describe("v0.6.18 Task E.3: the month-level demo project", () => {
     expect(events.find((e) => e.event === "first-collection-year")!.year).toBe(tl.milestones[2].year);
   });
 
-  it("DECK: the sub-year positions are composed (bars start and end inside their years; gates and milestones sit off the year centre); the computed first-payment ring rides read-only", () => {
+  it("DECK: the sub-year positions are composed (bars start and end inside their years; gates and milestones sit off the year centre); a tied marker draws at its live position", () => {
     const inp = landNewbuildProject();
     const g = deckSlides(inp, computeModel(inp), { startYear: null }).slides.find((s) => s.name === "timeline")!.gantt!;
     const bars = g.lanes.flatMap((l) => l.bars);
@@ -189,8 +189,10 @@ describe("v0.6.18 Task E.3: the month-level demo project", () => {
     expect(g.gates.every((x) => x.month !== null)).toBe(true);
     expect(g.gates.some((x) => x.pos !== x.year - g.window.firstYear + 0.5)).toBe(true);
     const first = g.milestones.find((m) => m.tie === "first-collection-year")!;
-    expect(first.month).toBe(1);
-    expect(first.computed).toMatchObject({ year: 3, month: 12 });
+    // v0.6.19: a tied marker draws at the live position only: the engine's computed month 12 (the authored month 1 is the fallback)
+    expect(first.month).toBe(12);
+    expect(first.year).toBe(3);
+    expect("computed" in first).toBe(false);
     // the year-level demo stays year-grained
     const shore = shorePowerProgram();
     expect(JSON.stringify(shore.timeline)).not.toMatch(/Month|"month"/);

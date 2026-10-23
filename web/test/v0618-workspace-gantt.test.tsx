@@ -5,8 +5,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { computeModel } from "../src/engine.js";
 import { deckSlides, workspaceGantt } from "../src/deck.js";
-import { GANTT_SVG } from "../src/charts.js";
-import { labelEm, GANTT_PLOT_EM } from "../src/ganttLayout.js";
 import { demoProject, landNewbuildProject, shorePowerProgram } from "../src/state.js";
 import { serializeProject } from "../../core/src/fileio.js";
 import type { ModelInputs } from "../../core/src/types.js";
@@ -48,7 +46,8 @@ describe("v0.6.18 I.1: the Timeline section renders it", () => {
     expect(panel.querySelectorAll("[data-gantt-gate]")).toHaveLength(g.gates.length);
     expect(panel.querySelectorAll("[data-gantt-milestone]")).toHaveLength(g.milestones.length);
     expect(panel.querySelector('[data-testid="gantt-caption"]')!.textContent).toBe(g.caption);
-    expect(panel.querySelectorAll("[data-gantt-computed]").length).toBe(1);
+    // v0.6.19: the computed ring retired; a tied marker is the only drawing at its live position
+    expect(panel.querySelectorAll("[data-gantt-computed]").length).toBe(0);
     expect(panel.querySelector('[data-testid="workspace-gantt-note"]')).toBeNull();
     // the chart sits on its own stage panel (legible in both app themes)
     expect(panel.className).toBe("workspace-gantt");
@@ -86,24 +85,4 @@ describe("v0.6.18 I.1: the Timeline section renders it", () => {
   });
 });
 
-describe("v0.6.18 H2 (the edge): the ring's label never crosses the window edge", () => {
-  it("LAND: the computed ring at month 12 of the last window year takes its label on the LEFT; the text stays inside the plot", () => {
-    const g = deckGantt(landNewbuildProject());
-    const m = g.milestones.find((x) => x.computed !== null)!;
-    expect(m.computed!.side).toBe("left");
-    const years = g.window.lastYear - g.window.firstYear + 1;
-    const colW = GANTT_SVG.plotW / years;
-    render(<App />);
-    fireEvent.click(byAction("load-multi-lease-demo"));
-    fireEvent.click(byNav("timeline"));
-    const label = document.querySelector('[data-testid="workspace-gantt"] [data-gantt-computed-label]') as SVGTextElement;
-    expect(label.getAttribute("text-anchor")).toBe("end");
-    const widthPx = labelEm(m.computed!.label) * 11;
-    const rightEdge = GANTT_SVG.labelW + GANTT_SVG.plotW;
-    const x = parseFloat(label.getAttribute("x") as string);
-    expect(x).toBeLessThanOrEqual(rightEdge);
-    expect(x - widthPx).toBeGreaterThanOrEqual(GANTT_SVG.labelW);
-    expect(GANTT_PLOT_EM).toBeGreaterThan(0);
-    expect(colW).toBeGreaterThan(0);
-  });
-});
+// v0.6.19: the ring and its edge-label pins RETIRED with the ring (see milestone-ties0619-ui.test.tsx for the retirement pins).

@@ -1,10 +1,10 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
-import { GANTT_LANE_LABEL_CHARS, GANTT_PLOT_EM, labelEm, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
+import { GANTT_LANE_LABEL_CHARS, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
+import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, resolveMilestone, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -107,15 +107,11 @@ export interface DeckGanttGate { id: string; code: string | null; title: string;
 // v0.6.13.4: the ordinal is the milestone's rank in the chronological order of the FULL milestone set
 // (composed once, stable under the year window, never derived from the authored id); the row is the
 // stack position among the drawn milestones sharing a year (0 = the first).
-// v0.6.17 supplement: a milestone tied to an engine event whose live schedule carries a month also carries the
-// COMPUTED position (read-only exposure, never authored): drawn as a muted ring, composed once here.
-// v0.6.18 Task H2 (the builder proposal, applied): the thin connector from the authored diamond to the ring is RETIRED —
-// it carried no meaning to a reader (a line between two marks says nothing about what the second one is). The ring
-// is NAMED instead: it carries its own short text label, composed once here ("computed: month 12"), set on the side
-// of the ring away from the authored diamond so it never lands on it. The authored diamond never changes; the ring
-// stays the read-only exposure of the live schedule (never authored).
-export interface DeckGanttComputed { year: number; month: number; pos: number; label: string; side: "left" | "right" }
-export interface DeckGanttMilestone { id: string; label: string; year: number; month: number | null; pos: number; tie: string | null; ordinal: number; row: number; computed: DeckGanttComputed | null }
+// v0.6.19: a milestone's year, month and pos are its DRAWN position, composed live from its tie (resolveMilestone: the
+// activity's finish or start, the engine event's live year and computed month) and the authored fields only as the
+// fallback of an absent or unresolvable tie. The v0.6.17/18 computed ring retired: a tied milestone draws once, at the
+// composed position, and the authored position never draws beside it.
+export interface DeckGanttMilestone { id: string; label: string; year: number; month: number | null; pos: number; tie: string | null; ordinal: number; row: number }
 export interface DeckGantt {
   // the program span; the axis and the plot cover the year window only
   spanYears: number;
@@ -751,19 +747,6 @@ function composeRecoverySeries(result: ModelResult, startYear: number | null, mo
   };
 }
 
-// v0.6.18 Task H2: the computed ring and its label, composed once. The label sits on the side of the ring with the
-// room: the right by default (away from an authored diamond to the left), the left when the label would cross the
-// window's right edge; where neither side has room the larger one is taken. The label width is MEASURED (em).
-function computedRing(win: { firstYear: number; years: number }, year: number, month: number, authoredPos: number): DeckGanttComputed {
-  const pos = markerPosition(win, year, month);
-  const label = `computed: month ${month}`;
-  const need = ((labelEm(label) + 1.6) * win.years) / GANTT_PLOT_EM;
-  const rightRoom = win.years - pos;
-  const leftRoom = pos - Math.max(0, authoredPos < pos ? authoredPos : 0);
-  const preferRight = authoredPos <= pos;
-  const side: "left" | "right" = preferRight ? (rightRoom >= need || rightRoom >= leftRoom ? "right" : "left") : (leftRoom >= need || leftRoom >= rightRoom ? "left" : "right");
-  return { year, month, pos, label, side };
-}
 function composeWaterfall(c: ReturnType<typeof composeInvestment>, money: (v: number) => string): DeckWaterfall {
   const cap = Math.max(1e-12, c.capitalSubtotal);
   const share = (v: number) => percentOneForDisplay(v / cap);
@@ -838,11 +821,16 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   // v0.6.13.4: the ordinal composes here, once, over the FULL set after the chronological sort (stable,
   // so same-year milestones keep their authored order) and BEFORE the window filter: a milestone the
   // window omits never renumbers the others, and the authored id plays no part.
-  const allMilestones = [...tl.milestones].sort((a, b) => a.year - b.year).map((m, i) => ({
-    id: m.id, label: m.label, year: m.year, month: m.month ?? null,
-    tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity ${m.tie.activityId}` : m.tie.event,
-    ordinal: i + 1,
-  }));
+  // v0.6.19: the position is the LIVE one (the tie's target, the authored fields the fallback); the order is the
+  // chronological order over those drawn positions, stable for equal positions.
+  const events = availableEngineEvents(inputs, result);
+  const allMilestones = tl.milestones.map((m) => ({ m, r: resolveMilestone(tl, m, events) }))
+    .sort((a, b) => a.r.year - b.r.year || markerPosition({ firstYear: 0 }, 0, a.r.month) - markerPosition({ firstYear: 0 }, 0, b.r.month))
+    .map(({ m, r }, i) => ({
+      id: m.id, label: m.label, year: r.year, month: r.month ?? null,
+      tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity${m.tie.anchor === "start" ? " start" : ""} ${m.tie.activityId}` : m.tie.event,
+      ordinal: i + 1,
+    }));
   const inWindow = (y: number) => y >= win.firstYear && y <= win.lastYear;
   const omittedMarkers = gates.filter((g) => !inWindow(g.year)).length + allMilestones.filter((m) => !inWindow(m.year)).length;
   const captionParts: string[] = [];
@@ -853,19 +841,10 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     captionParts.push(`${omittedMarkers} ${omittedMarkers === 1 ? "marker falls" : "markers fall"} outside this window and ${omittedMarkers === 1 ? "is" : "are"} not drawn; the gates and milestones listed on this slide name ${omittedMarkers === 1 ? "it" : "them"}.`);
   }
   // The drawn milestones stack on rows within a shared year by proximity (the ordinal breaks ties), so two
-  // diamonds never share a position; the computed engine-event month rides read-only beside the authored one.
-  const events = availableEngineEvents(inputs, result);
+  // diamonds never share a position.
   const drawn = allMilestones.filter((m) => inWindow(m.year));
   const stacked = layoutMilestoneRows(drawn.map((m) => ({ id: m.id, year: m.year, month: m.month ?? undefined, ordinal: m.ordinal })), win);
-  const tieOf = new Map(tl.milestones.map((m) => [m.id, m.tie]));
-  const drawnMilestones: DeckGanttMilestone[] = drawn.map((m, i) => {
-    const tie = tieOf.get(m.id);
-    const ev = tie !== undefined && tie.kind === "engine-event" ? events.find((e) => e.event === tie.event) : undefined;
-    const computed = ev !== undefined && ev.month !== undefined && inWindow(ev.year)
-      ? computedRing(win, ev.year, ev.month, stacked[i].pos)
-      : null;
-    return { ...m, pos: stacked[i].pos, row: stacked[i].row, computed };
-  });
+  const drawnMilestones: DeckGanttMilestone[] = drawn.map((m, i) => ({ ...m, pos: stacked[i].pos, row: stacked[i].row }));
   const drawnGates = gates.filter((g) => inWindow(g.year));
   const gateLabels = layoutGateLabels(drawnGates.map((g) => ({ id: g.id, code: g.code, year: g.year, month: g.month ?? undefined })), win);
   const gantt: DeckGantt = {

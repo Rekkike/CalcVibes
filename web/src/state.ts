@@ -1,6 +1,6 @@
 import type {
   ContractParams, CostLine, Facility, MaintenanceConfig, ModelInputs, ModelResult, OperatingLine,
-  TariffRow, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelinePhase, TimelineSource,
+  TariffRow, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelinePhase, TimelineSource, TimelineTie,
 } from "../../core/src/types.js";
 import templateFile from "../../data/template-project.json";
 import { ganttWindow } from "./ganttLayout.js";
@@ -325,8 +325,10 @@ export function landNewbuildProject(): ModelInputs {
     // year 2 and the delivery approval in month 11 of year 2, handover and closure in year 3 (months 1 and 12).
     // No gate outcome is recorded. The milestones are listed in chronological order: construction complete
     // (year 2 month 10, tied to the engine event of that year), the hotel fit-out (year 2 month 12, tied to its
-    // activity) and the first collection year (year 3 month 1, the leases begin; the engine's computed first
-    // payment month is month 12 of that year and shows as the read-only computed ring beside it).
+    // activity) and the first collection year (year 3 month 1, the leases begin). A tied milestone draws at its tie's
+    // live position only (the authored year and month hold the fallback): the fit-out follows its activity's finish,
+    // the first collection year draws at the engine's computed first payment month, month 12 of that year, and
+    // the construction-complete event, which carries no month, draws at the event's year position.
     timeline: {
       projectScale: "full",
       activities: [
@@ -676,6 +678,39 @@ export function programSpanYears(inputs: ModelInputs, result: ModelResult | null
   if (result === null) return null;
   if (inputs.projectLengthYears !== undefined && inputs.projectLengthYears !== null) return inputs.projectLengthYears;
   return result.horizon?.totalYears ?? Math.ceil(result.monthly.length / 12);
+}
+
+// v0.6.19 — the live tie: a tied milestone's DRAWN position composes from its tie target on every render (a reference,
+// never a copy), once, here; the authored year and month are the fallback ONLY when the tie is absent or unresolvable.
+//   activity (finish, the default) -> the activity's current end year and end month;
+//   activity (anchor "start")      -> the activity's current start year and start month;
+//   engine event                   -> the event's current year and, where the live schedule carries one, its computed month
+//                                     (first-collection-year only; the others are year-grained).
+// Unresolvable: the engine event with no solved model (the events unavailable), or a target that no longer exists (the
+// TIMELINE-MILESTONE-TIE refusal's case). The authored document fields are never written by the composition.
+export interface ResolvedMilestone {
+  year: number;
+  month: number | undefined;
+  source: "authored" | "activity-finish" | "activity-start" | "engine-event";
+}
+export function resolveMilestone(
+  tl: { activities: TimelineActivity[] },
+  m: { year: number; month?: number; tie?: TimelineTie },
+  events: { event: TimelineEngineEvent; year: number; month?: number }[],
+): ResolvedMilestone {
+  const authored: ResolvedMilestone = { year: m.year, month: m.month, source: "authored" };
+  const tie = m.tie;
+  if (tie === undefined) return authored;
+  if (tie.kind === "activity") {
+    const a = tl.activities.find((x) => x.id === tie.activityId);
+    if (a === undefined) return authored;
+    return tie.anchor === "start"
+      ? { year: a.startYear, month: a.startMonth, source: "activity-start" }
+      : { year: a.endYear, month: a.endMonth, source: "activity-finish" };
+  }
+  const ev = events.find((e) => e.event === tie.event);
+  if (ev === undefined) return authored;
+  return { year: ev.year, month: ev.month, source: "engine-event" };
 }
 
 // The engine events that compose for this project, with their program years, read from the solved
