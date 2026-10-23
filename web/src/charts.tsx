@@ -497,7 +497,7 @@ export function GanttChart(props: { gantt: DeckGantt }) {
             <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
               <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />
               <text data-gantt-milestone-number={m.ordinal} x={cx} y={cy + 19} textAnchor="middle" fontSize={12} fontWeight={700} fill={STAGE_CHART_COLORS.axisText}>{m.ordinal}</text>
-              <title>{`Milestone ${m.ordinal}: ${m.label}`}</title>
+              <title>{m.tooltip}</title>
             </g>
           );
         })}

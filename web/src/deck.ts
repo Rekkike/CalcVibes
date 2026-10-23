@@ -1,10 +1,10 @@
-import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
+import type { ModelInputs, ModelResult, TariffRow, TimelinePhase, TimelineTie } from "../../core/src/types.js";
 import { GANTT_LANE_LABEL_CHARS, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, resolveMilestone, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
+import { DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, availableEngineEvents, composeInvestment, resolveMilestone, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -111,7 +111,9 @@ export interface DeckGanttGate { id: string; code: string | null; title: string;
 // activity's finish or start, the engine event's live year and computed month) and the authored fields only as the
 // fallback of an absent or unresolvable tie. The v0.6.17/18 computed ring retired: a tied milestone draws once, at the
 // composed position, and the authored position never draws beside it.
-export interface DeckGanttMilestone { id: string; label: string; year: number; month: number | null; pos: number; tie: string | null; ordinal: number; row: number }
+// The tooltip is composed once here and names the tie (SVG hover title, PDF note): an untied marker's is the plain
+// "Milestone n: label"; a tied one adds what it follows and, when the tie does not resolve, says so.
+export interface DeckGanttMilestone { id: string; label: string; year: number; month: number | null; pos: number; tie: string | null; ordinal: number; row: number; tooltip: string }
 export interface DeckGantt {
   // the program span; the axis and the plot cover the year window only
   spanYears: number;
@@ -805,6 +807,20 @@ export function ganttTitle(spanYears: number, gateCount: number, startYear: numb
   return `The program runs years ${first}–${last} with ${count} decision ${gateCount === 1 ? "gate" : "gates"}`;
 }
 
+export function milestoneTooltip(tl: { activities: { id: string; label: string }[] }, m: { label: string; tie?: TimelineTie }, source: string, ordinal: number): string {
+  const plain = `Milestone ${ordinal}: ${m.label}`;
+  const tie = m.tie;
+  if (tie === undefined) return plain;
+  let follows: string;
+  if (tie.kind === "activity") {
+    const a = tl.activities.find((x) => x.id === tie.activityId);
+    follows = `${tie.anchor === "start" ? "the start" : "the finish"} of activity ${tie.activityId}${a !== undefined ? ` (${a.label || "unnamed"})` : ""}`;
+  } else {
+    follows = `the engine event ${TIMELINE_EVENT_LABELS[tie.event]}`;
+  }
+  return `${plain} — tied to ${follows}${source === "authored" ? " (does not resolve: drawn at the authored position)" : ""}`;
+}
+
 function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number | null, monthGrid: boolean): DeckSlide {
   const tl = timelineOf(inputs);
   const spanYears = programSpanYears(inputs, result) as number;
@@ -831,6 +847,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
       id: m.id, label: m.label, year: r.year, month: r.month ?? null,
       tie: m.tie === undefined ? null : m.tie.kind === "activity" ? `activity${m.tie.anchor === "start" ? " start" : ""} ${m.tie.activityId}` : m.tie.event,
       ordinal: i + 1,
+      tooltip: milestoneTooltip(tl, m, r.source, i + 1),
     }));
   const inWindow = (y: number) => y >= win.firstYear && y <= win.lastYear;
   const omittedMarkers = gates.filter((g) => !inWindow(g.year)).length + allMilestones.filter((m) => !inWindow(m.year)).length;

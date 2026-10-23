@@ -362,11 +362,13 @@ export function TimelineSection(props: {
           <tbody>
             {tl.milestones.map((m) => {
               const current = tieValue(m.tie);
+              // v0.6.19: while a tie resolves the authored year and month are only the fallback: muted, still editable
+              const fallback = m.tie !== undefined && resolveMilestone(tl, m, events).source !== "authored";
               const known = new Set(["", ...tl.activities.flatMap((a) => ["activity:" + a.id, "activity-start:" + a.id]), ...events.map((e) => "engine-event:" + e.event)]);
               return (
                 <tr key={m.id} data-kind="milestone" data-line={m.id}>
                   <td className="tl-grow"><input data-field="milestoneLabel" value={m.label} onChange={(e) => updateMilestone(m.id, { label: e.target.value })} /></td>
-                  <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} />{monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="milestone">{monthNote(m.year, m.month)}</span></td>
+                  <td className="tl-when"><span className="tl-pair" data-fallback={fallback ? "muted" : "live"} style={fallback ? { opacity: 0.5 } : undefined} title={fallback ? "Holds the fallback: while the tie resolves, the milestone draws at the tie's live position (still editable)." : undefined}><input className="tl-year" data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} />{monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="milestone">{monthNote(m.year, m.month)}</span></td>
                   <td className="tl-pick-tie">
                     <select data-field="milestoneTie" value={current} onChange={(e) => chooseTie(m, e.target.value)}>
                       <option value="">No tie</option>

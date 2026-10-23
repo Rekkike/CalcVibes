@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { computeModel } from "../../core/src/engine.js";
 import { parseProject, serializeProject } from "../../core/src/fileio.js";
-import { deckSlides } from "../src/deck.js";
+import { deckSlides, milestoneTooltip } from "../src/deck.js";
 import { markerPosition } from "../src/ganttLayout.js";
 import { availableEngineEvents, demoProject, landNewbuildProject, resolveMilestone, shorePowerProgram, validateTimeline } from "../src/state.js";
 import type { ModelInputs, TimelineActivity, TimelineBlock, TimelineMilestone } from "../../core/src/types.js";
@@ -195,5 +195,28 @@ describe("Task C — the demo wall: the timeline blocks stay byte-identical (the
   it("the land and shore-power timeline blocks hash to their v0.6.18 bytes", () => {
     expect(sha(landNewbuildProject().timeline)).toBe("d12b41cb8fce9cc1cefca64061f68313ce1c4d192d0ccd390f6876b19cb219c7");
     expect(sha(shorePowerProgram().timeline)).toBe("0d7156f2d7b080ec19b6aa6027e6c90be76dd98b3aae9b253839a1531367783f");
+  });
+});
+
+describe("the tooltip names the tie (composed once in the deck model)", () => {
+  const acts = { activities: [{ id: "a1", label: "Interior fit-out" }, { id: "a2", label: "" }] };
+  it("an untied marker's tooltip is the plain milestone line, exactly as before", () => {
+    expect(milestoneTooltip(acts, { label: "Done" }, "authored", 3)).toBe("Milestone 3: Done");
+  });
+  it("a tied marker names what it follows: the finish or the start of the activity, or the engine event", () => {
+    expect(milestoneTooltip(acts, { label: "Done", tie: { kind: "activity", activityId: "a1" } }, "activity-finish", 1)).toBe("Milestone 1: Done — tied to the finish of activity a1 (Interior fit-out)");
+    expect(milestoneTooltip(acts, { label: "Done", tie: { kind: "activity", activityId: "a1", anchor: "start" } }, "activity-start", 1)).toBe("Milestone 1: Done — tied to the start of activity a1 (Interior fit-out)");
+    expect(milestoneTooltip(acts, { label: "Done", tie: { kind: "activity", activityId: "a2" } }, "activity-finish", 2)).toContain("(unnamed)");
+    expect(milestoneTooltip(acts, { label: "Done", tie: { kind: "engine-event", event: "first-collection-year" } }, "engine-event", 4)).toBe("Milestone 4: Done — tied to the engine event First collection year");
+  });
+  it("a tie that does not resolve says so", () => {
+    expect(milestoneTooltip(acts, { label: "Done", tie: { kind: "engine-event", event: "first-collection-year" } }, "authored", 1)).toBe("Milestone 1: Done — tied to the engine event First collection year (does not resolve: drawn at the authored position)");
+  });
+  it("the deck model carries the composed tooltip on every drawn milestone", () => {
+    const g = gantt(tlOf([act()], [ms({ id: "m1", year: 3 }), ms({ id: "m2", year: 3, tie: { kind: "activity", activityId: "a1", anchor: "start" } })]));
+    expect(Object.fromEntries(g.milestones.map((m) => [m.id, m.tooltip]))).toEqual({
+      m1: "Milestone 2: Done",
+      m2: "Milestone 1: Done — tied to the start of activity a1 (Build)",
+    });
   });
 });

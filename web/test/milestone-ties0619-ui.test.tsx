@@ -163,3 +163,63 @@ describe("Task C — the computed ring is retired on every consumer", () => {
     for (const m of ws().querySelectorAll("[data-gantt-milestone]")) expect(m.querySelectorAll("polygon")).toHaveLength(1);
   });
 });
+
+describe("the fallback selectors mute while a tie resolves (still editable)", () => {
+  const pair = (mid: string) => row("milestone", mid).querySelector(".tl-pair") as HTMLElement;
+  it("an untied milestone's year and month stand live; a resolving tie mutes them; removing the tie restores them", () => {
+    const { aid, mid } = setup();
+    expect(pair(mid).getAttribute("data-fallback")).toBe("live");
+    expect(pair(mid).style.opacity).toBe("");
+    fireEvent.change(field("milestone", mid, "milestoneTie"), { target: { value: "activity:" + aid } });
+    expect(pair(mid).getAttribute("data-fallback")).toBe("muted");
+    expect(pair(mid).style.opacity).toBe("0.5");
+    expect(pair(mid).getAttribute("title")).toContain("fallback");
+    fireEvent.change(field("milestone", mid, "milestoneTie"), { target: { value: "" } });
+    expect(pair(mid).getAttribute("data-fallback")).toBe("live");
+    expect(pair(mid).style.opacity).toBe("");
+  });
+
+  it("the muted selectors stay editable: the authored fallback changes while the drawn position stays at the tie", () => {
+    const { aid, mid } = setup();
+    fireEvent.change(field("milestone", mid, "milestoneTie"), { target: { value: "activity:" + aid } });
+    const yearInput = field("milestone", mid, "milestoneYear");
+    const monthSelect = field("milestone", mid, "milestoneMonth");
+    expect(yearInput.disabled).toBe(false);
+    expect(monthSelect.disabled).toBe(false);
+    const x = markerX(ws(), mid);
+    fireEvent.change(yearInput, { target: { value: "6" } });
+    fireEvent.change(monthSelect, { target: { value: "2" } });
+    expect(authored(mid)).toEqual(["6", "2"]);
+    expect(pair(mid).getAttribute("data-fallback")).toBe("muted");
+    expect(markerX(ws(), mid)).toBe(x);
+  });
+
+  it("a tie that does not resolve is not muted: the authored position is what draws", () => {
+    const { mid } = setup();
+    fireEvent.change(field("milestone", mid, "milestoneTie"), { target: { value: "engine-event:first-collection-year" } });
+    fireEvent.click(byNav("overview"));
+    fireEvent.change(document.querySelector('[data-testid="overview"] [data-field="targetIrr"]') as HTMLElement, { target: { value: "-150" } });
+    fireEvent.click(byNav("timeline"));
+    expect(pair(mid).getAttribute("data-fallback")).toBe("live");
+  });
+});
+
+describe("the marker tooltip names the tie (SVG hover title)", () => {
+  const titleOf = (root: ParentNode, id: string) => root.querySelector(`[data-gantt-milestone="${id}"] title`)!.textContent;
+  it("the workspace Gantt's tied markers name their ties and an untied marker keeps the plain title", () => {
+    const { aid, mid } = setup();
+    expect(titleOf(ws(), mid)).toMatch(/^Milestone \d+: [^—]*$/);
+    fireEvent.change(field("milestone", mid, "milestoneTie"), { target: { value: "activity:" + aid } });
+    expect(titleOf(ws(), mid)).toContain(`tied to the finish of activity ${aid}`);
+    fireEvent.change(field("milestone", mid, "milestoneTie"), { target: { value: "activity-start:" + aid } });
+    expect(titleOf(ws(), mid)).toContain(`tied to the start of activity ${aid}`);
+    fireEvent.change(field("milestone", mid, "milestoneTie"), { target: { value: "engine-event:first-collection-year" } });
+    expect(titleOf(ws(), mid)).toContain("tied to the engine event First collection year");
+  });
+  it("the deck SVG draws the composed tooltip", () => {
+    const inp = landNewbuildProject();
+    const g = deckSlides(inp, computeModel(inp), { startYear: null }).slides.find((s) => s.name === "timeline")!.gantt!;
+    const { container } = render(<GanttChart gantt={g} />);
+    for (const m of g.milestones) expect(titleOf(container, m.id)).toBe(m.tooltip);
+  });
+});
