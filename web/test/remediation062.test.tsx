@@ -153,7 +153,10 @@ describe("v0.6.2 chunk 1: scenarios guards and the root error boundary (W4)", ()
     const refused = Array.from(table.querySelectorAll("td[data-cell-refusal]"));
     expect(refused.length).toBe(6);
     expect(refused.every((td) => (td.textContent ?? "").includes("The required collections extend to"))).toBe(true);
-  });
+  // v0.6.19 follow-up: the explicit per-test timeout. The test drives the demo's heaviest Scenarios render (the full balloon x term
+  // table); measured locally at 3.3-3.5 s alone and 3.8 s under the full suite (4 cores), it exceeded the 5,000 ms default on the CI
+  // runner (run 158, merge a9f7ed4). The timeout only bounds a hang; the assertions are untouched.
+  }, 20000);
 
   it("BND-1: a deliberately throwing child renders the boundary card with the shell intact", () => {
     const Throwing = () => { throw new Error("test-only explosion"); };
