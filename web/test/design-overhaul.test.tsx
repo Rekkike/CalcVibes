@@ -184,8 +184,8 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     expect(investmentSlot.querySelector('[data-testid="ledger-waterfall"]')).toBeTruthy(); // v0.6.15: the composition rows retired from the investment slide
     expect(recoverySlot.querySelector('[data-testid="recovery-bars"]')).toBeTruthy();
     const bars = recoverySlot.querySelectorAll('[data-recovery-column]');
-    // v0.6.7 re-anchor: 23 inflow years bucket at width 2 under the cap of 15 — 12 columns.
-    expect(bars.length).toBe(12);
+    // v0.6.18 Task H1 re-anchor: the annual basis — one column per program year (23), never bucketed.
+    expect(bars.length).toBe(23);
   });
 
   it("CHART-TRACE: the mapped values equal the engine fields (perturb the mapping and this fails)", async () => {
@@ -194,10 +194,11 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
-    const donutData = deck.slides[2].chart?.data;
-    expect(donutData?.length).toBe(result.lineTotals.length);
-    for (let i = 0; i < (donutData?.length ?? 0); i++) {
-      expect(donutData?.[i].value).toBe(result.lineTotals[i].total);
+    // v0.6.18 Task J.1: the investment slide's dead rows-chart field is retired; the ledger rows trace the engine
+    const donutData = deck.slides[2].waterfall!.rows.filter((r) => r.kind === "capital");
+    expect(donutData.length).toBe(result.lineTotals.length);
+    for (let i = 0; i < donutData.length; i++) {
+      expect(donutData[i].raw).toBe(result.lineTotals[i].total);
     }
     const barsData = deck.slides[3].chart?.data;
     expect(barsData?.length).toBe(result.yearly.length);
@@ -213,7 +214,7 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     const { buildDeckPdf } = await import("../src/pdf.js");
     const result = computeModel(demoProject());
     const model = deckSlides(demoProject(), result, { startYear: null });
-    expect(model.slides[2].chart?.kind).toBe("rows");
+    expect(model.slides[2].chart).toBeUndefined(); // v0.6.18 Task J.1
     expect(model.slides[3].chart?.kind).toBe("bars");
     const doc = buildDeckPdf(model, "Project Alpha");
     expect(doc.getNumberOfPages()).toBe(7);

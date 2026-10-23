@@ -90,7 +90,9 @@ function ScenarioTargetBars(props: { chart: ScenarioTargetChart; currency: Curre
 export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean }) {
   const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null, monthGrid = false } = props;
   const [slide, setSlide] = useState(0);
-  const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, monthGrid }) : null;
+  // v0.6.18 Task H1: the month level of the recovery bars composes only on request (a view state, never a document field)
+  const [recoveryMonthly, setRecoveryMonthly] = useState(false);
+  const deck = result !== null ? deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, monthGrid, recoveryMonthly }) : null;
   const totalSlides = deck?.slides.length ?? 7;
   const currency = (inputs.currency as CurrencyCode) ?? "SEK";
 
@@ -201,7 +203,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 {sl.donuts.map((d) => (
                   <div key={d.id} data-donut={d.id} className="summary-donut">
                     <p data-testid="chart-kicker" className="chart-kicker">{d.title}</p>
-                    <CompositionDonut lineTotals={d.segments.map((s) => ({ id: s.id, name: s.label, total: s.value }))} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
+                    <CompositionDonut lineTotals={d.segments.map((s) => ({ id: s.id, name: s.label, total: s.value, ...(s.share !== undefined ? { share: s.share } : {}) }))} valueFor={(t) => deckMoneyForDisplay(t, currency, entryUnit)} />
                     {d.disclosure !== undefined && <span className="deck-disclosure">{d.disclosure}</span>}
                   </div>
                 ))}
@@ -215,8 +217,8 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.summaryCharts !== undefined && result !== null && (
               <div data-testid="summary-charts" className="summary-charts">
-                <div data-summary-chart="hurdle"><HurdlePlot target={inputs.targetIrr} achieved={(result.achievedIrr ?? 0) * 100} goalMet={result.goalMet} solved={result.paymentAmount !== null} /></div>
-                <div data-summary-chart="bars"><RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} /></div>
+                <div data-summary-chart="hurdle"><HurdlePlot target={inputs.targetIrr} achieved={(result.achievedIrr ?? 0) * 100} achievedMissing={result.achievedIrr === null} goalMet={result.goalMet} solved={result.paymentAmount !== null} /></div>
+                {(() => { const bars = sl.summaryCharts.find((c) => c.kind === "bars"); return bars === undefined ? null : <div data-summary-chart="bars"><RecoveryBars series={bars.data} peakFor={peakFor} kicker={recoveryKicker} periodNote={`${bars.kicker ?? ""}. ${bars.periodNote ?? ""}`.trim()} basis={bars.basis ?? "annual"} /></div>; })()}
               </div>
             )}
             {sl.name === "investment" && result !== null && (
@@ -252,9 +254,19 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                 <GanttChart gantt={sl.gantt} />
               </div>
             )}
+            {sl.name === "operations" && sl.chart !== undefined && sl.chart.data.length > 0 && (
+              <div data-testid="deck-chart-slot" data-slide-chart="operations">
+                {/* v0.6.18 Task A: the yearly operating burn — the deck model's own series (the engine's
+                    per-year operating amounts), rendered as bars at the entry unit; nothing is recomputed. */}
+                <RecoveryBars series={sl.chart.data} peakFor={peakFor} kicker={sl.chart.kicker} periodNote="Each bar is one program year of operating cost." basis="annual" />
+              </div>
+            )}
             {sl.name === "recovery" && result !== null && (
               <div data-testid="deck-chart-slot" data-slide-chart="recovery">
-                <RecoveryBars collectionsGrid={result.collectionsGrid} years={result.yearly.length} labelFor={(y) => yearHeader(y, startYear)} peakFor={peakFor} kicker={recoveryKicker} cap={15} />
+                {/* v0.6.18 Task H1: the annual basis by default; the month level only on request (the toggle below recomposes the
+                    deck series; nothing is recomputed here) */}
+                <RecoveryBars series={sl.chart?.data ?? []} peakFor={peakFor} kicker={recoveryKicker} periodNote={`${sl.chart?.kicker ?? ""}. ${sl.chart?.periodNote ?? ""}`.trim()} basis={sl.chart?.basis ?? "annual"} />
+                <button data-action="recovery-monthly" onClick={() => setRecoveryMonthly((v) => !v)}>{recoveryMonthly ? "Show annual" : "Show monthly"}</button>
               </div>
             )}
             {sl.name === "coverage" && result !== null && (

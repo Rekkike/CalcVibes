@@ -43,14 +43,16 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
     expect(totalCostFigure.rawValue).toBe(result.totalCost);
     const costNpvFigure = investment.find((f) => f.label === "Cost NPV at target (discounted)")!;
     expect(costNpvFigure.rawValue).toBe(result.costNpv);
-    const chartData = deck.slides[2].chart?.data ?? [];
-    expect(chartData.length).toBe(result.lineTotals.length);
+    // v0.6.18 Task J.1: the dead rows-chart field is retired; the waterfall ledger carries the capital lines
+    expect(deck.slides[2].chart).toBeUndefined();
+    const ledger = deck.slides[2].waterfall!.rows.filter((r) => r.kind === "capital");
+    expect(ledger.length).toBe(result.lineTotals.length);
     for (const lt of result.lineTotals) {
-      const bar = chartData.find((d) => d.label === lt.name)!;
-      expect(bar.value).toBe(lt.total);
+      const row = ledger.find((d) => d.name === lt.name)!;
+      expect(row.raw).toBe(lt.total);
     }
     const recovery = deck.slides[3].body;
-    expect(recovery.find((f) => f.label === "Payment per period")!.rawValue).toBe(result.paymentAmount);
+    expect(recovery.find((f) => f.label === "Payment per quarter")!.rawValue).toBe(result.paymentAmount); // v0.6.18 Task H1: the cadence names the period
     expect(recovery.find((f) => f.label === "Total collected (nominal)")!.rawValue).toBe(result.totalCollected);
     const coverage = deck.slides[4].body;
     expect(coverage.find((f) => f.label === "Nominal payback")!.rawValue).toBe(result.paybackYears);

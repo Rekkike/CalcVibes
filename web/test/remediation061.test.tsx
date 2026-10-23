@@ -63,8 +63,14 @@ describe("v0.6.1 chunk 1 — the worksuite surfaces", () => {
     fireEvent.click(byAction("load-multi-lease-demo"));
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 2; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    // v0.6.18 Task H1 re-anchor: the annual basis — one bar per program year, never bucketed or capped; a long span
+    // scrolls (the grid reserves its width) with the labels thinned
     const bars = document.querySelectorAll('[data-slide-name="recovery"] [data-recovery-column]');
-    expect(bars.length).toBeLessThanOrEqual(15);
+    expect(bars.length).toBe(23); // the land demo loader's horizon (the 54-year multi-lease fixture is the internal template)
+    expect(bars.length).toBeGreaterThan(20);
+    const grid = document.querySelector('[data-slide-name="recovery"] .recovery-grid') as HTMLElement;
+    expect(parseFloat(grid.style.minWidth)).toBe(bars.length * 26);
+    expect(document.querySelectorAll('[data-slide-name="recovery"] [data-testid="bar-year-label"][data-thinned="true"]').length).toBeGreaterThan(0);
     fireEvent.click(document.querySelector('[data-action="exit-presentation"]') as HTMLElement);
     expect(document.querySelector('[data-testid="app-root"], .app-root')).toBeTruthy();
   });
@@ -150,8 +156,9 @@ describe("v0.6.1 chunk 2 — the deck as the presentation of the worksuite", () 
     fireEvent.click(byAction("load-multi-lease-demo"));
     fireEvent.click(byAction("present"));
     for (let i = 0; i < 2; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    // v0.6.18 Task H1 re-anchor: no cap — one bar per program year (the chart scrolls)
     const bars = document.querySelectorAll('[data-slide-name="recovery"] [data-recovery-column]');
-    expect(bars.length).toBeLessThanOrEqual(15);
+    expect(bars.length).toBeGreaterThan(15);
     for (let i = 0; i < 5; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
     const disclosure = Array.from(document.querySelectorAll('[data-slide-name="deal"] .warning')).map((el) => el.textContent);
     expect(disclosure.some((t) => t?.includes("Assumes sale at remaining book value"))).toBe(true);

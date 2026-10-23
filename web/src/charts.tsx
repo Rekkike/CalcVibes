@@ -1,5 +1,6 @@
-import type { GridRow, LineTotal, YearlyRow } from "../../core/src/types.js";
+import type { LineTotal, YearlyRow } from "../../core/src/types.js";
 import type { DeckGantt, DeckWaterfall } from "./deck.js";
+import { percentOneForDisplay } from "./engine.js";
 
 export const CHART_COLORS = {
   costBar: "#fb7185",
@@ -156,8 +157,11 @@ export function bucketSeries(values: number[], cap: number): { buckets: number[]
 
 export const DONUT_COLORS = ["#0074ba", "#059669", "#b45309", "#7c3aed", "#db2777", "#0891b2", "#65a30d", "#c2410c"];
 
+// v0.6.18 Task B: each label carries its share of the ring's OWN total, one decimal. The deck passes the
+// share composed in the deck model; the workspace ring (no deck model) formats the same fraction the arc
+// draws through the same percentOneForDisplay formatter.
 export function CompositionDonut(props: {
-  lineTotals: LineTotal[];
+  lineTotals: (LineTotal & { share?: string })[];
   valueFor: (total: number) => string;
 }) {
   const { lineTotals, valueFor } = props;
@@ -175,7 +179,7 @@ export function CompositionDonut(props: {
     const d = frac >= 0.9999
       ? `M ${cx + rMid} ${cy} A ${rMid} ${rMid} 0 1 1 ${cx - rMid - 0.01} ${cy} A ${rMid} ${rMid} 0 1 1 ${cx + rMid} ${cy}`
       : `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${rMid} ${rMid} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
-    return { id: l.id, name: l.name, total: l.total, frac, d, color: DONUT_COLORS[i % DONUT_COLORS.length] };
+    return { id: l.id, name: l.name, total: l.total, frac, d, color: DONUT_COLORS[i % DONUT_COLORS.length], share: l.share ?? percentOneForDisplay(frac) };
   });
   return (
     <div data-testid="composition-donut" className="chart-block composition-donut">
@@ -192,7 +196,7 @@ export function CompositionDonut(props: {
         {arcs.map((a) => (
           <li key={a.id} data-testid="donut-label" data-donut-label={a.id} className="donut-label">
             <span data-testid="donut-swatch" className="donut-swatch" style={{ background: a.color }} />
-            <span className="row-name">{a.name} {valueFor(a.total)}</span>
+            <span className="row-name">{a.name} {valueFor(a.total)} <span data-donut-share={a.id} className="donut-share">{a.share}</span></span>
           </li>
         ))}
       </ul>
@@ -200,40 +204,41 @@ export function CompositionDonut(props: {
   );
 }
 
+// v0.6.18 Task H1: the recovery bars draw the deck model's per-year series (the annual basis by default; the monthly
+// basis only on request) — nothing is bucketed, nothing is recomputed here. A SHORT span draws a few wide bars
+// (each capped in width); a LONG span draws one narrow bar per year in a scrollable grid with the year labels
+// thinned to every n-th bar and the peak named once. One bar is named by the period note.
+// The peak label is wider than its narrow column: a peak in the first third anchors the label at its column's left edge
+// (it spills right over the empty labels), one in the last third at the right edge (it spills left), so the figure is
+// never clipped by the scroll grid's edge; a peak in the middle stays centred.
+const peakEdge = (k: number, n: number): string => (k < n / 3 ? " peak-start" : k >= (2 * n) / 3 ? " peak-end" : "");
 export function RecoveryBars(props: {
-  collectionsGrid: GridRow[];
-  years: number;
-  labelFor: (year: number) => string;
+  series: { label: string; value: number }[];
   peakFor: (value: number) => string;
   kicker?: string;
-  cap?: number;
+  periodNote?: string;
+  basis?: "annual" | "monthly";
 }) {
-  const { collectionsGrid, years, labelFor, peakFor, kicker, cap = 20 } = props;
-  const rawInflows = new Array<number>(years).fill(0);
-  for (const row of collectionsGrid) {
-    for (let k = 0; k < Math.min(years, row.amounts.length); k++) rawInflows[k] += row.amounts[k];
-  }
-  const { buckets: inflows, width } = bucketSeries(rawInflows, cap);
-  const max = Math.max(1, ...inflows);
-  const peakIdx = inflows.indexOf(Math.max(...inflows));
-  // v0.6.8 Task C (finding W22): when the bucket width is greater than 1, the range label renders
-  // only on every ceil(bucketCount / 8)th column; the thinned columns render an empty label with
-  // data-thinned="true". At width 1 the yearly label set is the designed shape and is unchanged.
-  const thinStep = width > 1 ? Math.ceil(inflows.length / 8) : 1;
+  const { series, peakFor, kicker, periodNote, basis = "annual" } = props;
+  const max = Math.max(1, ...series.map((d) => d.value));
+  const peakIdx = series.findIndex((d) => d.value === Math.max(...series.map((x) => x.value)));
+  const labelStep = Math.max(1, Math.ceil(series.length / 12));
+  const colMin = basis === "monthly" ? 6 : 26;
   return (
-    <div data-testid="recovery-bars" className="chart-block">
+    <div data-testid="recovery-bars" data-basis={basis} className="chart-block">
       {kicker !== undefined && <p data-testid="chart-kicker" className="chart-kicker">{kicker}</p>}
-      {/* v0.6.9 Task B (finding W26): the scrollable bucket grid — the honest-overflow pattern
-          (the app's .editor-scroll) so the axis labels never overlap at phone width. */}
+      {periodNote !== undefined && <p data-testid="recovery-period-note" className="muted recovery-period-note">{periodNote}</p>}
+      {/* the scrollable grid — the honest-overflow pattern (the app's .editor-scroll), so a long span scrolls
+          instead of crowding and the labels never overlap at phone width. */}
       <div data-testid="recovery-scroll" className="recovery-scroll">
-        <div className="recovery-grid">
-          {inflows.map((v, k) => (
-            <div key={k} data-recovery-column={k} data-bucket-width={width} className="recovery-column">
-              <span data-testid="peak-label" className={k === peakIdx && v > 0 ? "peak-label" : "peak-label peak-hidden"}>{k === peakIdx && v > 0 ? (width === 1 ? `${peakFor(v)} in ${labelFor(k * width + 1)}` : `${peakFor(v)} in ${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}`) : "\u00a0"}</span>
-              <svg viewBox={`0 0 10 ${Math.max(1, Math.round((v / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
-                <rect x={0} y={0} width={10} height={Math.max(1, Math.round((v / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
+        <div className="recovery-grid" style={{ minWidth: `${series.length * colMin}px` }}>
+          {series.map((d, k) => (
+            <div key={k} data-recovery-column={k} data-bucket-width={1} className="recovery-column">
+              <span data-testid="peak-label" className={k === peakIdx && d.value > 0 ? "peak-label" + peakEdge(k, series.length) : "peak-label peak-hidden"}>{k === peakIdx && d.value > 0 ? `${peakFor(d.value)} in ${d.label}` : "\u00a0"}</span>
+              <svg viewBox={`0 0 10 ${Math.max(1, Math.round((d.value / max) * 100))}`} preserveAspectRatio="none" aria-hidden="true" className="recovery-bar-svg">
+                <rect x={0} y={0} width={10} height={Math.max(1, Math.round((d.value / max) * 100))} fill={CHART_COLORS.inflowBar} rx={2} />
               </svg>
-              <span data-testid="bar-year-label" {...(width > 1 && k % thinStep !== 0 ? { "data-thinned": "true" } : {})} className="bar-year-label">{width === 1 ? labelFor(k + 1) : (k % thinStep === 0 ? `${labelFor(k * width + 1)}\u2013${labelFor(Math.min(years, (k + 1) * width))}` : "\u00a0")}</span>
+              <span data-testid="bar-year-label" {...(k % labelStep !== 0 ? { "data-thinned": "true" } : {})} className="bar-year-label">{k % labelStep === 0 ? d.label : "\u00a0"}</span>
             </div>
           ))}
         </div>
@@ -241,7 +246,6 @@ export function RecoveryBars(props: {
     </div>
   );
 }
-
 export function StageReturnsChart(props: {
   yearly: YearlyRow[];
   labelFor: (year: number) => string;
@@ -322,7 +326,7 @@ export function CostWaterfall(props: { waterfall: DeckWaterfall }) {
         {steps.map((c, i) => (
           <span key={"val-" + c.id} data-testid="waterfall-label" data-waterfall-kind={c.kind} className="waterfall-label waterfall-value" style={{ bottom: `calc(${c.bottomPct + c.heightPct}% + 4px)`, left: `${i * slot}%`, width: `${0.6 * slot}%` }}>{c.value}</span>
         ))}
-        <span data-testid="waterfall-total-label" data-waterfall-kind="total" className="waterfall-label waterfall-value" style={{ bottom: "calc(100% + 4px)", left: `${steps.length * slot}%`, width: `${slot}%` }}>Total program cost {total.value}</span>
+        <span data-testid="waterfall-total-label" data-waterfall-kind="total" className="waterfall-label waterfall-value" style={{ bottom: "calc(100% + 4px)", left: `${steps.length * slot}%`, width: `${slot}%` }}>{total.name} {total.value}</span>
       </div>
       <div data-waterfall-ground="true" className="waterfall-ground" />
       <div className="waterfall-names">
@@ -352,13 +356,9 @@ export function LedgerWaterfall(props: { waterfall: DeckWaterfall; kicker?: stri
           <span data-ledger-label="name" className="ledger-name">{r.name}</span>
           <div className="ledger-track">
             <div data-ledger-edge="true" className="ledger-scale">
-              {r.kind === "subtotal" ? (
-                <span data-ledger-tick="true" className="ledger-tick" style={{ left: `${r.startPct}%` }} />
-              ) : (
-                <span data-ledger-bar={r.id} data-ledger-kind={r.kind} className={"ledger-bar ledger-bar-" + r.kind} style={{ left: `${r.startPct}%`, width: `${r.widthPct}%` }} />
-              )}
-              <span data-ledger-value="true" className="ledger-value" style={{ left: `calc(${r.kind === "subtotal" ? r.startPct : r.startPct + r.widthPct}% + 6px)` }}>{r.value}</span>
-              {r.kind !== "subtotal" && r.kind !== "total" && (
+              <span data-ledger-bar={r.id} data-ledger-kind={r.kind} className={"ledger-bar ledger-bar-" + r.kind} style={{ left: `${r.startPct}%`, width: `${r.widthPct}%` }} />
+              <span data-ledger-value="true" className="ledger-value" style={{ left: `calc(${r.startPct + r.widthPct}% + 6px)` }}>{r.value}</span>
+              {r.kind !== "total" && (
                 <span data-ledger-connector={r.id} className="ledger-connector" style={{ left: `${r.startPct + r.widthPct}%` }} />
               )}
             </div>
@@ -373,22 +373,24 @@ export function LedgerWaterfall(props: { waterfall: DeckWaterfall; kicker?: stri
 export function HurdlePlot(props: {
   target: number;
   achieved: number;
+  // v0.6.18 (AUD-10): the achieved IRR is null (no solution): no dot, the dash reads
+  achievedMissing?: boolean;
   goalMet: boolean;
   solved?: boolean;
 }) {
-  const { target, achieved, goalMet, solved = false } = props;
+  const { target, achieved, goalMet, solved = false, achievedMissing = false } = props;
   const bound = Math.max(target, achieved) * 1.15;
   const scale = Math.max(1e-12, bound);
   return (
     <div data-testid="hurdle-plot" className="chart-block">
       <div className="hurdle-track">
         <span data-testid="hurdle-target-dot" data-hurdle="target" className="hurdle-dot" style={{ left: `${(target / scale) * 100}%` }} />
-        <span data-testid="hurdle-achieved-dot" data-hurdle="achieved" className={"hurdle-dot " + (goalMet ? "tone-ok" : "tone-bad")} style={{ left: `${(achieved / scale) * 100}%` }} />
+        {!achievedMissing && <span data-testid="hurdle-achieved-dot" data-hurdle="achieved" className={"hurdle-dot " + (goalMet ? "tone-ok" : "tone-bad")} style={{ left: `${(achieved / scale) * 100}%` }} />}
       </div>
       <div className="hurdle-labels">
         <span data-testid="hurdle-target-label" className="column-year-label">Target {target.toFixed(2)}%</span>
-        <span data-testid="hurdle-margin-label" data-hurdle-mode={solved ? "solved" : "evaluated"} className="column-year-label">{solved ? "solved to the target" : goalMet ? "clears the hurdle" : "below the hurdle"}</span>
-        <span data-testid="hurdle-achieved-label" className="column-year-label">Achieved {achieved.toFixed(2)}%</span>
+        <span data-testid="hurdle-margin-label" data-hurdle-mode={solved ? "solved" : "evaluated"} className="column-year-label">{solved ? "solved to the target" : achievedMissing ? "no achieved rate" : goalMet ? "clears the hurdle" : "below the hurdle"}</span>
+        <span data-testid="hurdle-achieved-label" className="column-year-label">Achieved {achievedMissing ? "—" : `${achieved.toFixed(2)}%`}</span>
       </div>
     </div>
   );
@@ -493,13 +495,14 @@ export function GanttChart(props: { gantt: DeckGantt }) {
           const cy = lanesBottom + 34 + gateShift + m.row * 30;
           return (
             <g key={m.id} data-gantt-milestone={m.id} data-milestone-ordinal={m.ordinal}>
-              {m.computed !== null && m.computed.from !== m.computed.pos && (
-                <line data-gantt-computed-link={m.id} x1={xAt(m.computed.from)} x2={xAt(m.computed.pos)} y1={cy} y2={cy} stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1} />
-              )}
               {m.computed !== null && (
-                <circle data-gantt-computed={m.id} cx={xAt(m.computed.pos)} cy={cy} r={10} fill="none" stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1.5}>
-                  <title>{`Computed month ${m.computed.month} of year ${m.computed.year} (read-only, from the live schedule)`}</title>
-                </circle>
+                <>
+                  <circle data-gantt-computed={m.id} cx={xAt(m.computed.pos)} cy={cy} r={10} fill="none" stroke={STAGE_CHART_COLORS.axisText} strokeOpacity={0.55} strokeWidth={1.5}>
+                    <title>{`Computed month ${m.computed.month} of year ${m.computed.year} (read-only, from the live schedule)`}</title>
+                  </circle>
+                  {/* v0.6.18 Task H2: the ring is named in place of the retired connector */}
+                  <text data-gantt-computed-label={m.id} x={xAt(m.computed.pos) + (m.computed.side === "right" ? 14 : -14)} y={cy + 4} textAnchor={m.computed.side === "right" ? "start" : "end"} fontSize={11} fill={STAGE_CHART_COLORS.axisText} fillOpacity={0.85}>{m.computed.label}</text>
+                </>
               )}
               <polygon points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`} fill="#34d399" />
               <text data-gantt-milestone-number={m.ordinal} x={cx} y={cy + 19} textAnchor="middle" fontSize={12} fontWeight={700} fill={STAGE_CHART_COLORS.axisText}>{m.ordinal}</text>

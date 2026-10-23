@@ -91,7 +91,7 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     expect(byLabel("Achieved IRR").querySelector(".kpi-value")?.textContent).toBe(percentForDisplay(result.achievedIrr, 2));
     expect(byLabel("Achieved IRR").querySelector(".kpi-chip")?.textContent).toBe(`vs ${roundForDisplay(program.targetIrr, 2)}% target`);
     expect(byLabel("Achieved IRR").className).toContain("tone-ok");
-    expect(byLabel("NPV at WACC").querySelector(".kpi-value")?.textContent).toBe(deckMoneyForDisplay(result.npvAtWacc, "EUR", "ones"));
+    expect(byLabel("NPV at WACC").querySelector(".kpi-value")?.textContent).toBe(deckMoneyForDisplay(result.npvAtWacc, "EUR", "thousands")); // v0.6.18 (AUD-17) re-anchor: the NPV KPI carries the entry unit in force (the fresh app is at thousands)
     expect(byLabel("Payback (nominal)").querySelector(".kpi-value")?.textContent).toBe(deckYearsForDisplay(result.paybackYears as number));
     // The financing branch: the minimum DSCR through the two-decimal DSCR formatter with
     // its calendar chip at the preset start year 2026.
@@ -112,7 +112,7 @@ describe("Task B: ANSWER-BAND / KPI-ROW / FIGURE-BAND / COVERAGE-BOTTOM", () => 
     const band = document.querySelector('[data-testid="figure-band"]') as HTMLElement;
     expect(band.querySelectorAll(".figure-item").length).toBe(3);
     expect(band.querySelector('[data-testid="figure-band"] .figure-value') === null ? null : Array.from(band.querySelectorAll(".figure-value")).map((e) => e.textContent))
-      .toEqual([deckMoneyForDisplay(result.totalCost, "EUR", "ones"), deckMoneyForDisplay(result.totalCollected, "EUR", "ones"), deckMoneyForDisplay(result.netGain, "EUR", "ones")]);
+      .toEqual([deckMoneyForDisplay(result.totalCost, "EUR", "thousands"), deckMoneyForDisplay(result.totalCollected, "EUR", "thousands"), deckMoneyForDisplay(result.netGain, "EUR", "thousands")]); // v0.6.18 (AUD-17) re-anchor: the figure band carries the entry unit in force
     expect(band.querySelector(".caveat")?.textContent).toBe("Nominal figures are undiscounted; the cost NPV and achieved IRR are discounted.");
   });
 
@@ -200,7 +200,6 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
       { name: "Market pillar", total: group(["p4"]), kind: "capital" as const },
       { name: "Cruise terminal", total: group(["p5"]), kind: "capital" as const },
       { name: "Inland & public berths", total: group(["p6"]), kind: "capital" as const },
-      { name: "Operating lines", total: result.operatingTotal, kind: "operating" as const },
     ];
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -210,7 +209,8 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     const waterfall = slide.querySelector('[data-testid="cost-waterfall"]') as HTMLElement;
     const segments = waterfall.querySelectorAll("[data-waterfall-segment]");
     expect(segments.length).toBe(expectedSegments.length);
-    const cap = Math.max(1e-12, result.totalCost);
+    // v0.6.18 Task A re-anchor: the waterfall closes at the Capital program step (the capital groups only)
+    const cap = Math.max(1e-12, result.lineTotals.reduce((a, l) => a + l.total, 0));
     let accShare = 0;
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i] as HTMLElement;
@@ -226,11 +226,11 @@ describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTI
     expect(parseFloat(totalEl.style.height)).toBe(100);
     const totalLabel = waterfall.querySelector('[data-testid="waterfall-total-label"]') as HTMLElement;
     expect(totalLabel.getAttribute("data-waterfall-kind")).toBe("total");
-    expect(totalLabel.textContent).toBe(`Total program cost ${deckMoneyForDisplay(result.totalCost, "EUR", "thousands")}`);
-    expect(totalLabel.textContent).toBe("Total program cost €628 250 k");
+    expect(totalLabel.textContent).toBe(`Capital program ${deckMoneyForDisplay(cap, "EUR", "thousands")}`);
+    expect(totalLabel.textContent).toBe("Capital program €449 000 k");
     // the stepped geometry on n+1 slots: each column owns an equal slot, fills 60 percent of it; adjacent never overlap
     const stepEls = waterfall.querySelectorAll("[data-waterfall-step]");
-    expect(stepEls.length).toBe(6);
+    expect(stepEls.length).toBe(5);
     const slot = 100 / (expectedSegments.length + 1);
     for (let i = 0; i < stepEls.length; i++) {
       const seg = stepEls[i] as HTMLElement;

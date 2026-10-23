@@ -1,10 +1,10 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase } from "../../core/src/types.js";
-import { GANTT_LANE_LABEL_CHARS, ganttWindow, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
+import { GANTT_LANE_LABEL_CHARS, GANTT_PLOT_EM, labelEm, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
-import { moneyForDisplay, percentTwoForDisplay, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
+import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, programSpanYears, timelineAuthored, timelineOf, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
+import { DECISION_DISCLOSURE, availableEngineEvents, composeInvestment, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -20,6 +20,12 @@ export interface DeckChartSlot {
   kind: "donut" | "bars" | "rows" | "coverage" | "hurdle";
   data: { label: string; value: number }[];
   solved?: boolean;
+  // v0.6.18 (AUD-10): a hurdle chart whose achieved IRR is null draws no achieved dot and reads "—"
+  achievedMissing?: boolean;
+  // v0.6.18 Task H1: the basis of a per-year bar series (annual by default; monthly only on request) and the one
+  // line that names what one bar is, composed once with the series
+  basis?: "annual" | "monthly";
+  periodNote?: string;
   crossingX?: number | null;
   // v0.6.8 Task G: the deck model emits the chart's kicker (an action title naming the varied
   // parameter); the hard-coded Presentation line is gone.
@@ -30,6 +36,8 @@ export interface DeckDonutSegment {
   id: string;
   label: string;
   value: number;
+  // v0.6.18 Task B: the share of the ring's OWN total, one decimal (percentOneForDisplay), composed once here
+  share?: string;
 }
 
 export interface DeckDonut {
@@ -101,8 +109,12 @@ export interface DeckGanttGate { id: string; code: string | null; title: string;
 // stack position among the drawn milestones sharing a year (0 = the first).
 // v0.6.17 supplement: a milestone tied to an engine event whose live schedule carries a month also carries the
 // COMPUTED position (read-only exposure, never authored): drawn as a muted ring, composed once here.
-// from is the authored diamond's position: the renderers draw the thin muted connector from it to pos.
-export interface DeckGanttComputed { year: number; month: number; pos: number; from: number }
+// v0.6.18 Task H2 (the builder proposal, applied): the thin connector from the authored diamond to the ring is RETIRED —
+// it carried no meaning to a reader (a line between two marks says nothing about what the second one is). The ring
+// is NAMED instead: it carries its own short text label, composed once here ("computed: month 12"), set on the side
+// of the ring away from the authored diamond so it never lands on it. The authored diamond never changes; the ring
+// stays the read-only exposure of the live schedule (never authored).
+export interface DeckGanttComputed { year: number; month: number; pos: number; label: string; side: "left" | "right" }
 export interface DeckGanttMilestone { id: string; label: string; year: number; month: number | null; pos: number; tie: string | null; ordinal: number; row: number; computed: DeckGanttComputed | null }
 export interface DeckGantt {
   // the program span; the axis and the plot cover the year window only
@@ -131,10 +143,11 @@ export interface DeckGantt {
 export interface DeckLedgerRow {
   id: string;
   name: string;
-  kind: "capital" | "subtotal" | "operating" | "reinvestments" | "total";
+  // v0.6.18 Task A: the waterfall composes the capital program only and closes at the Capital program step
+  kind: "capital" | "total";
   raw: number;
   value: string;
-  // the share of the total program cost (the full-outflow basis), one decimal
+  // the share of the capital program (the v0.6.18 basis), one decimal
   share: string;
   startPct: number;
   widthPct: number;
@@ -142,7 +155,7 @@ export interface DeckLedgerRow {
 export interface DeckStepColumn {
   id: string;
   name: string;
-  kind: "capital" | "operating" | "reinvestments" | "total";
+  kind: "capital" | "total";
   raw: number;
   value: string;
   bottomPct: number;
@@ -194,7 +207,7 @@ export interface DeckModel {
 export function deckSlides(
   inputs: ModelInputs,
   result: ModelResult,
-  opts: { startYear: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean } = { startYear: null },
+  opts: { startYear: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean; recoveryMonthly?: boolean } = { startYear: null },
 ): DeckModel {
   const currency = (inputs.currency as Parameters<typeof moneyForDisplay>[1]) ?? "SEK";
   const unit = opts.entryUnit ?? "ones";
@@ -249,16 +262,20 @@ export function deckSlides(
       if (rowTotal > 0) inflowSegments.push({ id: row.id, label: row.name, value: rowTotal });
     }
   }
+  // v0.6.18 Task B: the percentages are shares of each ring's OWN total (the geometry the arcs draw), one
+  // decimal, composed here once; the one-decimal residue is disclosed, never smoothed. The outflow
+  // disclosure names the ring's basis — the capital lines plus the reinvestments, the operating lines
+  // excluded (the v0.6.8 "shown separately" wording retired with the v0.6.10 reinvestments segment) — and
+  // the percentages' basis.
+  const withShares = (segs: DeckDonutSegment[]): DeckDonutSegment[] => {
+    const ringTotal = Math.max(1e-12, segs.reduce((a, s) => a + s.value, 0));
+    return segs.map((s) => ({ ...s, share: percentOneForDisplay(s.value / ringTotal) }));
+  };
+  const SHARE_BASIS = "Percentages are shares of the ring's own total.";
+  const outflowDisclosure = `The outflow ring shows the capital lines${reinvestmentsTotal > 0 ? " plus the reinvestments" : ""}${result.operatingTotal > 0 ? "; the operating lines are excluded (they are part of the total cost and appear on the operations slide)" : ""}. ${SHARE_BASIS}`;
   const summaryDonuts: DeckDonut[] = [
-    {
-      id: "outflows",
-      title: "Outflows — the investment",
-      segments: outflowSegments,
-      // v0.6.8 Task A.4: the donut shows the capital program; the wording no longer contradicts
-      // the waterfall arithmetic (operating lines and reinvestments are part of the total cost).
-      ...(result.operatingTotal > 0 ? { disclosure: "The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately." } : {}),
-    },
-    { id: "inflows", title: "Inflows — the collections", segments: inflowSegments, ...(inflowDisclosure !== undefined ? { disclosure: inflowDisclosure } : {}) },
+    { id: "outflows", title: "Outflows — the investment", segments: withShares(outflowSegments), disclosure: outflowDisclosure },
+    { id: "inflows", title: "Inflows — the collections", segments: withShares(inflowSegments), disclosure: inflowDisclosure !== undefined ? `${inflowDisclosure} ${SHARE_BASIS}` : SHARE_BASIS },
   ];
   slides.push({
     name: "summary",
@@ -267,7 +284,7 @@ export function deckSlides(
     disclosures: [],
     tiles: [
       { label: "Cost NPV", value: money(result.costNpv), rawValue: result.costNpv, disclosure: "at the target rate" },
-      { label: "Achieved IRR", value: percentTwoForDisplay(result.achievedIrr ?? 0), rawValue: result.achievedIrr, tone: result.goalMet ? "ok" : "bad" },
+      { label: "Achieved IRR", value: percentTwoOrDash(result.achievedIrr), rawValue: result.achievedIrr, tone: result.goalMet ? "ok" : "bad" },
       { label: "Payback", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), rawValue: result.paybackYears },
       { label: "Solved payment", value: result.paymentAmount === null ? "—" : fee(result.paymentAmount), rawValue: result.paymentAmount },
       { label: "Collected vs cost", value: `${money(result.totalCollected)} vs ${money(result.totalCost)}`, rawValue: result.totalCollected },
@@ -281,9 +298,6 @@ export function deckSlides(
     { label: "Total cost (nominal)", value: money(result.totalCost), kind: "money", rawValue: result.totalCost },
     { label: "Cost NPV at target (discounted)", value: money(result.costNpv), kind: "money", rawValue: result.costNpv, disclosure: "discounted at the target rate" },
   ];
-  if (result.operatingTotal > 0) {
-    investmentBody.push({ label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "expensed as incurred; part of the total cost, not depreciated" });
-  }
   // v0.6.10 Task G.1: the funding breakdown block — gross capital program, grants, net private
   // capital (each at one decimal in the entry unit, the honest halves), the grant intensity,
   // and the funding rows listed with their kinds and years. The grants figure renders through
@@ -321,8 +335,10 @@ export function deckSlides(
     // in the completion report, never smoothed; the capital-program basis stays stated.
     // v0.6.15: the slide carries ONE basis — the shares are of the total program cost (the full outflow);
     // the capital-basis shares retired with the composition rows.
-    disclosures: ["Shares are of the total program cost, the full outflow: the capital lines, the operating lines and the reinvestments."],
-    chart: { kind: "rows", data: result.lineTotals.map((l) => ({ label: l.name, value: l.total })) },
+    // v0.6.18 Task A: the waterfall and its shares are of the capital program; the disclosure names the
+    // segments of the total program cost that lie beyond it (only the segments that exist). v0.6.18 Task J.1:
+    // the dead rows-chart field of the slide model retired (the waterfall is the investment chart).
+    disclosures: [investmentDisclosure(result.operatingTotal > 0, reinvestmentsTotal > 0)],
     ...(fundingBlock !== undefined ? { funding: fundingBlock } : {}),
     waterfall: composeWaterfall(composeInvestment(inputs, result), money),
   });
@@ -339,13 +355,22 @@ export function deckSlides(
     slides.push(ganttSlide(inputs, result, startYearOf(opts), opts.monthGrid === true));
   }
 
+  // v0.6.18 Task A: the conditional operations slide — composed ONLY when operating lines exist. The
+  // operating lines are running costs (what happens after the investment): the engine classification
+  // stands (expensed as incurred, part of the total cost, never depreciated); this slide only seats them.
+  // The yearly burn is the engine's own per-year operating series (the book view), shown from the first to
+  // the last operating year. No income is attributable to the operating lines alone, so none is paired.
+  if (result.operatingTotal > 0) slides.push(operationsSlide(result, money, startYear));
+
   // Slide 3 — recovery
   let recoveryTitle: string;
   const recoveryBody: DeckFigure[] = [];
   if (!tariffCollectionMode && result.paymentAmount !== null) {
     recoveryTitle = "The recovery — solved payments";
     recoveryBody.push({ label: "Payments", value: String(result.paymentCount), kind: "count", rawValue: result.paymentCount });
-    recoveryBody.push({ label: "Payment per period", value: fee(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
+    // v0.6.18 Task H1: "period" named — the payment is per PAYMENT PERIOD of the repayment cadence, never confused
+    // with the bars below (one bar is one program year)
+    recoveryBody.push({ label: `Payment per ${CADENCE_WORD[inputs.repayment.paymentsPerYear] ?? "period"}`, value: fee(result.paymentAmount), kind: "money", rawValue: result.paymentAmount });
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
     if (inputs.tariff?.mode === "decompose") {
       // v0.6.12 Task C (Round 46 Supplement 12): the title composes from the declared vocabulary;
@@ -385,10 +410,13 @@ export function deckSlides(
     recoveryTitle = "The recovery — evaluated, not solved";
     recoveryBody.push({ label: "Total collected (nominal)", value: money(result.totalCollected), kind: "money", rawValue: result.totalCollected });
   }
-  const yearsCount = result.yearly.length;
-  const inflowByYear = new Array<number>(yearsCount).fill(0);
-  for (const row of result.collectionsGrid) {
-    for (let k = 0; k < Math.min(yearsCount, row.amounts.length); k++) inflowByYear[k] += row.amounts[k];
+  // v0.6.18 Task H1 (and AUD-27): the recovery series is composed here ONCE — the annual basis by default, the month
+  // level only on request; the grants and the interest-free note are identified in their own figures, never summed
+  // into the bars unidentified.
+  const recoverySeries = composeRecoverySeries(result, startYear, opts.recoveryMonthly === true);
+  if (grantsTotal > 0 || recoverySeries.noteAdvance > 0) {
+    if (grantsTotal > 0) recoveryBody.push({ label: "Grant receipts (identified; not in the bars)", value: fee(grantsTotal), kind: "money", rawValue: grantsTotal, disclosure: "received once per grant row; shown on the investment slide" });
+    if (recoverySeries.noteAdvance > 0) recoveryBody.push({ label: "Interest-free note advance (identified; not in the bars)", value: fee(recoverySeries.noteAdvance), kind: "money", rawValue: recoverySeries.noteAdvance, disclosure: "repaid by installments; nets to zero over the horizon" });
   }
   // v0.6.8 Task E.4 (finding W21): the user basis notes surface here — disclosed verbatim when
   // non-empty, absent when empty (the land fixture is the null-tolerance demo and gains none).
@@ -404,7 +432,7 @@ export function deckSlides(
     title: recoveryTitle,
     body: recoveryBody,
     disclosures: recoveryDisclosures,
-    chart: { kind: "bars", data: inflowByYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })) },
+    chart: { kind: "bars", data: recoverySeries.data, kicker: recoverySeries.kicker, basis: recoverySeries.basis, periodNote: recoverySeries.periodNote },
   });
 
   // Slide 3 — returns
@@ -443,7 +471,7 @@ export function deckSlides(
     name: "returns",
     title: "The returns",
     body: [
-      { label: "Achieved IRR", value: percentTwoForDisplay(result.achievedIrr ?? 0), kind: "percent", rawValue: result.achievedIrr },
+      { label: "Achieved IRR", value: percentTwoOrDash(result.achievedIrr), kind: "percent", rawValue: result.achievedIrr },
       { label: "Goal check", value: result.goalMet ? "target achieved" : "target not achieved", kind: "text", rawValue: null },
       { label: "NPV at WACC (discounted)", value: money(result.npvAtWacc), kind: "money", rawValue: result.npvAtWacc, disclosure: "discounted at the WACC" },
       { label: "Profitability index", value: result.profitabilityIndex === null ? "—" : dscrTwoForDisplay(result.profitabilityIndex), kind: "dscr", rawValue: result.profitabilityIndex },
@@ -473,14 +501,14 @@ export function deckSlides(
   } else {
     const eq = result.financing.equity;
     verdict = result.goalMet
-      ? `Target met — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid.`
-      : `Target missed — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoForDisplay(eq.irr ?? 0)} on ${money(eq.outlay)} outlaid.`;
+      ? `Target met — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoOrDash(eq.irr)} on ${money(eq.outlay)} outlaid.`
+      : `Target missed — equity IRR ${eq.zeroOutlay ? "not applicable" : percentTwoOrDash(eq.irr)} on ${money(eq.outlay)} outlaid.`;
   }
   const tiles: DeckTile[] = [
     { label: "Total cost", value: money(result.totalCost), rawValue: result.totalCost },
     { label: "Total collected", value: money(result.totalCollected), rawValue: result.totalCollected },
     { label: "Net gain", value: money(result.netGain), tone: result.netGain >= 0 ? "ok" : "bad", rawValue: result.netGain },
-    { label: "Achieved IRR", value: `${percentTwoForDisplay(result.achievedIrr ?? 0)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad", rawValue: result.achievedIrr },
+    { label: "Achieved IRR", value: `${percentTwoOrDash(result.achievedIrr)} vs ${percentTwoForDisplay(inputs.targetIrr / 100)} target`, tone: result.goalMet ? "ok" : "bad", rawValue: result.achievedIrr },
     { label: "NPV at WACC", value: money(result.npvAtWacc), tone: result.npvAtWacc >= 0 ? "ok" : "bad", rawValue: result.npvAtWacc },
     { label: "Payback (nominal)", value: result.paybackYears === null ? "—" : deckYearsForDisplay(result.paybackYears), rawValue: result.paybackYears },
   ];
@@ -492,12 +520,14 @@ export function deckSlides(
       tiles.push({ label: "Minimum DSCR", value: dscrTwoForDisplay(result.financing.minDscr.value), tone: result.financing.minDscr.value >= 1.0 ? "ok" : "bad", disclosure: `in ${yearHeader(result.financing.minDscr.year, startYear)}`, rawValue: result.financing.minDscr.value });
     }
   }
+  // the deal slide's inflow bars are always the annual basis (the monthly request applies to the recovery slide)
+  const annualRecovery = composeRecoverySeries(result, startYear, false);
   const summaryCharts: DeckChartSlot[] = [
-    { kind: "hurdle", solved: result.paymentAmount !== null, data: [
+    { kind: "hurdle", solved: result.paymentAmount !== null, ...(result.achievedIrr === null ? { achievedMissing: true } : {}), data: [
       { label: "Target", value: inputs.targetIrr },
       { label: "Achieved", value: (result.achievedIrr ?? 0) * 100 },
     ] },
-    { kind: "bars", data: result.yearly.map((y) => ({ label: yearHeader(y.year, startYear), value: y.inflow })) },
+    { kind: "bars", data: annualRecovery.data, kicker: annualRecovery.kicker, basis: "annual", periodNote: annualRecovery.periodNote },
   ];
   if (result.residualDisclosure !== null && result.residualDisclosure !== undefined) {
     // v0.6.5 Task A (W8): the deck composes its sale disclosure from structured fields through the
@@ -589,7 +619,7 @@ export function deckSlides(
           if (r.paymentAmount !== null) {
             sceBody.push({ label: `Payment at target ${g}%`, value: money(r.paymentAmount), kind: "money", rawValue: r.paymentAmount });
           } else {
-            sceBody.push({ label: `Verdict at target ${g}%`, value: r.goalMet ? `met — achieved ${percentTwoForDisplay(r.achievedIrr ?? 0)}` : `not met — achieved ${percentTwoForDisplay(r.achievedIrr ?? 0)}`, kind: "percent", rawValue: r.achievedIrr });
+            sceBody.push({ label: `Verdict at target ${g}%`, value: r.goalMet ? `met — achieved ${percentTwoOrDash(r.achievedIrr)}` : `not met — achieved ${percentTwoOrDash(r.achievedIrr)}`, kind: "percent", rawValue: r.achievedIrr });
           }
         }
       }
@@ -655,12 +685,13 @@ export function deckSlides(
     });
   }
 
-  const kickerNumbers = ["01", "02", "03", "04", "05", "06", "07", "08"];
+  // v0.6.18 Task A: the numbering adapts to the slide count (the conditional timeline, operations and
+  // scenarios slides): two digits, no fixed array.
   let kickerIdx = 0;
   for (const sl of slides) {
     if (sl.name !== "title") {
-      sl.kickerNumber = kickerNumbers[kickerIdx] ?? "";
       kickerIdx++;
+      sl.kickerNumber = String(kickerIdx).padStart(2, "0");
     }
   }
   const provenance: string[] = anyScenarioSet
@@ -681,37 +712,104 @@ export function deckSlides(
   return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
 }
 
+// v0.6.18 Task A: the waterfall composes the capital program only — the capital lines (the ledger) and
+// the capital groups (the stepped columns) — and closes at the Capital program step; the shares are of
+// the capital program. The operating lines and the reinvestments no longer draw as steps: the total
+// program cost stays a labeled figure of the slide, and its disclosure names the segments beyond.
+
+const CADENCE_WORD: Record<number, string> = { 1: "year", 2: "half-year", 4: "quarter", 12: "month" };
+
+// v0.6.18 Task H1: the recovery bars. The annual basis is the default: one bar per program year, the sum of its
+// collections EXCLUDING the grant receipts and the interest-free note's cash (those are identified in their own
+// figures). The month level composes only on request (the view toggle), as the monthly project inflows: every
+// project inflow in the month it falls, the grants and the note's cash included — the kicker says so. The series
+// is the single source the Presentation and the print route draw.
+function composeRecoverySeries(result: ModelResult, startYear: number | null, monthly: boolean): { basis: "annual" | "monthly"; data: { label: string; value: number }[]; kicker: string; periodNote: string; noteAdvance: number } {
+  const noteAdvance = (result.fundingView?.rows ?? []).filter((r) => r.kind === "interest-free-loan").reduce((a, r) => a + r.amount, 0);
+  if (monthly) {
+    return {
+      basis: "monthly",
+      data: result.monthly.map((m) => ({ label: `${yearHeader(m.year, startYear)} · month ${((m.period - 1) % 12) + 1}`, value: m.inflow })),
+      kicker: "Project inflows by month, including the grants and the interest-free note's cash",
+      periodNote: "Each bar is one month of every project inflow.",
+      noteAdvance,
+    };
+  }
+  const years = result.yearly.length;
+  const byYear = new Array<number>(years).fill(0);
+  for (const row of result.collectionsGrid) {
+    if (row.kind === "grant" || row.kind === "funding-loan") continue;
+    for (let k = 0; k < Math.min(years, row.amounts.length); k++) byYear[k] += row.amounts[k];
+  }
+  const funded = result.collectionsGrid.some((r) => r.kind === "grant" || r.kind === "funding-loan");
+  return {
+    basis: "annual",
+    data: byYear.map((v, k) => ({ label: yearHeader(k + 1, startYear), value: v })),
+    kicker: funded ? "Collections per year, excluding the grants and the interest-free note" : "Collections per year",
+    periodNote: "Each bar is one program year: the sum of its twelve months.",
+    noteAdvance,
+  };
+}
+
+// v0.6.18 Task H2: the computed ring and its label, composed once. The label sits on the side of the ring with the
+// room: the right by default (away from an authored diamond to the left), the left when the label would cross the
+// window's right edge; where neither side has room the larger one is taken. The label width is MEASURED (em).
+function computedRing(win: { firstYear: number; years: number }, year: number, month: number, authoredPos: number): DeckGanttComputed {
+  const pos = markerPosition(win, year, month);
+  const label = `computed: month ${month}`;
+  const need = ((labelEm(label) + 1.6) * win.years) / GANTT_PLOT_EM;
+  const rightRoom = win.years - pos;
+  const leftRoom = pos - Math.max(0, authoredPos < pos ? authoredPos : 0);
+  const preferRight = authoredPos <= pos;
+  const side: "left" | "right" = preferRight ? (rightRoom >= need || rightRoom >= leftRoom ? "right" : "left") : (leftRoom >= need || leftRoom >= rightRoom ? "left" : "right");
+  return { year, month, pos, label, side };
+}
 function composeWaterfall(c: ReturnType<typeof composeInvestment>, money: (v: number) => string): DeckWaterfall {
-  const cap = Math.max(1e-12, c.totalCost);
+  const cap = Math.max(1e-12, c.capitalSubtotal);
   const share = (v: number) => percentOneForDisplay(v / cap);
   const rows: DeckLedgerRow[] = [];
   let acc = 0;
-  const push = (id: string, name: string, kind: DeckLedgerRow["kind"], raw: number) => {
-    rows.push({ id, name, kind, raw, value: money(raw), share: share(raw), startPct: (acc / cap) * 100, widthPct: (raw / cap) * 100 });
-    acc += raw;
-  };
-  for (const l of c.lines) push(l.id, l.name, "capital", l.total);
-  // the capital subtotal marks the end of the capital program; it exists only when a segment
-  // follows (otherwise it would equal the total and encode nothing)
-  if (c.operating !== null || c.reinvestments !== null) {
-    rows.push({ id: "subtotal", name: "Capital program", kind: "subtotal", raw: c.capitalSubtotal, value: money(c.capitalSubtotal), share: share(c.capitalSubtotal), startPct: (c.capitalSubtotal / cap) * 100, widthPct: 0 });
+  for (const l of c.lines) {
+    rows.push({ id: l.id, name: l.name, kind: "capital", raw: l.total, value: money(l.total), share: share(l.total), startPct: (acc / cap) * 100, widthPct: (l.total / cap) * 100 });
+    acc += l.total;
   }
-  if (c.operating !== null) push(c.operating.id, c.operating.name, "operating", c.operating.total);
-  if (c.reinvestments !== null) push(c.reinvestments.id, c.reinvestments.name, "reinvestments", c.reinvestments.total);
-  rows.push({ id: "total", name: "Total program cost", kind: "total", raw: c.totalCost, value: money(c.totalCost), share: share(c.totalCost), startPct: 0, widthPct: 100 });
+  rows.push({ id: "total", name: "Capital program", kind: "total", raw: c.capitalSubtotal, value: money(c.capitalSubtotal), share: share(c.capitalSubtotal), startPct: 0, widthPct: 100 });
   const columns: DeckStepColumn[] = [];
   let colAcc = 0;
-  const pushCol = (id: string, name: string, kind: DeckStepColumn["kind"], raw: number) => {
-    columns.push({ id, name, kind, raw, value: money(raw), bottomPct: (colAcc / cap) * 100, heightPct: (raw / cap) * 100 });
-    colAcc += raw;
-  };
-  for (const g of c.groups) pushCol(g.id, g.name, "capital", g.total);
-  if (c.operating !== null) pushCol(c.operating.id, c.operating.name, "operating", c.operating.total);
-  if (c.reinvestments !== null) pushCol(c.reinvestments.id, c.reinvestments.name, "reinvestments", c.reinvestments.total);
-  columns.push({ id: "total", name: "Total program cost", kind: "total", raw: c.totalCost, value: money(c.totalCost), bottomPct: 0, heightPct: 100 });
-  return { totalRaw: c.totalCost, rows, columns };
+  for (const g of c.groups) {
+    columns.push({ id: g.id, name: g.name, kind: "capital", raw: g.total, value: money(g.total), bottomPct: (colAcc / cap) * 100, heightPct: (g.total / cap) * 100 });
+    colAcc += g.total;
+  }
+  columns.push({ id: "total", name: "Capital program", kind: "total", raw: c.capitalSubtotal, value: money(c.capitalSubtotal), bottomPct: 0, heightPct: 100 });
+  return { totalRaw: c.capitalSubtotal, rows, columns };
 }
 
+function investmentDisclosure(hasOperating: boolean, hasReinvestments: boolean): string {
+  const beyond = [hasOperating ? "the operating lines" : null, hasReinvestments ? "the reinvestments" : null].filter((x): x is string => x !== null);
+  const tail = beyond.length === 0 ? "" : ` The total program cost also includes ${beyond.join(" and ")}${hasOperating ? " (the operations slide shows the operating lines)" : ""}.`;
+  return `Shares are of the capital program: the capital lines, closing at the Capital program step.${tail}`;
+}
+
+function operationsSlide(result: ModelResult, money: (v: number) => string, startYear: number | null): DeckSlide {
+  const series = (result.bookView?.combined ?? []).map((r) => ({ year: r.year, value: r.operating }));
+  const active = series.filter((s) => s.value > 0);
+  const firstYear = active.length > 0 ? active[0].year : 1;
+  const lastYear = active.length > 0 ? active[active.length - 1].year : 1;
+  const burn = series.filter((s) => s.year >= firstYear && s.year <= lastYear).map((s) => ({ label: yearHeader(s.year, startYear), value: s.value }));
+  const years = lastYear - firstYear + 1;
+  const body: DeckFigure[] = [
+    { label: "Operating lines total", value: money(result.operatingTotal), kind: "money", rawValue: result.operatingTotal, disclosure: "expensed as incurred; part of the total cost, not depreciated" },
+    { label: "Share of the total program cost", value: percentOneForDisplay(result.operatingTotal / Math.max(1e-12, result.totalCost)), kind: "percent", rawValue: result.operatingTotal / Math.max(1e-12, result.totalCost) },
+    ...result.operatingLines.map((o) => ({ label: `Operating line — ${o.label}`, value: money(o.total), kind: "money" as const, rawValue: o.total })),
+  ];
+  return {
+    name: "operations",
+    title: `The operating lines add ${money(result.operatingTotal)} of running cost over ${years} ${years === 1 ? "year" : "years"}`,
+    body,
+    disclosures: ["The tariff recovers the total program cost, capital and operating together; no income is attributable to the operating lines alone, so no income is paired with them on this slide."],
+    chart: { kind: "bars", data: burn, kicker: "The operating cost per year" },
+  };
+}
 const startYearOf = (opts: { startYear: number | null }): number | null => opts.startYear;
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
@@ -736,7 +834,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
   // activities (the program span when none); the bars stack on sub-rows; markers outside the window
   // are omitted and counted. All of it composes here, once.
   const lanes = visibleLanes(tl);
-  const win = ganttWindow(lanes.flatMap((l) => l.activities), spanYears);
+  const win = timelineWindow(tl, spanYears);
   // v0.6.13.4: the ordinal composes here, once, over the FULL set after the chronological sort (stable,
   // so same-year milestones keep their authored order) and BEFORE the window filter: a milestone the
   // window omits never renumbers the others, and the authored id plays no part.
@@ -764,7 +862,7 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     const tie = tieOf.get(m.id);
     const ev = tie !== undefined && tie.kind === "engine-event" ? events.find((e) => e.event === tie.event) : undefined;
     const computed = ev !== undefined && ev.month !== undefined && inWindow(ev.year)
-      ? { year: ev.year, month: ev.month, pos: markerPosition(win, ev.year, ev.month), from: stacked[i].pos }
+      ? computedRing(win, ev.year, ev.month, stacked[i].pos)
       : null;
     return { ...m, pos: stacked[i].pos, row: stacked[i].row, computed };
   });
@@ -803,6 +901,14 @@ function ganttSlide(inputs: ModelInputs, result: ModelResult, startYear: number 
     disclosures: [DECISION_DISCLOSURE],
     gantt,
   };
+}
+
+// v0.6.18 Task I.1: the inline workspace Gantt reuses THE deck model — the very ganttSlide composition (the window, the
+// sub-rows, the label placement, the month positions, the markers, the caption), composed once; the workspace renders
+// it and never recomputes it. Null while the timeline is not authored or is refused (as the deck omits the slide).
+export function workspaceGantt(inputs: ModelInputs, result: ModelResult, startYear: number | null, monthGrid: boolean): DeckGantt | null {
+  if (!timelineAuthored(inputs) || validateTimeline(inputs, result).length > 0) return null;
+  return ganttSlide(inputs, result, startYear, monthGrid).gantt ?? null;
 }
 
 export type { TariffRow };

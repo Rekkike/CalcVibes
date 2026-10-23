@@ -1,14 +1,25 @@
 import { useState } from "react";
+import { GanttChart } from "../charts.js";
+import { workspaceGantt } from "../deck.js";
 import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineSource, TimelineTie } from "../../../core/src/types.js";
 import {
   DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
   phaseVocabularyIssues, phasesOf, programSpanYears, replaceSourceActivities, sourceHasActivities, suggestActivitiesFromContracts,
   suggestActivitiesFromCosts, suggestActivitiesFromFinancing, suggestActivitiesFromFunding, suggestActivitiesFromOperating,
-  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, validateTimeline, yearMonthHeader,
+  suggestActivitiesFromTariff, tariffSuggestionBlock, timelineAuthored, timelineOf, timelineWindow, validateTimeline, withScalePreset, yearHeader, yearMonthHeader,
 } from "../state.js";
 
 // v0.6.13.2 Task B: the per-source suggestion buttons. Each derives one source of the project into
 // activities carrying that source's marker; the review note names what was derived.
+// v0.6.18 Task G: the space allocation of the Timeline editors — WHAT GETS WHAT SPACE, composed deliberately (the
+// walkthrough judges it). A free-text column (the label, the gate title) GROWS to take everything the fixed columns
+// leave; a year is a short whole number and gets four digits of room; a month select gets exactly its longest
+// option ("Year only" / "Month 12"); the year and its month sit on ONE line with their calendar note beneath, so the
+// pair no longer stacks into two full-width lines; a choice (the phase, the lane, the outcome, the tie) takes its
+// longest option, capped; the decision-point code is a short fixed token; an action is as wide as its button. The
+// widths below are the single source the stylesheet reads (the pin compares them).
+export const TIMELINE_SPACE = { label: "grow", year: "4.25rem", month: "6.75rem", phase: "9rem", lane: "9rem", outcome: "11rem", tie: "16rem", code: "3.5rem" } as const;
+
 const plural = (n: number) => `${n} ${n === 1 ? "activity" : "activities"}`;
 const SOURCES: { source: TimelineSource; action: string; label: string; noun: string; zero: string; note: (n: number) => string }[] = [
   {
@@ -135,11 +146,35 @@ export function TimelineSection(props: {
     commit({ activities: tl.activities.map((a) => (a.id === id ? merged(a, patch) : a)) });
   const updateGate = (id: string, patch: Partial<TimelineDecisionPoint>) =>
     commit({ decisionPoints: tl.decisionPoints.map((d) => (d.id === id ? merged(d, patch) : d)) });
-  const updateMilestone = (id: string, patch: Partial<TimelineMilestone>) =>
+  // v0.6.18 Task F: a milestone authored outside the chart window is asked about, never dropped silently: the
+  // guard follows the milestone whose year was just authored; "Extend the window" widens it (a confirmed
+  // extension carried in the block), "Keep the window" leaves it and the deck caption keeps counting the
+  // milestone as omitted. Nothing extends on its own.
+  const [guardFor, setGuardFor] = useState<{ id: string; year: number } | null>(null);
+  const [keptOutside, setKeptOutside] = useState<string[]>([]);
+  const updateMilestone = (id: string, patch: Partial<TimelineMilestone>) => {
     commit({ milestones: tl.milestones.map((m) => (m.id === id ? merged(m, patch) : m)) });
+    if (patch.year !== undefined) setGuardFor({ id, year: patch.year });
+  };
+  const chartWindow = span !== null ? timelineWindow(tl, span) : null;
+  const guardTarget = guardFor === null ? undefined : tl.milestones.find((m) => m.id === guardFor.id && m.year === guardFor.year);
+  const guardOutside = guardTarget !== undefined && chartWindow !== null && span !== null && Number.isInteger(guardTarget.year) && guardTarget.year >= 1 && guardTarget.year <= span
+    && (guardTarget.year < chartWindow.firstYear || guardTarget.year > chartWindow.lastYear) && !keptOutside.includes(`${guardTarget.id}:${guardTarget.year}`);
+  const extendWindow = () => {
+    if (guardTarget === undefined || chartWindow === null) return;
+    const ext = { ...(tl.windowExtension ?? {}) };
+    if (guardTarget.year < chartWindow.firstYear) ext.firstYear = guardTarget.year;
+    else ext.lastYear = guardTarget.year;
+    commit({ windowExtension: ext } as Partial<TimelineBlock>);
+    setGuardFor(null);
+  };
+  const keepWindow = () => {
+    if (guardTarget !== undefined) setKeptOutside((k) => [...k, `${guardTarget.id}:${guardTarget.year}`]);
+    setGuardFor(null);
+  };
   // v0.6.17: the optional month selector — the empty state is the year-grained default
   const monthSelect = (field: string, value: number | undefined, onPick: (m: number | undefined) => void) => (
-    <select data-field={field} value={value === undefined ? "" : String(value)} onChange={(e) => onPick(e.target.value === "" ? undefined : parseInt(e.target.value, 10))}>
+    <select className="tl-month" data-field={field} value={value === undefined ? "" : String(value)} onChange={(e) => onPick(e.target.value === "" ? undefined : parseInt(e.target.value, 10))}>
       <option value="">Year only</option>
       {Array.from({ length: 12 }, (_, i) => i + 1).map((mo) => <option key={mo} value={String(mo)}>Month {mo}</option>)}
       {value !== undefined && !(Number.isInteger(value) && value >= 1 && value <= 12) && <option value={String(value)}>{value} (outside 1–12)</option>}
@@ -175,13 +210,33 @@ export function TimelineSection(props: {
         A planning and presentation layer: the timeline never alters the cash flows, the solver or the horizon.{" "}
         {span !== null ? `The program span is years 1–${span}.` : "The program span appears once the model solves."}
       </p>
+      {/* v0.6.18 Task I.1: the program Gantt in the workspace — the deck's composed-once model, rendered here by the same
+          chart; the month gridlines follow the deck's view-state toggle below (never a document field). */}
+      {(() => {
+        const gantt = result !== null ? workspaceGantt(inputs, result, startYear, monthGrid) : null;
+        return gantt !== null ? (
+          <div data-testid="workspace-gantt" className="workspace-gantt">
+            <GanttChart gantt={gantt} />
+          </div>
+        ) : (
+          <p data-testid="workspace-gantt-note" className="muted">The program Gantt appears here once the timeline is authored and refusal-free.</p>
+        );
+      })()}
       {setMonthGrid !== undefined && (
         <label>Month gridlines on the Gantt (a view setting; not saved with the project){" "}
           <input data-field="monthGrid" type="checkbox" checked={monthGrid} onChange={(e) => setMonthGrid(e.target.checked)} />
         </label>
       )}
       <label>Project scale{" "}
-        <select data-field="projectScale" value={tl.projectScale ?? "full"} onChange={(e) => commit({ projectScale: e.target.value as "mini" | "full" })}>
+        {/* v0.6.18 Task E: Empty (the default; no automatic population), Full (the gates DP1-DP8) and Mini (the gates
+            DP1, DP3, DP4, DP8). Choosing Full or Mini adds the missing gates of the set; an authored gate is never
+            moved or removed. */}
+        <select data-field="projectScale" value={tl.projectScale ?? "empty"} onChange={(e) => {
+          const v = e.target.value;
+          if (v === "empty") commit({ projectScale: undefined });
+          else commit({ projectScale: v as "mini" | "full", decisionPoints: withScalePreset(tl, v as "mini" | "full") });
+        }}>
+          <option value="empty">Empty (no automatic gates)</option>
           <option value="full">Full (DP1–DP8)</option>
           <option value="mini">Mini (DP1, DP3, DP4, DP8)</option>
         </select>
@@ -216,15 +271,15 @@ export function TimelineSection(props: {
       <h3>Phases</h3>
       <p className="muted">The phase vocabulary is the lane set of the program Gantt. A lane is shown when it carries an activity; choose Always show to draw it empty or Hide to leave it off. The visibility is presentation-only: hiding a lane never removes its activities.</p>
       <div className="editor-scroll" data-testid="timeline-phases-scroll">
-        <table data-testid="timeline-phases">
+        <table className="timeline-table" data-testid="timeline-phases">
           <thead><tr><th>Id</th><th>Label</th><th>Activities</th><th>Lane</th><th></th></tr></thead>
           <tbody>
             {phases.map((p, i) => (
               <tr key={p.id + ":" + i} data-kind="phase" data-line={p.id}>
                 <td data-field="phaseId">{p.id}</td>
-                <td><input data-field="phaseLabel" value={p.label} onChange={(e) => commit({ phases: phases.map((q, j) => (j === i ? { ...q, label: e.target.value } : q)) })} /></td>
+                <td className="tl-grow"><input data-field="phaseLabel" value={p.label} onChange={(e) => commit({ phases: phases.map((q, j) => (j === i ? { ...q, label: e.target.value } : q)) })} /></td>
                 <td data-field="phaseCount">{activitiesInPhase(tl, p.id).length}</td>
-                <td>
+                <td className="tl-pick-lane">
                   <select data-field="laneVisibility" value={tl.laneVisibility?.[p.id] === undefined ? "auto" : tl.laneVisibility[p.id] ? "show" : "hide"} onChange={(e) => setLane(p.id, e.target.value)}>
                     <option value="auto">Automatic</option>
                     <option value="show">Always show</option>
@@ -247,15 +302,15 @@ export function TimelineSection(props: {
 
       <h3>Activities</h3>
       <div className="editor-scroll" data-testid="timeline-activities-scroll">
-        <table data-testid="timeline-activities">
+        <table className="timeline-table" data-testid="timeline-activities">
           <thead><tr><th>Label</th><th>Start year</th><th>End year</th><th>Phase</th><th></th></tr></thead>
           <tbody>
             {tl.activities.map((a) => (
               <tr key={a.id} data-kind="activity" data-line={a.id}>
-                <td><input data-field="activityLabel" value={a.label} onChange={(e) => updateActivity(a.id, { label: e.target.value })} /></td>
-                <td><input data-field="activityStart" type="number" value={a.startYear} onChange={(e) => updateActivity(a.id, { startYear: num(e.target.value) })} /> {monthSelect("activityStartMonth", a.startMonth, (mo) => updateActivity(a.id, { startMonth: mo }))}<span className="muted" data-span-note="start"> {monthNote(a.startYear, a.startMonth)}</span></td>
-                <td><input data-field="activityEnd" type="number" value={a.endYear} onChange={(e) => updateActivity(a.id, { endYear: num(e.target.value) })} /> {monthSelect("activityEndMonth", a.endMonth, (mo) => updateActivity(a.id, { endMonth: mo }))}<span className="muted" data-span-note="end"> {monthNote(a.endYear, a.endMonth)}</span></td>
-                <td>
+                <td className="tl-grow"><input data-field="activityLabel" value={a.label} onChange={(e) => updateActivity(a.id, { label: e.target.value })} /></td>
+                <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="activityStart" type="number" value={a.startYear} onChange={(e) => updateActivity(a.id, { startYear: num(e.target.value) })} />{monthSelect("activityStartMonth", a.startMonth, (mo) => updateActivity(a.id, { startMonth: mo }))}</span><span className="muted tl-note" data-span-note="start">{monthNote(a.startYear, a.startMonth)}</span></td>
+                <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="activityEnd" type="number" value={a.endYear} onChange={(e) => updateActivity(a.id, { endYear: num(e.target.value) })} />{monthSelect("activityEndMonth", a.endMonth, (mo) => updateActivity(a.id, { endMonth: mo }))}</span><span className="muted tl-note" data-span-note="end">{monthNote(a.endYear, a.endMonth)}</span></td>
+                <td className="tl-pick-phase">
                   <select data-field="activityPhase" value={a.phase} onChange={(e) => updateActivity(a.id, { phase: e.target.value as TimelinePhase })}>
                     {phases.map((p, i) => <option key={p.id + ":" + i} value={p.id}>{p.label}</option>)}
                   </select>
@@ -270,15 +325,15 @@ export function TimelineSection(props: {
 
       <h3>Decision points</h3>
       <div className="editor-scroll" data-testid="timeline-gates-scroll">
-        <table data-testid="timeline-gates">
+        <table className="timeline-table" data-testid="timeline-gates">
           <thead><tr><th>Title</th><th>Code</th><th>Year</th><th>Outcome</th><th></th></tr></thead>
           <tbody>
             {tl.decisionPoints.map((d) => (
               <tr key={d.id} data-kind="gate" data-line={d.id}>
-                <td><input data-field="gateTitle" value={d.title} onChange={(e) => updateGate(d.id, { title: e.target.value })} /></td>
-                <td data-field="gateCode">{d.code ?? "—"}</td>
-                <td><input data-field="gateYear" type="number" value={d.year} onChange={(e) => updateGate(d.id, { year: num(e.target.value) })} /> {monthSelect("gateMonth", d.month, (mo) => updateGate(d.id, { month: mo }))}<span className="muted" data-span-note="gate"> {monthNote(d.year, d.month)}</span></td>
-                <td>
+                <td className="tl-grow"><input data-field="gateTitle" value={d.title} onChange={(e) => updateGate(d.id, { title: e.target.value })} /></td>
+                <td className="tl-code" data-field="gateCode">{d.code ?? "—"}</td>
+                <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="gateYear" type="number" value={d.year} onChange={(e) => updateGate(d.id, { year: num(e.target.value) })} />{monthSelect("gateMonth", d.month, (mo) => updateGate(d.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="gate">{monthNote(d.year, d.month)}</span></td>
+                <td className="tl-pick-outcome">
                   <select data-field="gateOutcome" value={d.outcome ?? ""} onChange={(e) => {
                     if (e.target.value === "") {
                       const { outcome: _drop, ...rest } = d;
@@ -305,7 +360,7 @@ export function TimelineSection(props: {
 
       <h3>Milestones</h3>
       <div className="editor-scroll" data-testid="timeline-milestones-scroll">
-        <table data-testid="timeline-milestones">
+        <table className="timeline-table" data-testid="timeline-milestones">
           <thead><tr><th>Label</th><th>Year</th><th>Tie</th><th></th></tr></thead>
           <tbody>
             {tl.milestones.map((m) => {
@@ -313,9 +368,9 @@ export function TimelineSection(props: {
               const known = new Set(["", ...tl.activities.map((a) => "activity:" + a.id), ...events.map((e) => "engine-event:" + e.event)]);
               return (
                 <tr key={m.id} data-kind="milestone" data-line={m.id}>
-                  <td><input data-field="milestoneLabel" value={m.label} onChange={(e) => updateMilestone(m.id, { label: e.target.value })} /></td>
-                  <td><input data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} /> {monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}<span className="muted" data-span-note="milestone"> {monthNote(m.year, m.month)}</span></td>
-                  <td>
+                  <td className="tl-grow"><input data-field="milestoneLabel" value={m.label} onChange={(e) => updateMilestone(m.id, { label: e.target.value })} /></td>
+                  <td className="tl-when"><span className="tl-pair"><input className="tl-year" data-field="milestoneYear" type="number" value={m.year} onChange={(e) => updateMilestone(m.id, { year: num(e.target.value) })} />{monthSelect("milestoneMonth", m.month, (mo) => updateMilestone(m.id, { month: mo }))}</span><span className="muted tl-note" data-span-note="milestone">{monthNote(m.year, m.month)}</span></td>
+                  <td className="tl-pick-tie">
                     <select data-field="milestoneTie" value={current} onChange={(e) => chooseTie(m, e.target.value)}>
                       <option value="">No tie</option>
                       {tl.activities.map((a) => <option key={a.id} value={"activity:" + a.id}>Activity {a.id} ({a.label || "unnamed"})</option>)}
@@ -337,7 +392,18 @@ export function TimelineSection(props: {
           </tbody>
         </table>
       </div>
-      <button data-action="add-milestone" onClick={() => commit({ milestones: [...tl.milestones, { id: nextId("m", tl.milestones.map((m) => m.id)), label: "", year: 1 }] })}>Add milestone</button>
+      <button data-action="add-milestone" onClick={() => {
+        const id = nextId("m", tl.milestones.map((m) => m.id));
+        commit({ milestones: [...tl.milestones, { id, label: "", year: 1 }] });
+        setGuardFor({ id, year: 1 });
+      }}>Add milestone</button>
+      {guardOutside && guardTarget !== undefined && chartWindow !== null && (
+        <div data-testid="milestone-window-guard" role="alertdialog" className="warning">
+          <p data-testid="milestone-window-guard-message">Milestone {guardTarget.id} ({guardTarget.label || "unnamed"}) falls in {yearMonthHeader(guardTarget.year, guardTarget.month, startYear)}, outside the chart window of {yearHeader(chartWindow.firstYear, startYear)}–{yearHeader(chartWindow.lastYear, startYear)}. Extend the window to show it, or keep the window: the milestone then stays authored and the chart caption counts it as omitted.</p>
+          <button data-action="window-extend" onClick={extendWindow}>Extend the window</button>{" "}
+          <button data-action="window-keep" onClick={keepWindow}>Keep the window</button>
+        </div>
+      )}
 
       {result === null && authored && (
         <p data-testid="timeline-standdown" className="muted">The span checks stand down while the model has input issues; the input-issues panel governs.</p>

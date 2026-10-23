@@ -183,22 +183,28 @@ describe("Task C — the sub-year positions in both renderers", () => {
     expect(rec.circles.some((c) => Math.abs(c[0] - (52 + m.computed!.pos * colW)) < 1e-9)).toBe(true);
   });
 
-  it("the computed ring is connected to its diamond by a thin muted line in the SVG and the PDF", () => {
+  it("v0.6.18 Task H2: the computed ring is NAMED in place of the retired connector, in the SVG and the PDF", () => {
     const tied: TimelineBlock = { projectScale: "full", activities: [{ id: "a1", label: "Build", startYear: 1, endYear: 5, phase: "production" }], decisionPoints: [], milestones: [{ id: "m1", label: "Collections", year: 3, tie: { kind: "engine-event", event: "first-collection-year" } }] };
     const inp = { ...demoProject(), projectLengthYears: 5, timeline: tied };
     const model = deckSlides(inp, computeModel(inp), { startYear: null });
     const g = model.slides.find((s) => s.name === "timeline")!.gantt!;
     const c = g.milestones[0].computed!;
     const { container } = render(<GanttChart gantt={g} />);
-    const link = container.querySelector('[data-gantt-computed-link="m1"]') as SVGLineElement;
+    // the connector is gone from the SVG; the ring carries its label beside it, on the side away from the diamond
+    expect(container.querySelector('[data-gantt-computed-link]')).toBeNull();
+    const label = container.querySelector('[data-gantt-computed-label="m1"]') as SVGTextElement;
     const { labelW, plotW } = GANTT_SVG;
     const colW = plotW / (g.window.lastYear - g.window.firstYear + 1);
-    expect(parseFloat(link.getAttribute("x1") as string)).toBeCloseTo(labelW + c.from * colW, 6);
-    expect(parseFloat(link.getAttribute("x2") as string)).toBeCloseTo(labelW + c.pos * colW, 6);
+    expect(label.textContent).toBe("computed: month 12");
+    expect(parseFloat(label.getAttribute("x") as string)).toBeCloseTo(labelW + c.pos * colW + 14, 6);
+    expect(label.getAttribute("text-anchor")).toBe("start");
+    // the PDF draws no connecting line and draws the label
     rec.lines.length = 0;
-    buildDeckPdf(model, "Connector");
+    const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
+    buildDeckPdf(model, "Connector", trace);
     const pc = (257 - 32) / (g.window.lastYear - g.window.firstYear + 1);
-    expect(rec.lines.some((q) => Math.abs(q[0] - (52 + c.from * pc)) < 1e-9 && Math.abs(q[2] - (52 + c.pos * pc)) < 1e-9 && q[1] === q[3])).toBe(true);
+    expect(rec.lines.some((q) => q[1] === q[3] && Math.abs(q[2] - (52 + c.pos * pc)) < 1e-9)).toBe(false);
+    expect(trace.drawnFigures.flat()).toContain("computed: month 12");
   });
 });
 

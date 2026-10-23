@@ -1,11 +1,13 @@
 import ExcelJS from "exceljs";
-import type { ModelInputs, ModelResult } from "../../core/src/types.js";
-import { yearHeader } from "./state.js";
+import type { Facility, FacilityOptions, ModelInputs, ModelResult } from "../../core/src/types.js";
+import { composeBookCollections, composeFacilitySchedules, yearHeader } from "./state.js";
 
 export async function buildWorkbook(
   inputs: ModelInputs,
   result: ModelResult,
-  opts: { startYear: number | null } = { startYear: null },
+  // v0.6.18 Task C: the authored facility list rides beside the legacy twin (the twin strips it); the Inputs sheet
+  // echoes the facilities the legacy twin cannot express (an amount-first facility, a second share-sized one).
+  opts: { startYear: number | null; facilities?: Facility[]; facilityOptions?: FacilityOptions } = { startYear: null },
 ): Promise<ExcelJS.Buffer> {
   const wb = new ExcelJS.Workbook();
   const bold = (cell: ExcelJS.Cell | undefined) => {
@@ -67,6 +69,33 @@ export async function buildWorkbook(
       ["financing.amortization", inputs.financing.amortization],
       ["financing.leveragedSolve", inputs.financing.leveragedSolve],
     );
+  }
+  // v0.6.18 Task C: the authored facility inputs echo on the audit route (an amount-first facility carries no
+  // legacy financing block, so the echo above is silent for it). The first share-sized debt facility is the
+  // legacy twin's financing echo and the notes are the Funding sheet's rows; every other facility echoes here.
+  // A legacy-shaped document (nothing beyond the twin) adds no row.
+  const authored = opts.facilities ?? [];
+  const twinDebt = authored.find((f) => f.datedDraw === undefined && f.sharePct !== undefined);
+  const echoed = authored.filter((f) => f.datedDraw === undefined && f !== twinDebt);
+  if (echoed.length > 0) {
+    for (const f of echoed) {
+      flatInputs.push(
+        [`facility ${f.id} label`, f.label],
+        [`facility ${f.id} origin`, f.origin ?? "financing"],
+        [`facility ${f.id} enabled`, f.enabled !== false],
+        [`facility ${f.id} amount`, f.amount],
+        [`facility ${f.id} sharePct`, f.sharePct ?? null],
+        [`facility ${f.id} ratePct`, f.ratePct],
+        [`facility ${f.id} termYears`, f.termYears],
+        [`facility ${f.id} graceYears`, f.graceYears],
+        [`facility ${f.id} amortization`, f.amortization],
+        [`facility ${f.id} serviceStartYear`, f.serviceStartYear],
+        [`facility ${f.id} paymentsPerYear`, f.paymentsPerYear ?? 12],
+        [`facility ${f.id} scope`, f.scope.kind === "general" ? "general" : `attached: ${f.scope.lineIds.join(", ")}`],
+        [`facility ${f.id} datedDrawYear`, f.datedDraw?.year ?? null],
+      );
+    }
+    flatInputs.push(["facilityOptions.leveragedSolve", opts.facilityOptions?.leveragedSolve ?? false]);
   }
   if (inputs.contracts && inputs.contracts.length > 0) {
     for (const c of inputs.contracts) {
@@ -233,6 +262,28 @@ export async function buildWorkbook(
     finWs.addRow(["Equity outlay", result.financing.equity.outlay, "money"]);
     finWs.addRow(["Equity NPV at WACC", result.financing.equity.npvAtWacc, "money"]);
     finWs.addRow(["Equity IRR", result.financing.equity.irr, "rate"]);
+    // v0.6.18 Task C: the per-facility rows (the audit route) beneath the combined aggregate. Each block is
+    // titled by the facility; the note's payback is named "Installment". Raw values; the combined rows above
+    // are the sum of these, year by year.
+    const schedules = composeFacilitySchedules(result);
+    if (schedules.length > 0) {
+      finWs.addRow([]);
+      finWs.addRow(["Facility schedules (by facility; the combined rows above are their sum)"]);
+      bold(finWs.getRow(finWs.rowCount).getCell(1));
+      for (const f of schedules) {
+        finWs.addRow([]);
+        finWs.addRow([`${f.label || f.id} — ${f.origin === "funding-note" ? "interest-free note (payback installments)" : "facility"}, ${f.scopeText}`]);
+        bold(finWs.getRow(finWs.rowCount).getCell(1));
+        finWs.addRow(["Year", "Draws", "Interest", f.principalLabel, "Service", "Closing balance"]);
+        finWs.getRow(finWs.rowCount).eachCell(bold);
+        for (const r of f.rows) {
+          const added = finWs.addRow([r.year, r.draws, r.interest, r.principal, r.service, r.balance]);
+          for (let c = 2; c <= 6; c++) added.getCell(c).numFmt = "#,##0.00";
+        }
+        const totalRow = finWs.addRow(["Total", f.totals.draws, f.totals.interest, f.totals.principal, f.totals.service, null]);
+        for (let c = 2; c <= 5; c++) totalRow.getCell(c).numFmt = "#,##0.00";
+      }
+    }
     for (const c of [2, 3, 4]) finWs.getColumn(c).numFmt = "#,##0.00";
     finWs.getColumn(5).numFmt = "0.00";
     width(finWs, 20);
@@ -329,12 +380,20 @@ export async function buildWorkbook(
   if (result.bookView !== undefined && depreciationConfigured) {
     const bv = result.bookView;
     const bvWs = wb.addWorksheet("Book view");
-    bvWs.addRow(["Year", "Beginning book value", "Depreciation charge", "Ending book value", "Collections", "Operating", "Book result"]);
+    // v0.6.18 (AUD-28): the collections column names its basis (every project inflow); with grants or a note the
+    // identified columns follow it (fees, grant receipts, the note's advance net of installments) and sum to it.
+    const split = composeBookCollections(result);
+    bvWs.addRow(split === null
+      ? ["Year", "Beginning book value", "Depreciation charge", "Ending book value", "Collections (all project inflows)", "Operating", "Book result"]
+      : ["Year", "Beginning book value", "Depreciation charge", "Ending book value", "Collections (all project inflows)", "of which fee collections", "of which grant receipts", "of which the note (advance less installments)", "Operating", "Book result"]);
     bvWs.getRow(1).eachCell(bold);
     for (const row of bv.combined) {
-      bvWs.addRow([row.year, row.beginning, row.charge, row.ending, row.collections, row.operating, row.bookResult]);
+      const s = split?.find((x) => x.year === row.year);
+      bvWs.addRow(split === null
+        ? [row.year, row.beginning, row.charge, row.ending, row.collections, row.operating, row.bookResult]
+        : [row.year, row.beginning, row.charge, row.ending, row.collections, s?.fees ?? 0, s?.grants ?? 0, s?.note ?? 0, row.operating, row.bookResult]);
     }
-    for (const c of [2, 3, 4, 5, 6, 7]) bvWs.getColumn(c).numFmt = "#,##0.00";
+    for (const c of (split === null ? [2, 3, 4, 5, 6, 7] : [2, 3, 4, 5, 6, 7, 8, 9, 10])) bvWs.getColumn(c).numFmt = "#,##0.00";
     bvWs.addRow([]);
     bvWs.addRow(["Book view disclosure", "Depreciation is the book view; it never enters the cash flows."]);
     bvWs.addRow(["Residual mode", bv.residualMode]);

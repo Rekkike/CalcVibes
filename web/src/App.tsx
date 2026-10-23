@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { computeModel, solveTerm, CURRENCIES_ENUM, ENTRY_UNITS, VERSION } from "./engine.js";
+import { computeModel, solveTerm, valueToEntry, CURRENCIES_ENUM, ENTRY_UNITS, VERSION } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import type { ModelInputs } from "./engine.js";
 import { validateInputs } from "../../core/src/validate.js";
@@ -24,6 +24,23 @@ import { RootErrorBoundary } from "./ErrorBoundary.js";
 import { parseProject, ProjectFileError } from "../../core/src/fileio.js";
 import { downloadProjectFile } from "./projectFile.js";
 
+// v0.6.18 (AUD-13/14/35): the project state a "New project", a loader or an Open replaces — the document and every
+// setting the project file carries — snapshotted for the unsaved-change guard. The default entry unit is thousands.
+interface ProjectSnapshot {
+  inputs: ModelInputs;
+  startYear: number | null;
+  entryUnit: EntryUnit;
+  targets: number[] | null;
+  terms: number[] | null;
+  balloons: number[] | null;
+  grantScales: number[] | null;
+}
+const DEFAULT_ENTRY_UNIT: EntryUnit = "thousands";
+// The entry unit is a display preference (it re-reads the same raw values): changing it is not unsaved work, so it stays
+// out of the dirty comparison; New project and a file Open still reset or sync it.
+const snapshotKey = (s: ProjectSnapshot): string => JSON.stringify({ ...s, entryUnit: null });
+const blankSnapshot = (): ProjectSnapshot => ({ inputs: blankProject(), startYear: null, entryUnit: DEFAULT_ENTRY_UNIT, targets: null, terms: null, balloons: null, grantScales: null });
+
 type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "timeline" | "results" | "scenarios" | "detail";
 
 export function App() {
@@ -35,7 +52,7 @@ export function App() {
   const [mode, setMode] = useState<"A" | "B" | "C">("A");
   const [modePayment, setModePayment] = useState(400000);
   const [startYear, setStartYear] = useState<number | null>(null);
-  const [entryUnit, setEntryUnit] = useState<EntryUnit>("thousands");
+  const [entryUnit, setEntryUnit] = useState<EntryUnit>(DEFAULT_ENTRY_UNIT);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     // v0.6.5 Task G/W15: the theme follows prefers-color-scheme; with no system preference or no
     // matchMedia the posture falls back to DARK. The header select remains the manual override.
@@ -52,6 +69,10 @@ export function App() {
   const [scenarioBalloons, setScenarioBalloons] = useState<number[] | null>(null);
   const [scenarioGrantScales, setScenarioGrantScales] = useState<number[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // v0.6.18 (AUD-35): the unsaved-change guard — the key of the state last loaded, saved or started fresh, and
+  // the action waiting on the visible confirmation.
+  const [baselineKey, setBaselineKey] = useState<string>(() => snapshotKey(blankSnapshot()));
+  const [pendingAction, setPendingAction] = useState<{ label: string; run: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
 
@@ -111,6 +132,44 @@ export function App() {
     return null;
   }, [inputs, issues, mode, modePayment]);
 
+  const currentSnapshot = (): ProjectSnapshot => ({ inputs, startYear, entryUnit, targets: scenarioTargets, terms: scenarioTerms, balloons: scenarioBalloons, grantScales: scenarioGrantScales });
+  const dirty = snapshotKey(currentSnapshot()) !== baselineKey;
+  const applySnapshot = (s: ProjectSnapshot) => {
+    setInputs(s.inputs);
+    setStartYear(s.startYear);
+    setEntryUnit(s.entryUnit);
+    setScenarioTargets(s.targets);
+    setScenarioTerms(s.terms);
+    setScenarioBalloons(s.balloons);
+    setScenarioGrantScales(s.grantScales);
+    setBaselineKey(snapshotKey(s));
+  };
+  // A destructive action (New project, Open project, a loader) runs at once on a clean state; with unsaved
+  // changes it waits on the visible confirmation — nothing disappears quietly.
+  const guard = (label: string, run: () => void) => {
+    if (dirty) setPendingAction({ label, run });
+    else run();
+  };
+  // AUD-13: "New project" is the FULL reset — the document, the start year, the entry unit and every scenario axis.
+  const newProject = () => {
+    applySnapshot(blankSnapshot());
+    setMode("A");
+    setView("overview");
+    setStartYearError(null);
+    setLoadError(null);
+  };
+  // AUD-14: the loaders' balloon axis holds entry-unit values: the raw balloons scale to the ACTIVE unit.
+  const loadPreset = (inputsNext: ModelInputs, preset: { startYear?: number | null; targets: number[]; terms?: number[]; balloonsRaw?: number[] }) => {
+    applySnapshot({
+      inputs: migrateOnLoad(inputsNext),
+      startYear: preset.startYear === undefined ? startYear : preset.startYear,
+      entryUnit,
+      targets: preset.targets,
+      terms: preset.terms === undefined ? scenarioTerms : preset.terms,
+      balloons: preset.balloonsRaw === undefined ? scenarioBalloons : preset.balloonsRaw.map((v) => valueToEntry(v, entryUnit)),
+      grantScales: scenarioGrantScales,
+    });
+  };
   const setProjectName = (v: string) => setInputs((p) => ({ ...p, projectName: v }));
   const setCurrency = (v: string) => setInputs((p) => ({ ...p, currency: v }));
   const setTargetIrr = (v: string) => setInputs((p) => ({ ...p, targetIrr: parseFloat(v) || 0 }));
@@ -141,13 +200,15 @@ export function App() {
     reader.onload = () => {
       try {
         const loaded = parseProject(String(reader.result));
-        setInputs(migrateOnLoad(loaded.inputs));
-        setStartYear(loaded.settings.startYear);
-        setEntryUnit(loaded.settings.entryUnit);
-        setScenarioTargets(loaded.settings.scenarioTargets);
-        setScenarioTerms(loaded.settings.scenarioTerms);
-        setScenarioBalloons(loaded.settings.scenarioBalloons);
-        setScenarioGrantScales(loaded.settings.scenarioGrantScales ?? null);
+        applySnapshot({
+          inputs: migrateOnLoad(loaded.inputs),
+          startYear: loaded.settings.startYear,
+          entryUnit: loaded.settings.entryUnit,
+          targets: loaded.settings.scenarioTargets,
+          terms: loaded.settings.scenarioTerms,
+          balloons: loaded.settings.scenarioBalloons,
+          grantScales: loaded.settings.scenarioGrantScales ?? null,
+        });
         setMode("A");
         setLoadError(null);
       } catch (e) {
@@ -158,11 +219,12 @@ export function App() {
   };
   const saveProjectFile = () => {
     downloadProjectFile(inputs, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, scenarioGrantScales });
+    setBaselineKey(snapshotKey(currentSnapshot()));
   };
   const exportXlsx = async () => {
     if (result === null) return;
     const { buildWorkbook } = await import("./xlsx.js");
-    const buffer = await buildWorkbook(restoreLegacyFinancing(inputs), result, { startYear });
+    const buffer = await buildWorkbook(restoreLegacyFinancing(inputs), result, { startYear, ...(inputs.facilities !== undefined ? { facilities: inputs.facilities } : {}), ...(inputs.facilityOptions !== undefined ? { facilityOptions: inputs.facilityOptions } : {}) });
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -208,9 +270,9 @@ export function App() {
       <header className="app-header">
         <div className="toolbar-left">
           <h1>{inputs.projectName || "Untitled project"}</h1>
-          <button data-action="new-project" onClick={() => setInputs(blankProject())}>New project</button>
+          <button data-action="new-project" onClick={() => guard("Starting a new project", newProject)}>New project</button>
           <button data-testid="save-project" onClick={saveProjectFile}>Save project</button>
-          <button data-testid="open-project" onClick={() => fileInputRef.current?.click()}>Open project</button>
+          <button data-testid="open-project" onClick={() => guard("Opening a project", () => fileInputRef.current?.click())}>Open project</button>
           <input
             ref={fileInputRef}
             type="file"
@@ -232,12 +294,12 @@ export function App() {
               presets the target axis only; the term and balloon axes are inert in contracts
               mode (finding F1), so presetting them would be dishonest. The entry-unit select is
               untouched: only project-file open syncs the unit. */}
-          <button data-action="load-demo" onClick={() => { setInputs(migrateOnLoad(shorePowerProgram())); setStartYear(2026); setScenarioTargets([4, 6, 8]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 8, 16]); }}>Load shore-power program demo (Rotterdam)</button>
-          <button data-action="load-multi-lease-demo" onClick={() => { setInputs(migrateOnLoad(landNewbuildProject())); setScenarioTargets([6, 8, 10]); }}>Load land newbuild demo (Mjøstårnet)</button>
+          <button data-action="load-demo" onClick={() => guard("Loading the shore-power demo", () => loadPreset(shorePowerProgram(), { startYear: 2026, targets: [4, 6, 8], terms: [15, 20, 25], balloonsRaw: [0, 8000000, 16000000] }))}>Load shore-power program demo (Rotterdam)</button>
+          <button data-action="load-multi-lease-demo" onClick={() => guard("Loading the land newbuild demo", () => loadPreset(landNewbuildProject(), { targets: [6, 8, 10] }))}>Load land newbuild demo (Mjøstårnet)</button>
           {/* v0.6.6 Task B: the third loader presets the scenario axes (the amendment of record: the balloon
               entries are entry-unit values; at unit thousands, 1000 and 2000 scale to raw balloons of
               1 000 000 and 2 000 000 at compute). The other two loaders are untouched: additive only. */}
-          <button data-action="load-solar-demo" onClick={() => { setInputs(migrateOnLoad(solarParkProject())); setScenarioTargets([5, 7, 9]); setScenarioTerms([15, 20, 25]); setScenarioBalloons([0, 1000, 2000]); }}>Load solar park demo</button>
+          <button data-action="load-solar-demo" onClick={() => guard("Loading the solar park demo", () => loadPreset(solarParkProject(), { targets: [5, 7, 9], terms: [15, 20, 25], balloonsRaw: [0, 1000000, 2000000] }))}>Load solar park demo</button>
         </div>
         <div data-testid="header-controls" className="header-controls">
           <button data-action="present" onClick={() => setPresOpen(true)}>Present results</button>
@@ -301,6 +363,13 @@ export function App() {
           </div>
         </nav>
       </header>
+      {pendingAction !== null && (
+        <div data-testid="unsaved-guard" role="alertdialog" className="warning unsaved-guard">
+          <p data-testid="unsaved-guard-message">You have unsaved changes. {pendingAction.label} will discard them.</p>
+          <button data-action="guard-confirm" onClick={() => { const run = pendingAction.run; setPendingAction(null); run(); }}>Discard the changes and continue</button>{" "}
+          <button data-action="guard-cancel" onClick={() => setPendingAction(null)}>Keep my changes</button>
+        </div>
+      )}
       {loadError !== null && (
         <div data-testid="load-error" className="warning">{loadError}</div>
       )}

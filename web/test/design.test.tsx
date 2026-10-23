@@ -76,8 +76,8 @@ describe("Task G: the deck design system (structural pins)", () => {
     fireEvent.click(byAction("present"));
     const slides = document.querySelectorAll('[data-testid="presentation"] .deck-slide');
     // v0.6.7 re-anchor: the port loader presets the scenario axes, so the deck carries the
-    // scenarios slide as an eighth slide; v0.6.13.1: the authored demo timeline adds the Gantt slide, a ninth.
-    expect(slides.length).toBe(9);
+    // scenarios slide as an eighth slide; v0.6.13.1: the authored demo timeline adds the Gantt slide, a ninth; v0.6.18: the operations slide (the demo carries operating lines), a tenth.
+    expect(slides.length).toBe(10);
     for (const s of slides) {
       expect((s as HTMLElement).querySelector(".deck-slide-header")).toBeTruthy();
       expect((s as HTMLElement).querySelector(".deck-slide-footer")).toBeTruthy();

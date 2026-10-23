@@ -44,9 +44,12 @@ describe("v0.6.13 the Timeline section", () => {
     const codes = () => all('[data-kind="gate"]').map((r) => r.querySelector('[data-field="gateCode"]')!.textContent);
     expect(codes()).toEqual(["DP1", "DP2"]);
     expect(field(all('[data-kind="gate"]')[0], "gateTitle").value).toBe("Decision to start the project and initiate preparations");
+    // v0.6.18 Task E re-anchor: choosing the Mini scale populates its missing gates (DP3, DP4, DP8), never moving or
+    // removing the authored DP1 and DP2; the set is then exhausted, so a further added gate carries no code
     fireEvent.change(document.querySelector('[data-field="projectScale"]') as HTMLElement, { target: { value: "mini" } });
+    expect(codes()).toEqual(["DP1", "DP2", "DP3", "DP4", "DP8"]);
     fireEvent.click(byAction("add-gate"));
-    expect(codes()).toEqual(["DP1", "DP2", "DP3"]);
+    expect(codes()).toEqual(["DP1", "DP2", "DP3", "DP4", "DP8", "—"]);
   });
 
   it("EDIT: activities, ids stay unique after a removal, and an out-of-span activity refuses in the section panel only", () => {

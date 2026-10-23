@@ -66,7 +66,7 @@ describe("Task C: PRINT-DESIGN / PDF-DESIGN", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
     expect(doc.getNumberOfPages()).toBe(7);
-    expect(model.slides[2].chart?.data.length).toBe(3);
+    expect(model.slides[2].waterfall?.rows.filter((r) => r.kind === "capital").length).toBe(3); // v0.6.18 Task J.1: the dead rows-chart field retired
     expect(model.slides[3].chart?.data.length).toBe(10);
   });
 });
@@ -145,10 +145,10 @@ describe("Task E: SINGLE-ROOT / NO-DANGLING / TOGGLE / THEME-DARK / VERSION", ()
 
   it("VERSION-CURRENT (v0.6): the rendered string equals the VERSION constant equals the current directive version", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.17");
+    expect(VERSION).toBe("v0.6.18");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.17");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.18");
   });
 });
 

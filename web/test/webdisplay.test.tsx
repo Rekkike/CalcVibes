@@ -7,7 +7,7 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
 describe("Task A2: YEARLY-HONEST", () => {
-  it("the paired columns carry direct peak labels through the formatters and the year labels in HTML (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
+  it("(v0.6.18 AUD-17 re-anchor: the app cashflow chart carries the entry unit in force, thousands on a fresh app) the paired columns carry direct peak labels through the formatters and the year labels in HTML (v0.6.10 re-anchor: the shore-power program, EUR)", async () => {
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
@@ -19,10 +19,10 @@ describe("Task A2: YEARLY-HONEST", () => {
     const chart = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
     const costPeak = Array.from(chart.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakCost = Math.max(...result.yearly.map((y) => y.cost));
-    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "ones")}`);
+    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "thousands")}`);
     const inflowPeak = Array.from(chart.querySelectorAll('[data-testid="column-peak-inflow"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakInflow = Math.max(...result.yearly.map((y) => y.inflow));
-    expect(inflowPeak.textContent).toBe(`Inflow peak ${deckMoneyForDisplay(peakInflow, "EUR", "ones")}`);
+    expect(inflowPeak.textContent).toBe(`Inflow peak ${deckMoneyForDisplay(peakInflow, "EUR", "thousands")}`);
     expect(chart.querySelector('[data-testid="column-year-label-first"]')?.textContent).toBe(yearHeader(1, 2026));
   });
 
@@ -35,8 +35,8 @@ describe("Task A2: YEARLY-HONEST", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byNav("results"));
     const line = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
-    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "ones"));
-    expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[result.yearly.length - 1].cumulative, "EUR", "ones"));
+    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "thousands"));
+    expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[result.yearly.length - 1].cumulative, "EUR", "thousands"));
     expect(line.querySelector('[data-testid="zero-baseline"]')).toBeTruthy();
     const crossing = line.querySelector('[data-testid="line-zero-crossing"]');
     const values = result.yearly.map((y) => y.cumulative);
@@ -152,9 +152,9 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;
     const costPeak = Array.from(columns.querySelectorAll('[data-testid="column-peak-cost"]')).find((el) => !el.className.includes("hidden-peak")) as HTMLElement;
     const peakCost = Math.max(...result.yearly.map((y) => y.cost));
-    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "ones")}`);
+    expect(costPeak.textContent).toBe(`Cost peak ${deckMoneyForDisplay(peakCost, "EUR", "thousands")}`);
     const line = columns;
-    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "ones"));
+    expect(line.querySelector('[data-testid="line-start-value"]')?.textContent).toBe(deckMoneyForDisplay(result.yearly[0].cumulative, "EUR", "thousands"));
     expect(line.querySelector('[data-testid="line-end-value"]')?.textContent).not.toMatch(/,\d{2}/);
     fireEvent.click(byNav("detail"));
     const detailCell = Array.from(document.querySelectorAll("td.table-value-cell")).find((td) => (td.textContent ?? "").includes(","))?.textContent ?? "";
@@ -165,7 +165,6 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
-    const { bucketSeries } = await import("../src/charts.js");
     const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -173,14 +172,13 @@ describe("Task R1/R2/R3 (v0.5.7R): the rendered reading class and the named peak
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const peak = Array.from(document.querySelectorAll('[data-slide-name="recovery"] [data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
-    const inflows = result.collectionsGrid.reduce((acc, row) => {
+    // v0.6.18 Task H1 / AUD-27: the annual basis; the grants and the interest-free note are not in the bars
+    const inflows = result.collectionsGrid.filter((r) => r.kind !== "grant" && r.kind !== "funding-loan").reduce((acc, row) => {
       for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
       return acc;
     }, new Array<number>(result.yearly.length).fill(0));
-    const { buckets, width } = bucketSeries(inflows, 15);
-    const peakIdx = buckets.reduce((bi, v, i) => (v > buckets[bi] ? i : bi), 0);
-    // v0.6.8 Task C: the peak label names the bucket range, not just its first year.
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx * width + 1, 2026)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), 2026)}`);
+    const peakIdx = inflows.reduce((bi, v, i) => (v > inflows[bi] ? i : bi), 0);
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(inflows[peakIdx], "EUR", "thousands")} in ${yearHeader(peakIdx + 1, 2026)}`);
     fireEvent.click(byAction("exit-presentation"));
     fireEvent.click(byNav("results"));
     const columns = document.querySelector('[data-testid="signed-cashflow"]') as HTMLElement;

@@ -215,7 +215,6 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
-    const { bucketSeries } = await import("../src/charts.js");
     const result = computeModel(shorePowerProgram());
     render(<App />);
     fireEvent.click(byAction("load-demo"));
@@ -224,20 +223,16 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const bars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]') as SVGElement;
     const yearLabels = bars.querySelectorAll('[data-testid="bar-year-label"]');
-    const { width } = bucketSeries(new Array<number>(result.yearly.length).fill(0), 15);
-    expect(yearLabels.length).toBe(Math.ceil(result.yearly.length / width));
-    // v0.6.8 Task C: labels thin to every ceil(bucketCount/8)th column at width > 1;
-    // thinned columns carry a non-breaking space and data-thinned="true". The program
-    // at cap 15: 12 buckets, thinStep 2, six visible labels and six thinned; the
-    // labels read as calendar years through the loader-preset start year 2026.
-    const thinStep = width > 1 ? Math.ceil(yearLabels.length / 8) : 1;
-    expect(Array.from(yearLabels).filter((l) => (l as SVGTextElement).getAttribute("data-thinned") !== "true").length).toBe(6);
+    // v0.6.18 Task H1 re-anchor: the annual basis — one label slot per program year (23), thinned to every
+    // ceil(23 / 12) = 2nd; thinned slots carry a non-breaking space and data-thinned="true"; the labels read as
+    // calendar years through the loader-preset start year 2026.
+    expect(yearLabels.length).toBe(result.yearly.length);
+    const thinStep = Math.ceil(yearLabels.length / 12);
+    expect(Array.from(yearLabels).filter((l) => (l as SVGTextElement).getAttribute("data-thinned") !== "true").length).toBe(12);
     for (let k = 0; k < yearLabels.length; k++) {
       const labelEl = yearLabels[k] as SVGTextElement;
-      const expected = width === 1
-        ? yearHeader(k + 1, 2026)
-        : `${yearHeader(k * width + 1, 2026)}–${yearHeader(Math.min(result.yearly.length, (k + 1) * width), 2026)}`;
-      if (width > 1 && k % thinStep !== 0) {
+      const expected = yearHeader(k + 1, 2026);
+      if (k % thinStep !== 0) {
         expect(labelEl.textContent).toBe("\u00a0");
         expect(labelEl.getAttribute("data-thinned")).toBe("true");
       } else {
@@ -249,7 +244,6 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
   it("CHART-PURPOSE: every deck chart carries its kicker title, its labels, and its total (v0.6.10 re-anchor: the program cost base and per-lift recovery, EUR at entry thousands)", async () => {
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
-    const { bucketSeries } = await import("../src/charts.js");
     const demo = shorePowerProgram();
     const result = computeModel(demo);
     const unit = "thousands";
@@ -268,8 +262,8 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     const recoveryBars = document.querySelector('[data-slide-name="recovery"] [data-testid="recovery-bars"]');
     expect(recoveryBars?.querySelector('[data-testid="chart-kicker"]')?.textContent).toBe("Per-lift prices set the yearly recovery");
-    const { width } = bucketSeries(new Array<number>(result.yearly.length).fill(0), 15);
-    expect(recoveryBars?.querySelectorAll('[data-testid="bar-year-label"]').length).toBe(Math.ceil(result.yearly.length / width));
+    // v0.6.18 Task H1: one annual label slot per program year
+    expect(recoveryBars?.querySelectorAll('[data-testid="bar-year-label"]').length).toBe(result.yearly.length);
     expect(recoveryBars?.querySelector('[data-testid="peak-label"]')).toBeTruthy();
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
@@ -284,22 +278,21 @@ describe("Task R5: CHART-WHOLE / CHART-PURPOSE", () => {
     const { shorePowerProgram } = await import("../src/state.js");
     const { computeModel, deckMoneyForDisplay } = await import("../src/engine.js");
     const { yearHeader } = await import("../src/state.js");
-    const { bucketSeries } = await import("../src/charts.js");
     const demo = shorePowerProgram();
     const result = computeModel(demo);
     const unit = "thousands";
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
-    const peak = Array.from(document.querySelectorAll('[data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
-    const rawInflows = result.collectionsGrid.reduce((acc, row) => {
+    // v0.6.18: scoped to the recovery slide (the operations slide also draws a per-year bar chart)
+    const peak = Array.from(document.querySelectorAll('[data-slide-name="recovery"] [data-testid="peak-label"]')).find((el) => el.textContent !== "\u00a0") as HTMLElement;
+    // v0.6.18 Task H1 / AUD-27: the annual basis, the grants and the interest-free note excluded from the bars
+    const annual = result.collectionsGrid.filter((r) => r.kind !== "grant" && r.kind !== "funding-loan").reduce((acc, row) => {
       for (let k = 0; k < Math.min(result.yearly.length, row.amounts.length); k++) acc[k] = (acc[k] ?? 0) + row.amounts[k];
       return acc;
     }, new Array<number>(result.yearly.length).fill(0));
-    const { buckets, width } = bucketSeries(rawInflows, 15);
-    const peakIdx = buckets.indexOf(Math.max(...buckets));
-    // v0.6.8 Task C: the peak label names the bucket range, not just its first year.
-    expect(peak.textContent).toBe(`${deckMoneyForDisplay(buckets[peakIdx], "EUR", unit)} in ${yearHeader(peakIdx * width + 1, 2026)}–${yearHeader(Math.min(result.yearly.length, (peakIdx + 1) * width), 2026)}`);
+    const peakIdx = annual.indexOf(Math.max(...annual));
+    expect(peak.textContent).toBe(`${deckMoneyForDisplay(annual[peakIdx], "EUR", unit)} in ${yearHeader(peakIdx + 1, 2026)}`);
   });
 
   it("PEAK-PRINT: the print stylesheet carries the peak-label ink variant", () => {

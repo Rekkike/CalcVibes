@@ -108,7 +108,7 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
     const kickers = document.querySelectorAll('[data-testid="slide-kicker"]');
-    expect(kickers.length).toBe(8);
+    expect(kickers.length).toBe(9); // v0.6.18 re-anchor: the operations slide adds a ninth numbered kicker
     expect(kickers[0].textContent).toMatch(/^01 — /);
     const titleMetrics = document.querySelector('[data-testid="title-metrics"]') as HTMLElement;
     expect(titleMetrics).toBeTruthy();
@@ -153,10 +153,10 @@ describe("v0.6R — the prototype-pinned infographic layer", () => {
 
   it("VERSION-CURRENT: the rendered label equals the constant equals v0.6R", async () => {
     const { VERSION } = await import("../src/engine.js");
-    expect(VERSION).toBe("v0.6.17");
+    expect(VERSION).toBe("v0.6.18");
     render(<App />);
     expect(document.querySelector('[data-testid="version"]')?.textContent).toBe(VERSION);
-    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.17");
+    expect(document.querySelector('[data-testid="version"]')?.textContent).toBe("v0.6.18");
   });
 
   it("CHART-TRACE and ACTION-TITLES stand: the signed chart values equal the engine yearly rows; the deck titles carry no figures on the coverage slide (v0.6.7 re-anchor: the port demo)", () => {

@@ -145,6 +145,12 @@ export function percentTwoForDisplay(rate: number): string {
   return roundForDisplay(rate * 100, 2).toFixed(2) + "%";
 }
 
+// v0.6.18 (AUD-10): a null IRR renders the dash everywhere — the deck, the PDF, the charts and the app —
+// never "0.00%" (the retired "?? 0" fallback read an absent rate as a computed zero).
+export function percentTwoOrDash(rate: number | null | undefined): string {
+  return rate === null || rate === undefined || !Number.isFinite(rate) ? "—" : percentTwoForDisplay(rate);
+}
+
 export function yearsTwoForDisplay(years: number): string {
   return roundForDisplay(years, 2).toFixed(2) + " years";
 }
@@ -153,4 +159,4 @@ export function dscrTwoForDisplay(value: number): string {
   return roundForDisplay(value, 2).toFixed(2);
 }
 
-export const VERSION = "v0.6.17";
+export const VERSION = "v0.6.18";

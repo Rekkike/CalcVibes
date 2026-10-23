@@ -65,11 +65,11 @@ describe("v0.6.13.4 Tasks B and E: the numbered text lines", () => {
     expect(slide.body.some((f) => f.label === "Milestone 1" && f.value.startsWith("Kickoff"))).toBe(true);
   });
 
-  it("DEMOS: the demo decks number their milestones 1..n and the slide count stands at nine", () => {
+  it("DEMOS: the demo decks number their milestones 1..n and the slide count is ten (v0.6.18: the operations slide)", () => {
     for (const make of [shorePowerProgram, landNewbuildProject]) {
       const inp = make();
       const deck = deckSlides(inp, computeModel(inp), { startYear: null, scenarioTargets: [4, 6, 8], scenarioTerms: [15, 20, 25], scenarioBalloons: [0, 8, 16] });
-      expect(deck.slides).toHaveLength(9);
+      expect(deck.slides).toHaveLength(10);
       const n = inp.timeline!.milestones.length;
       const labels = deck.slides.find((s) => s.name === "timeline")!.body.filter((f) => f.label.startsWith("Milestone")).map((f) => f.label);
       expect(labels).toEqual(Array.from({ length: n }, (_, i) => `Milestone ${i + 1}`));

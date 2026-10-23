@@ -47,7 +47,8 @@ describe("v0.6.13.2 Task C: the lean-or-big lane visibility (presentation-only)"
   });
 
   it("VISIBILITY-DEMOS: the demo decks compose the lanes their activities occupy (the bar layout per Addendum 1)", () => {
-    expect(ganttOf(landNewbuildProject()).lanes.map((l) => l.phase)).toEqual(["prestudy", "detail-design", "production"]);
+    // v0.6.18 Task E.3 re-anchor: the month-level land demo adds the handover activity in the operations lane
+    expect(ganttOf(landNewbuildProject()).lanes.map((l) => l.phase)).toEqual(["prestudy", "detail-design", "production", "operations"]);
     expect(ganttOf(shorePowerProgram()).lanes.map((l) => l.phase)).toEqual(["prestudy", "production"]);
   });
 
@@ -283,9 +284,10 @@ describe("v0.6.13.2 Addendum 2: the adaptive year window", () => {
 
   it("WINDOW-DEMOS: the demo decks compose their content window (the cramped-axis defect of record is gone)", () => {
     const land = ganttOf(landNewbuildProject());
-    expect(land.window).toEqual({ firstYear: 1, lastYear: 2 });
-    expect(land.omittedMarkers).toBe(3);
-    expect(land.caption).toBe("The axis shows Year 1–Year 2 of the program span Year 1–Year 23. 3 markers fall outside this window and are not drawn; the gates and milestones listed on this slide name them.");
+    // v0.6.18 Task E.3 re-anchor: the handover activity carries the land demo's window into year 3, so every marker is drawn
+    expect(land.window).toEqual({ firstYear: 1, lastYear: 3 });
+    expect(land.omittedMarkers).toBe(0);
+    expect(land.caption).toBe("The axis shows Year 1–Year 3 of the program span Year 1–Year 23.");
     const shore = ganttOf(shorePowerProgram());
     expect(shore.window).toEqual({ firstYear: 1, lastYear: 5 });
     expect(shore.omittedMarkers).toBe(0);

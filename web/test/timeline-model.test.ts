@@ -29,11 +29,11 @@ describe("the decision-point vocabulary of record", () => {
     expect(nextUnusedDecisionPoint(block({ projectScale: "mini", decisionPoints: all }))).toBeNull();
   });
 
-  it("the empty block is not authored; the scale defaults to full", () => {
+  it("the empty block is not authored; the scale defaults to Empty (v0.6.18 Task E: the field absent)", () => {
     expect(timelineAuthored(alpha())).toBe(false);
     expect(timelineAuthored(alpha(block()))).toBe(false);
     expect(timelineAuthored(alpha(block({ milestones: [{ id: "m1", label: "x", year: 1 }] })))).toBe(true);
-    expect(timelineOf(alpha()).projectScale).toBe("full");
+    expect(timelineOf(alpha()).projectScale).toBeUndefined();
   });
 });
 

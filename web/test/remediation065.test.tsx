@@ -135,7 +135,8 @@ describe("v0.6.5 Task C: the paired composition donuts (W13)", () => {
     const infl = donuts.find((d) => d.id === "inflows")!;
     expect(out.segments.map((s) => s.value)).toEqual([5563620, 1836240, 450000]);
     expect(out.segments.every((s) => !s.label.includes("Reinvestments"))).toBe(true);
-    expect(out.disclosure).toBeUndefined();
+    // v0.6.18 Task B re-anchor: every ring carries the share-basis disclosure; this fixture has neither operating lines nor reinvestments
+    expect(out.disclosure).toBe("The outflow ring shows the capital lines. Percentages are shares of the ring's own total.");
     const sum = out.segments.reduce((a, s) => a + s.value, 0);
     expect(sum).toBe(7849860);
     expect(sum).toBe(result.totalCost);
@@ -238,15 +239,15 @@ describe("v0.6.5 Task F: the static navigation chrome (W14)", () => {
     expect(prev.className).toContain("stage-nav-button-disabled");
     expect(prev.textContent).toBe("‹");
     expect(next.textContent).toBe("›");
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 9");
-    expect(nav.querySelectorAll("[data-dot]").length).toBe(9);
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 10");
+    expect(nav.querySelectorAll("[data-dot]").length).toBe(10); // v0.6.18 re-anchor: the operations slide
     expect(next.getAttribute("aria-disabled")).toBe("false");
-    for (let i = 0; i < 8; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("9 / 9");
+    for (let i = 0; i < 9; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("10 / 10");
     expect(next.getAttribute("aria-disabled")).toBe("true");
     expect(next.className).toContain("stage-nav-button-disabled");
     expect(prev.getAttribute("aria-disabled")).toBe("false");
-    expect(document.querySelectorAll('[data-dot="8"].stage-dot-active').length).toBe(1);
+    expect(document.querySelectorAll('[data-dot="9"].stage-dot-active').length).toBe(1);
   });
 
   it("F-SWIPE-SOURCE: the swipe handlers attach with a threshold and the dominant-axis test; the chrome reserves the safe area", () => {

@@ -48,7 +48,7 @@ describe("chunk 7: section parity and presentation", () => {
     expect(warning.textContent).toContain("3 sign changes");
   });
 
-  it("presentation mode navigates nine slides by keyboard and exits on Escape", () => {
+  it("presentation mode navigates ten slides by keyboard and exits on Escape", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -69,7 +69,9 @@ describe("chunk 7: section parity and presentation", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("8");
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("8");
+    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("9");
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(screen.getByTestId("presentation").getAttribute("data-slide")).toBe("9"); // v0.6.18 re-anchor: the operations slide makes ten
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByTestId("presentation")).toBeNull();
     expect(byStat("paymentAmount")).toBeTruthy();

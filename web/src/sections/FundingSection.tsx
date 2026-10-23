@@ -4,12 +4,13 @@ import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
 import { yearHeader } from "../state.js";
 
-// v0.6.10 Task E.1: the funding block worksuite surface — the rows editor (label, kind,
-// amount, landing year; the loan kind gains the term and repayment-start fields), add and
-// remove, live validation through the standing issues summary (the engine's FND-* refusals
-// surface there), and the funding view disclosure (grantsTotal, fundingNpv, the allocation
-// table rendered per grant with the per-line shares). The UI performs no financial
-// arithmetic: every figure comes from the engine's fundingView.
+// The funding section: the GRANTS surface. v0.6.10 Task E.1 built it as the funding-block worksuite (the rows editor
+// with label, kind, amount and landing year; add and remove; live validation through the standing issues summary,
+// where the engine's FND-* refusals surface; the funding view disclosure with the grantsTotal, the fundingNpv and the
+// allocation table rendered per grant with the per-line shares). Since v0.6.16 the interest-free note is NOT a funding
+// row here: it is a zero-rate facility authored in the Financing section (the load migration moves a legacy note
+// there), so this surface lists and edits the grant rows only and the funding block keeps the grants. The UI
+// performs no financial arithmetic: every figure comes from the engine's fundingView.
 export function FundingSection(props: {
   inputs: ModelInputs;
   result: ModelResult | null;

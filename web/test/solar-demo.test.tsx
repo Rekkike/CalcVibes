@@ -102,8 +102,8 @@ describe("v0.6.6: the solar park demo", () => {
     const outflows = summary?.donuts?.find((d) => d.id === "outflows");
     expect(outflows?.segments).toHaveLength(4);
     expect(outflows?.segments.reduce((a, s) => a + s.value, 0)).toBe(11500000);
-    // v0.6.8 Task A: the donut disclosure states the capital-program scope honestly.
-    expect(outflows?.disclosure).toBe("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
+    // v0.6.18 Task B re-anchor: the corrected disclosure names the ring's basis and the percentages' basis.
+    expect(outflows?.disclosure).toBe("The outflow ring shows the capital lines; the operating lines are excluded (they are part of the total cost and appear on the operations slide). Percentages are shares of the ring's own total.")
     const inflows = summary?.donuts?.find((d) => d.id === "inflows");
     expect(inflows?.segments).toHaveLength(1);
     expect(inflows?.segments[0].value).toBeCloseTo(29796073.19, 2);

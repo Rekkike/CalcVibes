@@ -202,7 +202,9 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     // The three preset axes surface; the grant-scale axis ships empty (Task E.5).
     expect(scenarioAxisValues("target")).toEqual(["4", "6", "8"]);
     expect(scenarioAxisValues("term")).toEqual(["15", "20", "25"]);
-    expect(scenarioAxisValues("balloon")).toEqual(["0", "8", "16"]);
+    // v0.6.18 (AUD-14) re-anchor: the balloon axis holds entry-unit values; the fresh app is at unit thousands, so the
+    // raw balloons 0 / 8 000 000 / 16 000 000 read 0 / 8 000 / 16 000 (the retired preset assumed unit millions)
+    expect(scenarioAxisValues("balloon")).toEqual(["0", "8000", "16000"]);
     expect(scenarioAxisValues("grant-scale")).toEqual([]);
     // v0.6.11 re-anchor (Task E): the per-variant contract — the optimistic variant refuses
     // under its own terms (the term-25 shift leaves the declared tariff span) and carries its
@@ -233,12 +235,13 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const outflows = summary?.donuts?.find((d) => d.id === "outflows");
     const inflows = summary?.donuts?.find((d) => d.id === "inflows");
     expect(outflows?.segments.map((s) => s.value)).toEqual([74000000, 110000000, 100000000, 125000000, 20000000, 20000000]);
-    expect(outflows?.disclosure).toBe("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
+    // v0.6.18 Task B re-anchor: the corrected disclosure names the ring's basis and the percentages' basis.
+    expect(outflows?.disclosure).toBe("The outflow ring shows the capital lines; the operating lines are excluded (they are part of the total cost and appear on the operations slide). Percentages are shares of the ring's own total.");
     // The inflow donut: fees and grants of the totalCollected circle; the interest-free loan
     // nets to zero and never joins the donut (the loan-nets-zero disclosure).
     expect(inflows?.segments.map((s) => s.value)).toEqual([682407745.3398229, 173500000]);
     expect(sum(inflows?.segments.map((s) => s.value) ?? [])).toBeCloseTo(result.totalCollected, 6);
-    expect(inflows?.disclosure).toBe("Fees are the collections-side tariff rows; the interest-free loan nets to zero over the horizon and never joins the donut.");
+    expect(inflows?.disclosure).toBe("Fees are the collections-side tariff rows; the interest-free loan nets to zero over the horizon and never joins the donut. Percentages are shares of the ring's own total."); // v0.6.18 Task B: the share basis rides
     // The investment slide's funding breakdown block: the raws and the rendered forms.
     const investment = deck.slides.find((s) => s.name === "investment");
     expect(investment?.funding).toBeDefined();
@@ -273,7 +276,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     setEntryUnit("ones");
     fireEvent.click(byAction("present"));
     await waitFor(() => {
-      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(9);
+      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(10); // v0.6.18: the operations slide mounts (the program carries operating lines)
     });
     expect(titleMetricValue("Project cost")).toBe("€628 250 000");
     expect(titleMetricValue("Target IRR")).toBe("6.00%");
@@ -286,7 +289,8 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     expect(tileValue("Verdict")).toBe("Target met");
     expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("€628 250 000");
     expect(bodyFigureValue("investment", "Cost NPV at target (discounted)")).toBe("€479 231 370");
-    expect(bodyFigureValue("investment", "Operating lines total")).toBe("€179 250 000");
+    // v0.6.18 Task A: the operating lines total is the anchor figure of the operations slide (retired from the investment slide)
+    expect(bodyFigureValue("operations", "Operating lines total")).toBe("€179 250 000");
     // The funding breakdown block renders beneath the waterfall.
     const fundingBlock = document.querySelector('[data-testid="deck-funding-block"]');
     expect(fundingBlock).toBeTruthy();
@@ -306,7 +310,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — " + inputs.tariff?.priceUnitLabel + " prices");
     expect(bodyFigureValue("recovery", "Payments")).toBe("240");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("€2 843 366");
+    expect(bodyFigureValue("recovery", "Payment per month")).toBe("€2 843 366"); // v0.6.18 Task H1: the cadence names the period
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("€855 907 745");
     expect(bodyFigureValue("recovery", "Unit price 2028")).toBe("€7 108,41");
     expect(bodyFigureValue("recovery", "Segment rate — Deep-sea container berths (full ramp)")).toBe("5,83 €ct/kWh");
@@ -330,7 +334,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     const outflowDonut = document.querySelector('[data-donut="outflows"]');
     expect(outflowDonut).toBeTruthy();
     expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(6);
-    expect(outflowDonut?.textContent).toContain("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
+    expect(outflowDonut?.textContent).toContain("The outflow ring shows the capital lines; the operating lines are excluded (they are part of the total cost and appear on the operations slide). Percentages are shares of the ring's own total."); // v0.6.18 Task B
     const inflowDonut = document.querySelector('[data-donut="inflows"]');
     expect(inflowDonut).toBeTruthy();
     expect(inflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(2);
@@ -500,8 +504,8 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const outflows = summary?.donuts?.find((d) => d.id === "outflows");
     const inflows = summary?.donuts?.find((d) => d.id === "inflows");
     expect(outflows?.segments.map((s) => s.value)).toEqual([45000000, 320000000, 55000000]);
-    // v0.6.8 Task A.4 re-anchor: the repaired disclosure (the arithmetic-honest wording).
-    expect(outflows?.disclosure).toBe("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
+    // v0.6.18 Task B re-anchor: the corrected disclosure names the ring's basis and the percentages' basis.
+    expect(outflows?.disclosure).toBe("The outflow ring shows the capital lines; the operating lines are excluded (they are part of the total cost and appear on the operations slide). Percentages are shares of the ring's own total.");
     expect(inflows?.segments.map((s) => s.value)).toEqual([663914798.4595231, 307291022.122572, 161363636.36363652]);
     expect(sum(inflows?.segments.map((s) => s.value) ?? [])).toBeCloseTo(result.totalCollected, 6);
     const scenariosSlide = deck.slides.find((s) => s.name === "scenarios");
@@ -519,7 +523,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     setEntryUnit("thousands");
     fireEvent.click(byAction("present"));
     await waitFor(() => {
-      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(9);
+      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(10); // v0.6.18: the land demo carries operating lines, so the operations slide mounts
     });
     expect(titleMetricValue("Project cost")).toBe("NOK 599 071 k");
     expect(titleMetricValue("Target IRR")).toBe("8.00%");
@@ -533,11 +537,11 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     expect(tileValue("Verdict")).toBe("Target met");
     expect(bodyFigureValue("investment", "Total cost (nominal)")).toBe("NOK 599 071 k");
     expect(bodyFigureValue("investment", "Cost NPV at target (discounted)")).toBe("NOK 456 582 k");
-    expect(bodyFigureValue("investment", "Operating lines total")).toBe("NOK 179 071 k");
+    expect(bodyFigureValue("operations", "Operating lines total")).toBe("NOK 179 071 k"); // v0.6.18 Task A
     const recovery = document.querySelector('[data-slide-name="recovery"] h2');
     expect(recovery?.textContent).toBe("The recovery — solved payments");
     expect(bodyFigureValue("recovery", "Payments")).toBe("360");
-    expect(bodyFigureValue("recovery", "Payment per period")).toBe("NOK 2 393 k");
+    expect(bodyFigureValue("recovery", "Payment per month")).toBe("NOK 2 393 k"); // v0.6.18 Task H1
     expect(bodyFigureValue("recovery", "Total collected (nominal)")).toBe("NOK 1 132 569 k");
     // v0.6.8 Task E.5 pin: the land fixture carries neither basis note — the recovery slide
     // gains no note disclosures (the null-tolerance demo).
@@ -553,8 +557,8 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     const outflowDonut = document.querySelector('[data-donut="outflows"]');
     expect(outflowDonut).toBeTruthy();
     expect(outflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(3);
-    // v0.6.8 Task A: the pinned donut disclosure wording.
-    expect(outflowDonut?.textContent).toContain("The outflow donut shows the capital program; operating lines and reinvestments are part of the total cost and are shown separately.");
+    // v0.6.18 Task B: the corrected disclosure names the ring's basis and the percentages' basis.
+    expect(outflowDonut?.textContent).toContain("The outflow ring shows the capital lines; the operating lines are excluded (they are part of the total cost and appear on the operations slide). Percentages are shares of the ring's own total.");
     const inflowDonut = document.querySelector('[data-donut="inflows"]');
     expect(inflowDonut).toBeTruthy();
     expect(inflowDonut?.querySelectorAll('[data-testid="donut-label"]').length).toBe(3);

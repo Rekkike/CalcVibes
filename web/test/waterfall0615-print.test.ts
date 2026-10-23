@@ -27,16 +27,14 @@ describe("the printed investment slide", () => {
     expect(drawn).toContain("Container shore power — engineering & studies (RSP JV)");
   });
 
-  it("the honesty gap closes: the operating segment prints, and the drawn values reconcile to the total", () => {
+  it("v0.6.18: the waterfall closes at the Capital program step on the print route too; the drawn values reconcile to the capital program, and the operating lines no longer print as a step", () => {
     const { drawn, waterfall } = printed();
-    expect(drawn).toContain("Operating lines");
-    expect(drawn).toContain("€179 250 k");
-    expect(drawn).toContain("Total program cost");
-    expect(drawn).toContain("€628 250 k");
-    const parts = waterfall.rows.filter((r) => r.kind === "capital" || r.kind === "operating" || r.kind === "reinvestments");
-    expect(parts.reduce((a, r) => a + r.raw, 0)).toBeCloseTo(waterfall.totalRaw, 6);
     expect(drawn).toContain("Capital program");
     expect(drawn).toContain("€449 000 k");
+    expect(drawn).not.toContain("€179 250 k");
+    const parts = waterfall.rows.filter((r) => r.kind === "capital");
+    expect(parts.reduce((a, r) => a + r.raw, 0)).toBeCloseTo(waterfall.totalRaw, 6);
+    expect(waterfall.totalRaw).toBe(449000000);
   });
 
   it("draws the stepped columns: the group names and the group values", () => {

@@ -4,6 +4,7 @@ import { CompositionRows, CompositionDonut } from "../charts.js";
 import { moneyForDisplay, entryToValue } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
+import { YearMapEditor } from "../YearMapEditor.js";
 
 
 export function CostModelSection(props: {
@@ -121,36 +122,7 @@ export function CostModelSection(props: {
                 <td colSpan={9}>
                   <details>
                     <summary data-testid="year-editor-toggle">Per-year amounts</summary>
-                    <table data-testid="year-editor">
-                      <thead><tr><th>Year</th><th>Amount</th><th></th></tr></thead>
-                      <tbody>
-                        {Object.entries(c.yearOverrides ?? {}).map(([y, amount]) => (
-                          <tr key={y} data-override-year={y}>
-                            <td><input data-field="override-year" value={y} onChange={(e) => {
-                              const next = { ...(c.yearOverrides ?? {}) };
-                              delete next[Number(y)];
-                              next[parseFloat(e.target.value) || 0] = amount;
-                              updateCost(c.id, { yearOverrides: next });
-                            }} /></td>
-                            <td><MoneyEditor dataField="override-amount" value={amount} entryUnit={entryUnit} onChange={(v) => {
-                              const next = { ...(c.yearOverrides ?? {}) };
-                              next[Number(y)] = v;
-                              updateCost(c.id, { yearOverrides: next });
-                            }} /></td>
-                            <td><button data-action="remove-override" data-year={y} onClick={() => {
-                              const next = { ...(c.yearOverrides ?? {}) };
-                              delete next[Number(y)];
-                              updateCost(c.id, { yearOverrides: next });
-                            }}>Remove</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <button data-action="add-override" onClick={() => {
-                      const next = { ...(c.yearOverrides ?? {}) };
-                      next[1] = next[1] ?? 0;
-                      updateCost(c.id, { yearOverrides: next });
-                    }}>Add year</button>
+                    <YearMapEditor value={c.yearOverrides ?? {}} onChange={(next) => updateCost(c.id, { yearOverrides: next })} entryUnit={entryUnit} tableTestId="year-editor" rowAttr="data-override-year" yearField="override-year" amountField="override-amount" removeAction="remove-override" addAction="add-override" defaultNewYear={1} />
                     <div data-testid="spread-editor">
                       <label>Spread total <input data-field="spread-total" type="number" defaultValue="" /></label>
                       <label>First year <input data-field="spread-first" type="number" defaultValue={1} /></label>

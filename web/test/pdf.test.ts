@@ -71,21 +71,21 @@ describe("v0.6.9 Task G: the scenarios slide reserves the chart row in one pass"
     expect(doc.getNumberOfPages()).toBe(7);
   });
 
-  it("the port deck (millions, all three scenario sets) renders eight slides on exactly eight pages", () => {
+  it("the port deck (millions, all three scenario sets) renders nine slides on exactly nine pages (v0.6.18: the operations slide)", () => {
     const inputs = shorePowerProject();
     const result = computeModel(inputs);
     const portModel = deckSlides(inputs, result, { startYear: null, entryUnit: "millions", scenarioTargets: [4, 6, 8], scenarioTerms: [15, 20, 25], scenarioBalloons: [0, 1000, 2000] });
-    expect(portModel.slides.length).toBe(8);
+    expect(portModel.slides.length).toBe(9);
     const doc = buildDeckPdf(portModel, inputs.projectName);
-    expect(doc.getNumberOfPages()).toBe(8);
+    expect(doc.getNumberOfPages()).toBe(9);
   });
 
-  it("the solar deck (thousands, the target range) renders eight slides on exactly eight pages", () => {
+  it("the solar deck (thousands, the target range) renders nine slides on exactly nine pages (v0.6.18: the operations slide)", () => {
     const inputs = solarParkProject();
     const result = computeModel(inputs);
     const solarModel = deckSlides(inputs, result, { startYear: null, entryUnit: "thousands", scenarioTargets: [5, 7, 9] });
-    expect(solarModel.slides.length).toBe(8);
+    expect(solarModel.slides.length).toBe(9);
     const doc = buildDeckPdf(solarModel, inputs.projectName);
-    expect(doc.getNumberOfPages()).toBe(8);
+    expect(doc.getNumberOfPages()).toBe(9);
   });
 });

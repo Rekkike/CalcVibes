@@ -29,11 +29,13 @@ describe("the ledger waterfall (the upper section)", () => {
     expect(slide.querySelector('[data-testid="composition-rows"]')).toBeNull();
   });
 
-  it("rows: the capital lines with full names, the subtotal, the operating row, the total — in order", () => {
+  it("rows: the capital lines with full names, then the Capital program total — in order (v0.6.18: the operating row and the subtotal retired; the waterfall closes at the Capital program step)", () => {
     const { ledger, model } = openInvestment();
     const rows = Array.from(ledger.querySelectorAll("[data-ledger-row]")) as HTMLElement[];
     expect(rows.map((r) => r.getAttribute("data-ledger-kind"))).toEqual(model.rows.map((r) => r.kind));
-    expect(rows).toHaveLength(9);
+    expect(rows).toHaveLength(7);
+    expect(rows.map((r) => r.getAttribute("data-ledger-kind"))).toEqual(["capital", "capital", "capital", "capital", "capital", "capital", "total"]);
+    expect(rows[6].querySelector('[data-ledger-label="name"]')!.textContent).toBe("Capital program");
     rows.forEach((r, i) => expect(r.querySelector('[data-ledger-label="name"]')!.textContent).toBe(model.rows[i].name));
     expect(rows[0].querySelector('[data-ledger-label="name"]')!.textContent).toBe("Container shore power — engineering & studies (RSP JV)");
   });
@@ -41,7 +43,7 @@ describe("the ledger waterfall (the upper section)", () => {
   it("the bars float on the shared scale as percent left and width; the closure identity reaches 100 percent; the stubs keep full rows", () => {
     const { ledger, model } = openInvestment();
     const bars = Array.from(ledger.querySelectorAll("[data-ledger-bar]")) as HTMLElement[];
-    const barRows = model.rows.filter((r) => r.kind !== "subtotal");
+    const barRows = model.rows;
     expect(bars).toHaveLength(barRows.length);
     bars.forEach((b, i) => {
       expect(pct(b, "left")).toBeCloseTo(barRows[i].startPct, 6);
@@ -53,7 +55,7 @@ describe("the ledger waterfall (the upper section)", () => {
     const last = steps[steps.length - 1];
     expect(pct(last, "left") + pct(last, "width")).toBeCloseTo(100, 6);
     const stubs = model.rows.filter((r) => r.id === "p5" || r.id === "p6");
-    expect(stubs.map((s) => s.widthPct.toFixed(2))).toEqual(["3.18", "3.18"]);
+    expect(stubs.map((s) => s.widthPct.toFixed(2))).toEqual(["4.45", "4.45"]);
     for (const s of stubs) expect(ledger.querySelector(`[data-ledger-row="${s.id}"] [data-ledger-value]`)!.textContent).toBe(s.value);
   });
 
@@ -65,38 +67,37 @@ describe("the ledger waterfall (the upper section)", () => {
       expect(row.querySelector("[data-ledger-share]")!.textContent).toBe(r.share);
     }
     expect(model.rows[0].value).toBe("€74 000 k");
-    expect(model.rows[0].share).toBe("11,8%");
+    expect(model.rows[0].share).toBe("16,5%"); // v0.6.18: the shares are of the capital program
   });
 
-  it("the capital subtotal marker is a hairline row with a tick at the capital position and the gross capital", () => {
+  it("the waterfall closes at the Capital program step: no subtotal, operating or reinvestments row draws; the total row carries the gross capital", () => {
     const { ledger, model } = openInvestment();
-    const sub = ledger.querySelector('[data-ledger-kind="subtotal"]') as HTMLElement;
-    expect(sub.querySelector("[data-ledger-bar]")).toBeNull();
-    const tick = sub.querySelector("[data-ledger-tick]") as HTMLElement;
-    expect(pct(tick, "left")).toBeCloseTo(model.rows.find((r) => r.kind === "subtotal")!.startPct, 6);
-    expect(sub.querySelector("[data-ledger-value]")!.textContent).toBe("€449 000 k");
+    expect(ledger.querySelector('[data-ledger-kind="subtotal"]')).toBeNull();
+    expect(ledger.querySelector('[data-ledger-kind="operating"]')).toBeNull();
+    expect(ledger.querySelector('[data-ledger-kind="reinvestments"]')).toBeNull();
+    expect(ledger.querySelector("[data-ledger-tick]")).toBeNull();
+    const total = ledger.querySelector('[data-ledger-kind="total"]') as HTMLElement;
+    expect(total.querySelector("[data-ledger-value]")!.textContent).toBe("€449 000 k");
+    expect(model.totalRaw).toBe(449000000);
   });
 
   it("the connectors carry the build from each bar end to the next row; the closure edge runs through every row", () => {
     const { ledger, model } = openInvestment();
     const conns = Array.from(ledger.querySelectorAll("[data-ledger-connector]")) as HTMLElement[];
-    const stepRows = model.rows.filter((r) => r.kind === "capital" || r.kind === "operating" || r.kind === "reinvestments");
+    const stepRows = model.rows.filter((r) => r.kind === "capital");
     expect(conns).toHaveLength(stepRows.length);
     conns.forEach((c, i) => expect(pct(c, "left")).toBeCloseTo(stepRows[i].startPct + stepRows[i].widthPct, 6));
     expect(ledger.querySelectorAll("[data-ledger-edge]").length).toBe(model.rows.length);
   });
 
-  it("the total row is a full-width neutral bar at heavier weight; the operating row is visually distinct", () => {
+  it("the total row is a full-width neutral bar at heavier weight", () => {
     const { ledger } = openInvestment();
     const total = ledger.querySelector('[data-ledger-kind="total"] [data-ledger-bar]') as HTMLElement;
     expect(total.className).toContain("ledger-bar-total");
     expect(pct(total, "left")).toBe(0);
     expect(pct(total, "width")).toBe(100);
-    const op = ledger.querySelector('[data-ledger-kind="operating"] [data-ledger-bar]') as HTMLElement;
-    expect(op.className).toContain("ledger-bar-operating");
     const css = fs.readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\.ledger-bar-total\s*\{[^}]*background:\s*#e2e8f0/);
-    expect(css).toMatch(/\.ledger-bar-operating\s*\{[^}]*repeating-linear-gradient/);
     expect(css).not.toMatch(/\.ledger-name[^{]*\{[^}]*text-overflow/);
   });
 });
@@ -110,10 +111,10 @@ describe("the two sections keep clear of each other (the walkthrough at phone wi
 });
 
 describe("the stepped columns (the lower section, at group level)", () => {
-  it("n+1 slots: the group steps, the operating step, and the ground-standing total column of the same width", () => {
+  it("n+1 slots: the group steps and the ground-standing Capital program column of the same width", () => {
     const { cols, model } = openInvestment();
     const steps = Array.from(cols.querySelectorAll("[data-waterfall-segment]")) as HTMLElement[];
-    expect(steps.map((s) => s.getAttribute("data-waterfall-kind"))).toEqual(["capital", "capital", "capital", "capital", "operating"]);
+    expect(steps.map((s) => s.getAttribute("data-waterfall-kind"))).toEqual(["capital", "capital", "capital", "capital"]);
     const slot = 100 / model.columns.length;
     steps.forEach((s, i) => {
       expect(s.getAttribute("data-waterfall-step")).toBe(String(i));
@@ -136,8 +137,8 @@ describe("the stepped columns (the lower section, at group level)", () => {
   it("direct value labels above the bars; the total label verbatim; the group names under the ground line with the full name in the title", () => {
     const { cols, model } = openInvestment();
     const labels = Array.from(cols.querySelectorAll('[data-testid="waterfall-label"]')) as HTMLElement[];
-    expect(labels.map((l) => l.textContent)).toEqual(model.columns.slice(0, 5).map((c) => c.value));
-    expect(cols.querySelector('[data-testid="waterfall-total-label"]')!.textContent).toBe("Total program cost €628 250 k");
+    expect(labels.map((l) => l.textContent)).toEqual(model.columns.slice(0, 4).map((c) => c.value));
+    expect(cols.querySelector('[data-testid="waterfall-total-label"]')!.textContent).toBe("Capital program €449 000 k");
     expect(cols.querySelector("[data-waterfall-ground]")).toBeTruthy();
     const names = Array.from(cols.querySelectorAll("[data-waterfall-name]")) as HTMLElement[];
     expect(names.map((n) => n.textContent)).toEqual(model.columns.map((c) => c.name));
@@ -150,7 +151,7 @@ describe("the stepped columns (the lower section, at group level)", () => {
   it("the dotted connectors carry each step top to the next base and the last top to the total", () => {
     const { cols, model } = openInvestment();
     const conns = Array.from(cols.querySelectorAll("[data-waterfall-connector]")) as HTMLElement[];
-    expect(conns).toHaveLength(5);
+    expect(conns).toHaveLength(4);
     conns.forEach((c, i) => expect(pct(c, "bottom")).toBeCloseTo(model.columns[i].bottomPct + model.columns[i].heightPct, 6));
   });
 });
