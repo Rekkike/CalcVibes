@@ -45,9 +45,9 @@ describe("v0.6.10 Task E.2/E.3: the tariff span editors and the per-segment surc
     // silently drops the other (the ratified defect fix of the pass).
     expect(byField("tariffSpanStart").value).toBe("3");
     expect(byField("tariffSpanTerm").value).toBe("20");
-    // The grid header: years 3 through 23 (a term of 20 touches 21 calendar years),
+    // The grid header: years 3 through 23 (a term of 20 touches 21 calendar years); v0.6.21 Task D re-anchor: the h3 caption carries the calendar-year vocabulary (start year 2026), so 3–23 reads 2028–2048,
     // declared span, and the machine volume unit.
-    expect(gridHeaderText()).toBe("Volume grid (collection years 3–23, declared tariff span) — volumes in GWh");
+    expect(gridHeaderText()).toBe("Volume grid (collection years 2028–2048, declared tariff span) — volumes in GWh");
     expect(byTestid("tariff-volume-unit").textContent).toBe(" — volumes in GWh");
     // The grid columns: Descriptor, Weight, 21 year columns, and the two row-span columns.
     expect(document.querySelectorAll('[data-testid="tariff-rows"] th').length).toBe(25);
@@ -61,7 +61,7 @@ describe("v0.6.10 Task E.2/E.3: the tariff span editors and the per-segment surc
     await loadProgramDemo();
     fireEvent.click(byAction("clear-tariff-span"));
     await waitFor(() => {
-      expect(gridHeaderText()).toBe("Volume grid (collection years 3–23, derived from the model span) — volumes in GWh");
+      expect(gridHeaderText()).toBe("Volume grid (collection years 2028–2048, derived from the model span) — volumes in GWh");
     });
     // The placeholders show the repayment-derived default (first collection year 3, term 20).
     expect(byField("tariffSpanStart").value).toBe("");
@@ -70,12 +70,12 @@ describe("v0.6.10 Task E.2/E.3: the tariff span editors and the per-segment surc
     expect(byField("tariffSpanTerm").placeholder).toBe("20");
     // A start year alone never declares the span (all-or-nothing).
     fireEvent.change(byField("tariffSpanStart"), { target: { value: "3" } });
-    expect(gridHeaderText()).toBe("Volume grid (collection years 3–23, derived from the model span) — volumes in GWh");
+    expect(gridHeaderText()).toBe("Volume grid (collection years 2028–2048, derived from the model span) — volumes in GWh");
     expect(byField("tariffSpanStart").value).toBe("3");
     // The term completes the declaration: a term of 21 touches years 3 through 24.
     fireEvent.change(byField("tariffSpanTerm"), { target: { value: "21" } });
     await waitFor(() => {
-      expect(gridHeaderText()).toBe("Volume grid (collection years 3–24, declared tariff span) — volumes in GWh");
+      expect(gridHeaderText()).toBe("Volume grid (collection years 2028–2049, declared tariff span) — volumes in GWh");
     });
     expect(document.querySelectorAll('[data-testid="tariff-rows"] th').length).toBe(26);
     const ths = Array.from(document.querySelectorAll('[data-testid="tariff-rows"] th')).map((th) => th.textContent);

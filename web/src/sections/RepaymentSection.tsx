@@ -98,7 +98,8 @@ export function RepaymentSection(props: {
                 <label>Payment per period <MoneyEditor dataField="contract-evaluatedPayment" value={c.evaluatedPayment ?? 0} entryUnit={entryUnit} onChange={(v) => updateContract(c.id, { evaluatedPayment: v })} /></label>
                 <details data-testid="contract-profile-editor">
                   <summary>Per-year collections profile (optional)</summary>
-                  <YearMapEditor value={c.evaluatedProfile ?? {}} onChange={(next) => updateContract(c.id, { evaluatedProfile: next })} entryUnit={entryUnit} tableTestId="contract-profile-rows" rowAttr="data-profile-year" yearField="profile-year" amountField="profile-amount" removeAction="remove-profile-year" addAction="add-profile-year" defaultNewYear={3} />
+                  {/* v0.6.21 Task D: the per-contract profile editor rows carry the calendar-year vocabulary of record (the yearHeader pattern), like the collections editor's delivered twin */}
+                  <YearMapEditor value={c.evaluatedProfile ?? {}} onChange={(next) => updateContract(c.id, { evaluatedProfile: next })} entryUnit={entryUnit} tableTestId="contract-profile-rows" rowAttr="data-profile-year" yearField="profile-year" amountField="profile-amount" removeAction="remove-profile-year" addAction="add-profile-year" defaultNewYear={3} rowExtra={(y) => ({ "data-calendar-label": yearHeader(y, startYear) })} yearNote={(y) => <span className="muted" data-testid="contract-profile-calendar-label">{yearHeader(y, startYear)}</span>} />
                 </details>
               </>
             )}
@@ -108,8 +109,8 @@ export function RepaymentSection(props: {
                 <thead><tr><th>Year</th><th>Amount</th><th></th></tr></thead>
                 <tbody>
                   {(c.reinvestments ?? []).map((ri, idx) => (
-                    <tr key={idx} data-reinvestment-year={ri.year}>
-                      <td><input data-field="reinvestment-year" type="number" value={ri.year} onChange={(e) => updateReinvestment(c, idx, { year: parseFloat(e.target.value) || 0 })} /></td>
+                    <tr key={idx} data-reinvestment-year={ri.year} data-calendar-label={yearHeader(ri.year, startYear)}>
+                      <td><input data-field="reinvestment-year" type="number" value={ri.year} onChange={(e) => updateReinvestment(c, idx, { year: parseFloat(e.target.value) || 0 })} />{" "}<span className="muted" data-testid="reinvestment-calendar-label">{yearHeader(ri.year, startYear)}</span></td>
                       <td><MoneyEditor dataField="reinvestment-amount" value={ri.amount} entryUnit={entryUnit} onChange={(v) => updateReinvestment(c, idx, { amount: v })} /></td>
                       <td><button data-action="remove-reinvestment" onClick={() => updateContract(c.id, { reinvestments: (c.reinvestments ?? []).filter((_, j) => j !== idx) })}>Remove</button></td>
                     </tr>

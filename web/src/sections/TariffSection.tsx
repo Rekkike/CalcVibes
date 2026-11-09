@@ -179,7 +179,8 @@ export function TariffSection(props: {
               if (declaredSpan !== null) setTariff({ ...t, span: null });
             }}>Clear tariff span</button>
           </div>
-          <h3>Volume grid {gridYears.length > 0 ? `(collection years ${gridYears[0]}–${gridYears[gridYears.length - 1]}, ${declaredSpan ? "declared tariff span" : "derived from the model span"})` : ""}{t.volumeUnitLabel ? <span data-testid="tariff-volume-unit"> — volumes in {t.volumeUnitLabel}</span> : null}</h3>
+          {/* v0.6.21 Task D: the volume-grid h3 caption carries the calendar-year vocabulary of record (the yearHeader pattern; the generic Year-k form when no start year is set) */}
+          <h3>Volume grid {gridYears.length > 0 ? `(collection years ${yearHeader(gridYears[0], startYear)}–${yearHeader(gridYears[gridYears.length - 1], startYear)}, ${declaredSpan ? "declared tariff span" : "derived from the model span"})` : ""}{t.volumeUnitLabel ? <span data-testid="tariff-volume-unit"> — volumes in {t.volumeUnitLabel}</span> : null}</h3>
           {/* v0.6.9 Task D (finding W25): the volume grid gains the .editor-scroll wrapper —
               parity with the cost grid (scroll, sticky header, sticky first column) so the
               per-year headers never bleed outside the card at the capped width. */}
@@ -236,8 +237,9 @@ export function TariffSection(props: {
       {t.mode === "manual" && (
         <>
           <h3>Manual prices (one per grid column)</h3>
+          {/* v0.6.21 Task D: the manual-prices input labels carry the calendar-year vocabulary of record (the yearHeader pattern) */}
           {gridYears.map((y, k) => (
-            <label key={y}>Price for collection year {y}{" "}
+            <label key={y}>Price for collection year {yearHeader(y, startYear)}{" "}
               <MoneyEditor dataField="manualPrice" dataColumn={k} value={t.manualPrices?.[k] ?? 0} entryUnit={entryUnit} onChange={(v) => {
                 const prices = (t.manualPrices ?? gridYears.map(() => 0)).slice();
                 prices[k] = v;
