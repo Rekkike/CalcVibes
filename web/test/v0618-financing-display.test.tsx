@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { render, fireEvent, waitFor, screen } from "@testing-library/react";
 import { App } from "../src/App.js";
-import { computeModel, roundForDisplay } from "../src/engine.js";
+import { deckMoneyForDisplay, computeModel, roundForDisplay } from "../src/engine.js";
 import { deckSlides } from "../src/deck.js";
 import { buildWorkbook, readWorkbook } from "../src/xlsx.js";
 import { composeFacilitySchedules, demoProject, migrateOnLoad, shorePowerProgram } from "../src/state.js";
@@ -102,7 +102,8 @@ describe("v0.6.18 Task C: the Results view", () => {
       expect(trs).toHaveLength(v.rows.length);
       trs.forEach((tr, j) => {
         const cells = Array.from(tr.querySelectorAll("td")).map((td) => td.textContent);
-        expect(cells.slice(1)).toEqual([v.rows[j].draws, v.rows[j].interest, v.rows[j].principal, v.rows[j].service, v.rows[j].balance].map((x) => String(roundForDisplay(x))));
+        // v0.6.21 Task B re-anchor: the facility-schedule money cells render in the reading form (EUR at unit ones)
+        expect(cells.slice(1)).toEqual([v.rows[j].draws, v.rows[j].interest, v.rows[j].principal, v.rows[j].service, v.rows[j].balance].map((x) => deckMoneyForDisplay(x, "EUR", "ones")));
       });
     });
     expect(blocks[1].querySelector('[data-testid="facility-schedule-title"]')!.textContent).toBe("Municipality interest-free note — interest-free note (payback installments), general (the whole program)");
@@ -110,7 +111,7 @@ describe("v0.6.18 Task C: the Results view", () => {
     // the combined aggregate retained; the DSCR and the equity figures are the engine's own
     expect(combined.querySelectorAll("tbody tr")).toHaveLength(r.financing!.yearly.length);
     expect(document.querySelector('[data-testid="min-dscr"]')!.textContent).toBe(`Minimum DSCR: ${roundForDisplay(r.financing!.minDscr!.value, 4)} in Year ${r.financing!.minDscr!.year}`);
-    expect(document.querySelector('[data-stat="equityOutlay"]')!.textContent).toBe(String(roundForDisplay(r.financing!.equity.outlay)));
+    expect(document.querySelector('[data-stat="equityOutlay"]')!.textContent).toBe(deckMoneyForDisplay(r.financing!.equity.outlay, "EUR", "ones"));
   });
 
   it("DECK-UNTOUCHED: the deck gains nothing from the facility schedules", () => {

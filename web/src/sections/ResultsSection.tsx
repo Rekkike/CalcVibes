@@ -7,6 +7,11 @@ import { deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } from "../
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null; entryUnit?: import("../engine.js").EntryUnit }) {
   const { result, targetIrr, currency, startYear = null, entryUnit = "ones" } = props;
   const money = (v: number) => deckMoneyForDisplay(v, currency as Parameters<typeof deckMoneyForDisplay>[1], entryUnit);
+  // v0.6.21 Task B (Round 46 Supplement 6): every money figure on this READ surface renders in the
+  // established reading form through money() below — the entry-unit scaling per the project's setting,
+  // space-separated thousands, display-rounded decimals, the currency form per the unit vocabulary.
+  // Years, percentages and ratios (DSCR, IRR, payback) keep their standing forms; the fee-class
+  // unit-price exemption at unit ones stands; the XLSX export stays raw.
   const bookSplit = composeBookCollections(result);
   return (
     <section data-testid="results">
@@ -78,7 +83,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
       <h3>Key metrics</h3>
       <dl data-testid="metrics">
         <dt>Total cost (nominal)</dt><dd data-stat="totalCost">{money(result.totalCost)}</dd>
-        <dt>Cost NPV at target (discounted)</dt><dd data-stat="costNpv">{roundForDisplay(result.costNpv)}</dd>
+        <dt>Cost NPV at target (discounted)</dt><dd data-stat="costNpv">{money(result.costNpv)}</dd>
         <dt>Total collected (nominal)</dt><dd data-stat="totalCollected">{money(result.totalCollected)}</dd>
         <dt>Net gain (nominal)</dt><dd data-stat="netGain">{money(result.netGain)}</dd>
         <dt>Payback (years, nominal)</dt>
@@ -92,9 +97,9 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
         <>
           <h3>Equity metrics</h3>
           <dl data-testid="equity-panel">
-            <dt>Equity outlay</dt><dd data-stat="equityOutlay">{roundForDisplay(result.financing.equity.outlay)}</dd>
-            <dt>Equity NPV at WACC (discounted)</dt><dd data-stat="equityNpvAtWacc">{roundForDisplay(result.financing.equity.npvAtWacc)}</dd>
-            <dt>Equity NPV at target (leveraged verification)</dt><dd data-stat="equityNpvAtTarget">{roundForDisplay(result.financing.equity.npvAtTarget)}</dd>
+            <dt>Equity outlay</dt><dd data-stat="equityOutlay">{money(result.financing.equity.outlay)}</dd>
+            <dt>Equity NPV at WACC (discounted)</dt><dd data-stat="equityNpvAtWacc">{money(result.financing.equity.npvAtWacc)}</dd>
+            <dt>Equity NPV at target (leveraged verification)</dt><dd data-stat="equityNpvAtTarget">{money(result.financing.equity.npvAtTarget)}</dd>
             <dt>Equity payback (years)</dt><dd data-stat="equityPayback">{result.financing.equity.payback === null ? "—" : roundForDisplay(result.financing.equity.payback, 5)}</dd>
             <dt>Equity IRR</dt>
             <dd data-stat="equityIrr">
@@ -113,7 +118,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
             <thead><tr><th>Year</th><th>Interest</th><th>Principal</th><th>Service</th></tr></thead>
             <tbody>
               {result.financing.yearly.map((y) => (
-                <tr key={y.year}><td>{yearHeader(y.year, startYear)}</td><td>{roundForDisplay(y.interest)}</td><td>{roundForDisplay(y.principal)}</td><td>{roundForDisplay(y.service)}</td></tr>
+                <tr key={y.year}><td>{yearHeader(y.year, startYear)}</td><td>{money(y.interest)}</td><td>{money(y.principal)}</td><td>{money(y.service)}</td></tr>
               ))}
             </tbody>
           </table>
@@ -131,9 +136,9 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
                     <thead><tr><th>Year</th><th>Draws</th><th>Interest</th><th>{f.principalLabel}</th><th>Service</th><th>Closing balance</th></tr></thead>
                     <tbody>
                       {f.rows.map((r) => (
-                        <tr key={r.year} data-facility-year={r.year}><td>{yearHeader(r.year, startYear)}</td><td>{roundForDisplay(r.draws)}</td><td>{roundForDisplay(r.interest)}</td><td>{roundForDisplay(r.principal)}</td><td>{roundForDisplay(r.service)}</td><td>{roundForDisplay(r.balance)}</td></tr>
+                        <tr key={r.year} data-facility-year={r.year}><td>{yearHeader(r.year, startYear)}</td><td>{money(r.draws)}</td><td>{money(r.interest)}</td><td>{money(r.principal)}</td><td>{money(r.service)}</td><td>{money(r.balance)}</td></tr>
                       ))}
-                      <tr data-facility-total="true"><td>Total</td><td>{roundForDisplay(f.totals.draws)}</td><td>{roundForDisplay(f.totals.interest)}</td><td>{roundForDisplay(f.totals.principal)}</td><td>{roundForDisplay(f.totals.service)}</td><td></td></tr>
+                      <tr data-facility-total="true"><td>Total</td><td>{money(f.totals.draws)}</td><td>{money(f.totals.interest)}</td><td>{money(f.totals.principal)}</td><td>{money(f.totals.service)}</td><td></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -146,7 +151,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
             <tbody>
               {result.financing.dscr.filter((d) => d.dscr !== null).map((d) => (
                 <tr key={d.year} data-dscr-min={result.financing?.minDscr?.year === d.year ? "true" : "false"}>
-                  <td>{yearHeader(d.year, startYear)}</td><td>{roundForDisplay(d.inflows)}</td><td>{roundForDisplay(d.service)}</td>
+                  <td>{yearHeader(d.year, startYear)}</td><td>{money(d.inflows)}</td><td>{money(d.service)}</td>
                   <td>{d.dscr === null ? "—" : roundForDisplay(d.dscr, 4)}</td>
                 </tr>
               ))}
@@ -175,9 +180,9 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
                   <td data-term-label>Project position at the end of {tp.label}</td>
                   <td>{tp.endMonth}</td>
                   <td>{tp.truncatedIrr === null ? "\u2014" : roundForDisplay(tp.truncatedIrr * 100, 2) + "%"}{tp.truncatedIrrAmbiguous ? " (ambiguous)" : ""}</td>
-                  <td>{roundForDisplay(tp.cumulativeNet)}</td>
-                  <td>{roundForDisplay(tp.npvAtWacc)}</td>
-                  <td>{roundForDisplay(tp.npvAtTarget)}</td>
+                  <td>{money(tp.cumulativeNet)}</td>
+                  <td>{money(tp.npvAtWacc)}</td>
+                  <td>{money(tp.npvAtTarget)}</td>
                   <td>{tp.paybackSoFar === null ? "\u2014" : roundForDisplay(tp.paybackSoFar, 2)}</td>
                 </tr>
               ))}
@@ -197,27 +202,27 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
               {result.bookView.combined.map((row) => (
                 <tr key={row.year} data-book-year={row.year}>
                   <td>{yearHeader(row.year, startYear)}</td>
-                  <td>{roundForDisplay(row.beginning)}</td>
-                  <td>{roundForDisplay(row.charge)}</td>
-                  <td>{roundForDisplay(row.ending)}</td>
-                  <td>{roundForDisplay(row.collections)}</td>
+                  <td>{money(row.beginning)}</td>
+                  <td>{money(row.charge)}</td>
+                  <td>{money(row.ending)}</td>
+                  <td>{money(row.collections)}</td>
                   {bookSplit !== null && (() => {
                     const s = bookSplit.find((x) => x.year === row.year);
-                    return (<><td data-book-fees>{roundForDisplay(s?.fees ?? 0)}</td><td data-book-grants>{roundForDisplay(s?.grants ?? 0)}</td><td data-book-note>{roundForDisplay(s?.note ?? 0)}</td></>);
+                    return (<><td data-book-fees>{money(s?.fees ?? 0)}</td><td data-book-grants>{money(s?.grants ?? 0)}</td><td data-book-note>{money(s?.note ?? 0)}</td></>);
                   })()}
-                  <td>{roundForDisplay(row.operating)}</td>
-                  <td>{roundForDisplay(row.bookResult)}</td>
+                  <td>{money(row.operating)}</td>
+                  <td>{money(row.bookResult)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           <dl data-testid="residual-reconciliation">
             <dt>Residual mode</dt><dd data-stat="residualMode">{result.bookView.residualMode}</dd>
-            <dt>Remaining book value at the residual year</dt><dd data-stat="remainingBookValue">{roundForDisplay(result.bookView.remainingBookValueAtResidualYear)}</dd>
-            <dt>Residual used (terminal inflow)</dt><dd data-stat="residualUsed">{roundForDisplay(result.residualAmountUsed ?? 0)}</dd>
+            <dt>Remaining book value at the residual year</dt><dd data-stat="remainingBookValue">{money(result.bookView.remainingBookValueAtResidualYear)}</dd>
+            <dt>Residual used (terminal inflow)</dt><dd data-stat="residualUsed">{money(result.residualAmountUsed ?? 0)}</dd>
             {result.bookView.residualMode === "amount" && (
-              <><dt>Set amount</dt><dd data-stat="residualSetAmount">{roundForDisplay(result.bookView.setAmount)}</dd>
-              <dt>Gain or loss on sale</dt><dd data-stat="gainOrLoss">{roundForDisplay(result.bookView.gainOrLossOnSale)}</dd></>
+              <><dt>Set amount</dt><dd data-stat="residualSetAmount">{money(result.bookView.setAmount)}</dd>
+              <dt>Gain or loss on sale</dt><dd data-stat="gainOrLoss">{money(result.bookView.gainOrLossOnSale)}</dd></>
             )}
           </dl>
         </>
