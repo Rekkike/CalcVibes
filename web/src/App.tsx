@@ -36,9 +36,10 @@ interface ProjectSnapshot {
   grantScales: number[] | null;
 }
 const DEFAULT_ENTRY_UNIT: EntryUnit = "thousands";
-// The entry unit is a display preference (it re-reads the same raw values): changing it is not unsaved work, so it stays
-// out of the dirty comparison; New project and a file Open still reset or sync it.
-const snapshotKey = (s: ProjectSnapshot): string => JSON.stringify({ ...s, entryUnit: null });
+// v0.6.21 Task G(b): the entry-unit exclusion is retired — the entry-unit switch joins the
+// unsaved-changes key, so a unit switch marks the document dirty (no silently lost unit switch).
+// New project and a file Open still reset or sync the unit.
+const snapshotKey = (s: ProjectSnapshot): string => JSON.stringify(s);
 const blankSnapshot = (): ProjectSnapshot => ({ inputs: blankProject(), startYear: null, entryUnit: DEFAULT_ENTRY_UNIT, targets: null, terms: null, balloons: null, grantScales: null });
 
 type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "timeline" | "results" | "scenarios" | "detail";
