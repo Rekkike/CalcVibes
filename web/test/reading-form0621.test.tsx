@@ -67,7 +67,9 @@ describe("v0.6.21 Task B — the reading form on the READ surfaces", () => {
     expect(cells[2]).toBe(money(d0.service));
     expect(cells[3]).toBe(String(Math.round(d0.dscr! * 1e4) / 1e4)); // the ratio, not money
     const fac = document.querySelector('[data-testid="facility-schedules"]')!;
-    expect(fac.textContent).toContain(money(r.financing!.facilities[0].monthly.service.reduce((a, b) => a + b, 0)));
+    const fac0 = r.financing!.facilities[0]!;
+    const facServiceTotal = fac0.monthly.service.reduce((a: number, b: number) => a + b, 0);
+    expect(fac.textContent).toContain(money(facServiceTotal));
   });
 
   it("OVERVIEW TILES: the metric cards render in the reading form (program demo, EUR, unit thousands)", () => {
