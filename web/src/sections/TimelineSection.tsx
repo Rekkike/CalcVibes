@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { GanttChart } from "../charts.js";
 import { workspaceGantt } from "../deck.js";
+import { parseTimelinePdf, type TimelineImportReport } from "../timelineImport.js";
 import type { ModelInputs, ModelResult, TimelineActivity, TimelineBlock, TimelineDecisionPoint, TimelineEngineEvent, TimelineMilestone, TimelineOutcome, TimelinePhase, TimelineSource, TimelineTie } from "../../../core/src/types.js";
 import {
   DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, resolveMilestone, activitiesInPhase, availableEngineEvents, ensurePhases, financingSuggestionBlock, nextId, nextUnusedDecisionPoint,
@@ -105,6 +106,48 @@ export function TimelineSection(props: {
     const derived = derive(source, taken);
     commit({ activities: replaceSourceActivities(tl.activities, source, derived), phases: ensurePhases(tl, derived) });
     setSuggested((s) => ({ ...s, [source]: derived.length }));
+  };
+  // v0.6.20 Tasks C and D: the PDF import is authorship and nothing composes without the explicit accept.
+  // The file is chosen through the browser picker and read client-side only (no upload); the parser
+  // composes the candidate rows once and the review panel discloses the parse report. ACCEPT authors the
+  // parsed rows (the activities grid is replaced wholesale; the gates and the milestones are untouched);
+  // REFUSE writes nothing.
+  const [importReview, setImportReview] = useState<TimelineImportReport | null>(null);
+  const [importNote, setImportNote] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const onImportFile = async (file: File) => {
+    try {
+      const buf = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error ?? new Error("the file could not be read"));
+        reader.readAsArrayBuffer(file);
+      });
+      const report = await parseTimelinePdf(new Uint8Array(buf), file.name, startYear);
+      setImportNote(null);
+      setImportReview(report);
+    } catch (err) {
+      setImportNote(null);
+      setImportReview({
+        fileName: file.name, ok: false, pages: 0, headerFound: false, columns: [], ignoredColumns: [], rows: [], candidates: [],
+        refusals: [{ code: "TIMELINE-IMPORT-NOT-PDF", message: `The file "${file.name}" could not be read (${err instanceof Error ? err.message : String(err)}): nothing was read and nothing was written (TIMELINE-IMPORT-NOT-PDF).` }],
+        startYear, mapping: "", counts: { rowsFound: 0, rowsParsed: 0, rowsRefused: 0, beforeStart: 0, durationMismatches: 0, durationUnchecked: 0, linesNotRead: 0 },
+      });
+    }
+  };
+  const acceptImport = () => {
+    if (importReview === null || !importReview.ok) return;
+    const n = importReview.candidates.length;
+    const removed = tl.activities.length;
+    commit({ activities: importReview.candidates, phases: ensurePhases(tl, importReview.candidates) });
+    const before = importReview.counts.beforeStart > 0 ? ` ${importReview.counts.beforeStart} imported row(s) fall before the start year and fall under the standing TIMELINE-ACTIVITY-SPAN refusal once authored.` : "";
+    setImportReview(null);
+    setImportNote(`Accepted the import of "${importReview.fileName}": ${n} ${n === 1 ? "activity was" : "activities were"} authored and the activities grid was replaced wholesale (${removed} previous ${removed === 1 ? "activity" : "activities"} removed); the decision gates and the milestones are untouched. Every imported activity entered in the Production phase and is editable like any authored activity.${before}`);
+  };
+  const refuseImport = () => {
+    if (importReview === null) return;
+    setImportReview(null);
+    setImportNote(`Refused the import of "${importReview.fileName}": nothing was written, the timeline is unchanged.`);
   };
   const blockReason = (source: TimelineSource): string | null =>
     source === "financing" ? financingSuggestionBlock(inputs, result) : source === "tariff" ? tariffSuggestionBlock(inputs) : null;
@@ -264,6 +307,71 @@ export function TimelineSection(props: {
           <p key={s.source} data-testid="timeline-suggestion-note" data-source={s.source} className="muted">{n === 0 ? s.zero : s.note(n)}</p>
         );
       })}
+
+      {/* v0.6.20 Task C: the import button and the review step. The button opens the browser file picker;
+          the chosen PDF is parsed client-side and the parse report composes as the disclosure. Nothing is
+          written before the explicit ACCEPT; REFUSE leaves the document untouched. */}
+      <div data-testid="timeline-import">
+        <button data-action="import-pdf" onClick={() => importInputRef.current?.click()}>Import activities from a PDF export</button>{" "}
+        <input
+          ref={importInputRef}
+          data-testid="timeline-import-input"
+          type="file"
+          accept="application/pdf,.pdf"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f !== undefined) void onImportFile(f);
+            e.target.value = "";
+          }}
+        />
+        <p className="muted">Imports a Gantt PDF exported from another project application (the columns aktivitet, startdatum, slutdatum, varaktighet). The file is read in the browser only; nothing is uploaded. The parse report below discloses what was read; accepting replaces the activities grid wholesale and leaves the decision gates and the milestones untouched.</p>
+      </div>
+      {importNote !== null && <p data-testid="timeline-import-note" className="muted">{importNote}</p>}
+      {importReview !== null && (
+        <div data-testid="timeline-import-review" className="warning">
+          <h3>Import review — {importReview.fileName}</h3>
+          <p className="muted">
+            {importReview.pages} page(s) read.{" "}
+            {importReview.headerFound ? `The header line was located: the columns of record sit at ${importReview.columns.map((c) => `${c.header} (x ${Math.round(c.x)})`).join(", ")}.` : "No header line was located."}
+            {importReview.ignoredColumns.length > 0 ? ` Ignored columns (no word of record): ${importReview.ignoredColumns.map((c) => `"${c.text}" (x ${Math.round(c.x)})`).join(", ")}.` : ""}
+          </p>
+          <p className="muted" data-testid="timeline-import-mapping">{importReview.mapping}</p>
+          <p className="muted" data-testid="timeline-import-counts">
+            {importReview.counts.rowsFound} row(s) found, {importReview.counts.rowsParsed} parsed, {importReview.counts.rowsRefused} refused, {importReview.counts.beforeStart} before the start year, {importReview.counts.durationMismatches} duration mismatch(es), {importReview.counts.durationUnchecked} unchecked, {importReview.counts.linesNotRead} line(s) outside the table not read.
+          </p>
+          {importReview.rows.length > 0 && (
+            <div className="editor-scroll" data-testid="timeline-import-rows-scroll">
+              <table className="timeline-table" data-testid="timeline-import-rows">
+                <thead><tr><th>Row</th><th>Aktivitet</th><th>Startdatum</th><th>Slutdatum</th><th>Program years</th><th>Varaktighet check</th><th>Refusals</th></tr></thead>
+                <tbody>
+                  {importReview.rows.map((r) => (
+                    <tr key={r.row} data-row={r.row}>
+                      <td>{r.row}</td>
+                      <td className="tl-grow">{r.name === "" ? "(unnamed)" : r.name}</td>
+                      <td>{r.startText === "" ? "—" : r.startText}</td>
+                      <td>{r.endText === "" ? "—" : r.endText}</td>
+                      <td>{r.startProgramYear === undefined ? "—" : `${r.startProgramYear}–${r.endProgramYear}`}</td>
+                      <td data-field="durationCheck" data-verdict={r.durationCheck}>{r.durationText === "" ? "—" : `${r.durationText}: ${r.durationCheck}${r.durationDetail === "" ? "" : ` (${r.durationDetail})`}`}</td>
+                      <td><ul>{r.refusals.map((x, i) => <li key={i} data-refusal={x.code}>{x.message}</li>)}</ul></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {importReview.refusals.length > 0 && (
+            <ul data-testid="timeline-import-refusals">
+              {importReview.refusals.map((r, i) => <li key={i} data-refusal={r.code}>{r.message}</li>)}
+            </ul>
+          )}
+          <p className="muted" data-testid="timeline-import-replace-note">
+            Accepting authors the {importReview.candidates.length} parsed row(s) and replaces the activities grid wholesale ({tl.activities.length} current {tl.activities.length === 1 ? "activity" : "activities"} removed); the decision gates and the milestones are untouched. Refusing writes nothing.
+          </p>
+          <button data-action="import-accept" disabled={!importReview.ok} onClick={acceptImport}>Accept the import</button>{" "}
+          <button data-action="import-refuse" onClick={refuseImport}>Refuse the import</button>
+        </div>
+      )}
 
       <h3>Phases</h3>
       <p className="muted">The phase vocabulary is the lane set of the program Gantt. A lane is shown when it carries an activity; choose Always show to draw it empty or Hide to leave it off. The visibility is presentation-only: hiding a lane never removes its activities.</p>
