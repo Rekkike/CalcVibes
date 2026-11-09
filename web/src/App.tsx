@@ -175,6 +175,8 @@ export function App() {
   const setTargetIrr = (v: string) => setInputs((p) => ({ ...p, targetIrr: parseFloat(v) || 0 }));
   const setTimeline = (tl: import("../../core/src/types.js").TimelineBlock) => setInputs((p) => ({ ...p, timeline: tl }));
   const setProjectLength = (v: number | null) => setInputs((p) => ({ ...p, projectLengthYears: v }));
+  // v0.6.21 Task E: the deck slide title overrides ride the project document (additive optional field, declared web-side)
+  const setDeckTitles = (t: Record<string, string>) => setInputs((p) => ({ ...p, deckTitles: t }) as ModelInputs);
   const setRepayment = (patch: Partial<ModelInputs["repayment"]>) =>
     setInputs((p) => ({ ...p, repayment: { ...p.repayment, ...patch } }));
   const setContracts = (contracts: import("../../core/src/types.js").ContractParams[]) =>
@@ -385,7 +387,7 @@ export function App() {
       <main>
         <RootErrorBoundary>
         {view === "overview" && (
-          <OverviewSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setStartYear={(v) => {
+          <OverviewSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setDeckTitles={setDeckTitles} setStartYear={(v) => {
             // v0.6.13 Task F (AUD-18): the writer refuses — symmetric with the file layer's
             // FILE-SETTINGS bound (null or a whole year between 1900 and 2200); a refused entry
             // never applies and the refusal follows.

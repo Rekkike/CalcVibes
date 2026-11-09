@@ -2,7 +2,8 @@ import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
 import { roundForDisplay, percentForDisplay, deckMoneyForDisplay, deckYearsForDisplay, feeForDisplay } from "../engine.js";
 import { useEffect, useState } from "react";
 import { SignedCashflowChart } from "../charts.js";
-import { yearHeader } from "../state.js";
+import { yearHeader, deckTitlesOf } from "../state.js";
+import { deckSlides } from "../deck.js";
 
 export function OverviewSection(props: {
   inputs: ModelInputs;
@@ -13,9 +14,10 @@ export function OverviewSection(props: {
   setProjectName: (v: string) => void;
   setTargetIrr: (v: string) => void;
   setProjectLength: (v: number | null) => void;
+  setDeckTitles?: (t: Record<string, string>) => void;
   entryUnit?: import("../engine.js").EntryUnit;
 }) {
-  const { inputs, result, startYear, setStartYear, startYearError, setProjectName, setTargetIrr, setProjectLength, entryUnit = "ones" } = props;
+  const { inputs, result, startYear, setStartYear, startYearError, setProjectName, setTargetIrr, setProjectLength, setDeckTitles, entryUnit = "ones" } = props;
   // v0.6.13 Task F (AUD-18): the writer refuses an out-of-range entry, so a refused entry never
   // reaches the applied start year; the field shows the typed draft while the refusal stands.
   const [draft, setDraft] = useState<string | null>(null);
@@ -49,6 +51,32 @@ export function OverviewSection(props: {
         }} />
       </label>
       {startYearError !== null && <p data-testid="start-year-error" className="warning">{startYearError}</p>}
+      {/* v0.6.21 Task E: the author-overridable deck slide titles — an optional per-slide override in
+          the project document; the data-driven title is the placeholder (the default and the fallback). */}
+      {result !== null && setDeckTitles !== undefined && (
+        <details data-testid="deck-titles-editor">
+          <summary>Deck slide titles (optional overrides)</summary>
+          {deckSlides(inputs, result, { startYear }).slides.map((sl) => {
+            const overrides = deckTitlesOf(inputs);
+            return (
+              <label key={sl.name} data-slide={sl.name}>Slide {sl.name}{" "}
+                <input
+                  data-field="deck-title"
+                  data-slide-name={sl.name}
+                  value={overrides[sl.name] ?? ""}
+                  placeholder={sl.title}
+                  onChange={(e) => {
+                    const next = { ...deckTitlesOf(inputs) };
+                    if (e.target.value === "") delete next[sl.name];
+                    else next[sl.name] = e.target.value;
+                    setDeckTitles(next);
+                  }}
+                />
+              </label>
+            );
+          })}
+        </details>
+      )}
       <p data-testid="length-hint" className="note">Derived horizon: {result !== null ? `${result.monthly.length} months (${result.yearly.length} years)` : "not computed"}</p>
       {result !== null && result.horizon !== undefined && (
         <div data-testid="horizon-derivation">

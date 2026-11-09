@@ -4,7 +4,7 @@ import type { GanttBarLaid } from "./ganttLayout.js";
 import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay, TERM_GLOSSES } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, availableEngineEvents, composeInvestment, resolveMilestone, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
+import { DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, availableEngineEvents, composeInvestment, resolveMilestone, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader , deckTitlesOf } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -702,6 +702,14 @@ export function deckSlides(
     );
   }
   if (timelineProvenance !== null) provenance.push(timelineProvenance);
+  // v0.6.21 Task E: the author-overridable deck titles compose ONCE here, at the deck-model build —
+  // an optional per-slide override in the project document wins; the data-driven title is the default
+  // and the fallback (a blank override changes nothing), so no deck slide can draw a stale title.
+  const titleOverrides = deckTitlesOf(inputs);
+  for (const slide of slides) {
+    const o = titleOverrides[slide.name];
+    if (o !== undefined && o.trim() !== "") slide.title = o;
+  }
   return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
 }
 
