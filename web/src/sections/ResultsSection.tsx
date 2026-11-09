@@ -2,6 +2,7 @@ import type { ModelResult } from "../../../core/src/types.js";
 import { percentForDisplay, roundForDisplay } from "../engine.js";
 import { composeBookCollections, composeFacilitySchedules, yearHeader } from "../state.js";
 import { SignedCashflowChart } from "../charts.js";
+import { TermGloss } from "../TermGloss.js";
 import { deckMoneyForDisplay, deckYearsForDisplay, dscrTwoForDisplay } from "../engine.js";
 
 export function ResultsSection(props: { result: ModelResult; targetIrr: number; currency: string; startYear?: number | null; entryUnit?: import("../engine.js").EntryUnit }) {
@@ -33,11 +34,15 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
           <span className="kpi-label">Achieved IRR</span>
           <span className="kpi-value">{result.achievedIrr === null ? "—" : percentForDisplay(result.achievedIrr, 2)}</span>
           <span className="kpi-chip">vs {roundForDisplay(targetIrr, 2)}% target</span>
+          <TermGloss term="IRR" />
         </div>
         <div className={"kpi-card " + (result.npvAtWacc >= 0 ? "tone-ok" : "tone-bad")}>
           <span className="kpi-label">NPV at WACC</span>
           <span className="kpi-value">{money(result.npvAtWacc)}</span>
           <span className="kpi-chip">{result.npvAtWacc >= 0 ? "positive at the benchmark" : "negative at the benchmark"}</span>
+          {/* v0.6.21 Task C: the glosses of record on first appearance, once per surface */}
+          <TermGloss term="NPV" />
+          <TermGloss term="WACC" />
         </div>
         <div className="kpi-card">
           <span className="kpi-label">Payback (nominal)</span>
@@ -49,6 +54,7 @@ export function ResultsSection(props: { result: ModelResult; targetIrr: number; 
           {result.financing !== null && result.financing.minDscr !== null && (
             <span className="kpi-chip">in {yearHeader(result.financing.minDscr.year, startYear)}</span>
           )}
+          {result.financing !== null && result.financing.minDscr !== null && <TermGloss term="DSCR" />}
         </div>
       </div>
       <div data-testid="figure-band" className="figure-band">

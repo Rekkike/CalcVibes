@@ -312,7 +312,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
               <p key={j} className="warning deck-disclosure">{d}</p>
             ))}
             {sl.name === "deal" && deck?.glosses !== undefined && deck.glosses.map((g, j) => (
-              <p key={"gl-" + j} data-testid="term-gloss" className="deck-disclosure"><strong>{g.term}</strong>: {g.gloss}</p>
+              <p key={"gl-" + j} data-testid="term-gloss" data-term={g.term} className="deck-disclosure"><strong>{g.term}</strong> — {g.gloss}</p>
             ))}
 
             <footer className="deck-slide-footer">

@@ -108,7 +108,8 @@ describe("Task D: INSIGHT-BREAKEVEN / INSIGHT-NULL / VERDICT / GLOSSES", () => {
     const verdict = document.querySelector('[data-testid="deck-verdict"]');
     expect(verdict && verdict.textContent).toContain("Target met");
     const glosses = document.querySelectorAll('[data-testid="term-gloss"]');
-    expect(glosses.length).toBe(6);
+    // v0.6.21 Task C re-anchor: the five terms of record (NPV, IRR, MIRR, DSCR, WACC) with the glosses verbatim
+    expect(glosses.length).toBe(5);
   });
 });
 
