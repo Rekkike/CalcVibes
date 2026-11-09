@@ -238,7 +238,8 @@ export function App() {
     const { buildDeckPdf } = await import("./pdf.js");
     const { deckSlides } = await import("./deck.js");
     const model = deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, monthGrid });
-    const doc = buildDeckPdf(model, inputs.projectName || "project");
+    // v0.6.21 W33/W34: the PDF export follows the app theme select; the dark stage is the default (W34), light is the paper-and-toner option.
+    const doc = buildDeckPdf(model, inputs.projectName || "project", undefined, theme);
     doc.save(`${inputs.projectName || "project"}.pdf`);
   };
   const printDeck = () => { setPresOpen(true); };
@@ -262,7 +263,7 @@ export function App() {
   }, [issues]);
 
   if (presOpen) {
-    return <RootErrorBoundary><Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} monthGrid={monthGrid} /></RootErrorBoundary>;
+    return <RootErrorBoundary><Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} monthGrid={monthGrid} theme={theme} /></RootErrorBoundary>;
   }
 
   return (

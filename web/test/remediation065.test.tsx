@@ -5,7 +5,7 @@ import { App } from "../src/App.js";
 import { deckSlides } from "../src/deck.js";
 import { computeModel, deckMoneyForDisplay, percentTwoForDisplay } from "../src/engine.js";
 import { demoProject, multiLeaseProject } from "../src/state.js";
-import { buildDeckPdf } from "../src/pdf.js";
+import { buildDeckPdf, PDF_THEME_LIGHT } from "../src/pdf.js";
 import type { ModelInputs } from "../../core/src/types.js";
 
 const byAction = (v: string) => document.querySelector('[data-action="' + v + '"]') as HTMLElement;
@@ -317,19 +317,22 @@ describe("v0.6.5 Task G: the theme posture and the color once-over (W15)", () =>
 });
 
 describe("v0.6.5 Task H: the PDF quality sweep (W10/W16)", () => {
-  it("H-PRINT-PALETTE: no stage color appears on the paper route; the print inks and the print donut palette stand; the base demo stays seven pages", () => {
+  it("H-PRINT-PALETTE: the paper-and-toner route stays stage-free and the print inks stand; the base demo stays seven pages (v0.6.21 W33/W34 re-anchor: the source-level stage-color ban is superseded by the theme mapping — the dark stage is the PDF default and the light route is pinned stage-free at the palette level and at the route level in print-pass0621)", () => {
     const src = fs.readFileSync("src/pdf.ts", "utf8");
-    for (const banned of ["52, 211, 153", "251, 113, 133", "204, 233, 255", "232, 184, 75", "#34d399", "#fb7185"]) {
-      expect(src.includes(banned)).toBe(false);
-    }
     expect(src).toContain("[4, 120, 87]");
     expect(src).toContain("[190, 18, 60]");
     expect(src).toContain("[146, 100, 14]");
     expect(src).toContain('"#0074ba", "#047857", "#b45309", "#6d28d9", "#be123c", "#103558"');
+    // the light palette carries no stage color (the W16 honest-presentation contract, now route-scoped)
+    const stageColors: [number, number, number][] = [[8, 28, 51], [52, 211, 153], [251, 113, 133], [204, 233, 255], [232, 184, 75], [226, 232, 240]];
+    const lightFields = [PDF_THEME_LIGHT.page, PDF_THEME_LIGHT.headerBand, PDF_THEME_LIGHT.ink, PDF_THEME_LIGHT.mut, PDF_THEME_LIGHT.caption, PDF_THEME_LIGHT.peak, PDF_THEME_LIGHT.ok, PDF_THEME_LIGHT.bad, PDF_THEME_LIGHT.gold, PDF_THEME_LIGHT.barPos, PDF_THEME_LIGHT.barNeg, PDF_THEME_LIGHT.capital, PDF_THEME_LIGHT.total, PDF_THEME_LIGHT.cardFill, PDF_THEME_LIGHT.cardLabel];
+    for (const field of lightFields) {
+      expect(stageColors.some((c) => c[0] === field[0] && c[1] === field[1] && c[2] === field[2])).toBe(false);
+    }
     const demo = demoProject();
     const result = computeModel(demo);
     const model = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
-    const doc = buildDeckPdf(model, "Project Alpha");
+    const doc = buildDeckPdf(model, "Project Alpha", undefined, "light");
     expect(doc.getNumberOfPages()).toBe(7);
   });
 
