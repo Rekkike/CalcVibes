@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { jsPDF } from "jspdf";
 import { parseExportDate, parseExportDuration, parseTimelinePdf, TIMELINE_IMPORT_HEADERS } from "../src/timelineImport.js";
 import { demoProject, timelineOf, validateTimeline } from "../src/state.js";
@@ -286,6 +287,18 @@ describe("v0.6.20 — the date and duration parsers of record", () => {
     expect(parseExportDuration("7 xyz")).toEqual({ value: 7, unit: "xyz", raw: "7 xyz" });
     expect(parseExportDuration("")).toBeNull();
     expect(parseExportDuration("abc")).toBeNull();
+  });
+});
+
+describe("v0.6.20 — the lazy-load increment (clearance condition)", () => {
+  it("LAZY-LOAD pin: the parser module carries no static pdfjs-dist import; the extractor module loads on the first parse", () => {
+    const src = readFileSync("src/timelineImport.ts", "utf8");
+    expect(src).not.toMatch(/^import[^\n]*pdfjs-dist/m);
+    expect(src).not.toMatch(/^import[^\n]*\?url/m);
+    expect(src).toContain('await import("./timelinePdfText.js")');
+    const lazy = readFileSync("src/timelinePdfText.ts", "utf8");
+    expect(lazy).toMatch(/^import \* as pdfjsLib from "pdfjs-dist\/legacy\/build\/pdf\.mjs";/m);
+    expect(lazy).toMatch(/^import workerAssetUrl from "pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs\?url";/m);
   });
 });
 
