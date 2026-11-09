@@ -2,6 +2,7 @@ import type { AppraisalParams, ModelInputs } from "../../../core/src/types.js";
 import { percentForDisplay, moneyForDisplay, roundForDisplay, dscrTwoForDisplay } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
+import { TermGloss } from "../TermGloss.js";
 
 export function AppraisalSection(props: {
   inputs: ModelInputs;
@@ -30,6 +31,7 @@ export function AppraisalSection(props: {
     <section data-testid="appraisal">
       <h2>Appraisal</h2>
       <label>WACC (%) <input data-field="wacc" type="number" value={a.wacc} onChange={num("wacc")} /></label>
+      <TermGloss term="WACC" />
       <label>Finance rate (%) <input data-field="financeRate" type="number" value={a.financeRate} onChange={num("financeRate")} /></label>
       <label>Reinvestment rate (%) <input data-field="reinvestmentRate" type="number" value={a.reinvestmentRate} onChange={num("reinvestmentRate")} /></label>
       <h3>Residual value (terminal inflow on the collections side)</h3>
@@ -52,6 +54,7 @@ export function AppraisalSection(props: {
       {result !== null && (
         <dl data-testid="appraisal-summary">
           <dt>NPV at target IRR (solver identity, discounted)</dt><dd data-stat="npvAtTarget">{money(result.npvAtTarget)}</dd>
+          <TermGloss term="NPV" />
           <dt>NPV at WACC (discounted)</dt><dd data-stat="npvAtWacc">{money(result.npvAtWacc)}</dd>
           <dt>NPV of collections at WACC (discounted)</dt><dd data-stat="npvCollectionsAtWacc">{money(result.npvCollectionsAtWacc)}</dd>
           <dt>NPV of costs at WACC (discounted)</dt><dd data-stat="npvCostsAtWacc">{money(result.npvCostsAtWacc)}</dd>
@@ -61,6 +64,7 @@ export function AppraisalSection(props: {
           <dt>Payback, discounted at WACC (years)</dt>
           <dd data-stat="discountedPaybackYears">{result.discountedPaybackYears === null ? "—" : roundForDisplay(result.discountedPaybackYears, 5)}</dd>
           <dt>MIRR (finance 6, reinvest 6 shown as configured)</dt><dd data-stat="mirr">{percentForDisplay(result.mirr)}</dd>
+          <TermGloss term="MIRR" />
           <dt>Goal check (engine)</dt><dd data-stat="goalMet">{result.goalMet ? "Target achieved" : "Target not achieved"}</dd>
         </dl>
       )}

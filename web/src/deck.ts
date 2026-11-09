@@ -1,10 +1,10 @@
 import type { ModelInputs, ModelResult, TariffRow, TimelinePhase, TimelineTie } from "../../core/src/types.js";
 import { GANTT_LANE_LABEL_CHARS, layoutGateLabels, layoutLane, layoutMilestoneRows, markerPosition, wrapLabel } from "./ganttLayout.js";
 import type { GanttBarLaid } from "./ganttLayout.js";
-import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay } from "./engine.js";
+import { moneyForDisplay, percentTwoForDisplay, percentTwoOrDash, dscrTwoForDisplay, deckMoneyForDisplay, deckYearsForDisplay, computeModel, entryToValue, feeForDisplay, unitPriceForDisplay, percentOneForDisplay, roundForDisplay, TERM_GLOSSES } from "./engine.js";
 import type { EntryUnit } from "./engine.js";
 import { scenarioResults } from "../../core/src/scenarios.js";
-import { DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, availableEngineEvents, composeInvestment, resolveMilestone, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader } from "./state.js";
+import { DECISION_DISCLOSURE, TIMELINE_EVENT_LABELS, availableEngineEvents, composeInvestment, resolveMilestone, programSpanYears, timelineAuthored, timelineOf, timelineWindow, validateTimeline, visibleLanes, yearHeader, yearMonthHeader , deckTitlesOf } from "./state.js";
 
 export type FigureKind = "money" | "percent" | "years" | "dscr" | "count" | "text";
 
@@ -185,14 +185,9 @@ export interface DeckSlide {
   waterfall?: DeckWaterfall;
 }
 
-export const TERM_GLOSSES: { term: string; gloss: string }[] = [
-  { term: "NPV", gloss: "Net present value: the value of all cash flows in today's money." },
-  { term: "IRR", gloss: "Internal rate of return: the yearly return the project earns on invested money." },
-  { term: "WACC", gloss: "Weighted average cost of capital: the minimum return investors require." },
-  { term: "MIRR", gloss: "Modified internal rate of return: IRR adjusted for reinvestment of interim cash." },
-  { term: "Payback", gloss: "Payback: how long until cumulative inflows cover the invested cost." },
-  { term: "Profitability index", gloss: "Profitability index: the value created per unit of cost, at the benchmark rate." },
-];
+// v0.6.21 Task C: the glosses of record live in the display-helper module (engine.ts) and are
+// re-exported here for the deck model's consumers; the five terms of record, verbatim.
+export { TERM_GLOSSES };
 
 export interface DeckModel {
   slides: DeckSlide[];
@@ -707,6 +702,14 @@ export function deckSlides(
     );
   }
   if (timelineProvenance !== null) provenance.push(timelineProvenance);
+  // v0.6.21 Task E: the author-overridable deck titles compose ONCE here, at the deck-model build —
+  // an optional per-slide override in the project document wins; the data-driven title is the default
+  // and the fallback (a blank override changes nothing), so no deck slide can draw a stale title.
+  const titleOverrides = deckTitlesOf(inputs);
+  for (const slide of slides) {
+    const o = titleOverrides[slide.name];
+    if (o !== undefined && o.trim() !== "") slide.title = o;
+  }
   return { slides, glosses: TERM_GLOSSES, currency, unit, provenance };
 }
 

@@ -87,8 +87,8 @@ function ScenarioTargetBars(props: { chart: ScenarioTargetChart; currency: Curre
   );
 }
 
-export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean }) {
-  const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null, monthGrid = false } = props;
+export function Presentation(props: { inputs: ModelInputs; result: ModelResult | null; onExit: () => void; startYear?: number | null; entryUnit?: EntryUnit; scenarioTargets?: number[] | null; scenarioTerms?: number[] | null; scenarioBalloons?: number[] | null; monthGrid?: boolean; theme?: "light" | "dark" }) {
+  const { inputs, result, onExit, startYear = null, entryUnit = "ones", scenarioTargets = null, scenarioTerms = null, scenarioBalloons = null, monthGrid = false, theme = "dark" } = props;
   const [slide, setSlide] = useState(0);
   // v0.6.18 Task H1: the month level of the recovery bars composes only on request (a view state, never a document field)
   const [recoveryMonthly, setRecoveryMonthly] = useState(false);
@@ -160,7 +160,8 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
         <button data-action="download-pdf" onClick={async () => {
           if (result === null) return;
           const { buildDeckPdf } = await import("../pdf.js");
-          const doc = buildDeckPdf(deck as NonNullable<typeof deck>, inputs.projectName || "project");
+          // v0.6.21 W33/W34: the PDF export follows the app theme; the dark stage is the default, light is the paper-and-toner option.
+          const doc = buildDeckPdf(deck as NonNullable<typeof deck>, inputs.projectName || "project", undefined, theme);
           doc.save(`${inputs.projectName || "project"}.pdf`);
         }} disabled={result === null}>Download PDF</button>
         {result === null && <span data-testid="export-disabled-reason" className="muted">Exports and PDF are disabled until the input issues are resolved.</span>}
@@ -311,7 +312,7 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
               <p key={j} className="warning deck-disclosure">{d}</p>
             ))}
             {sl.name === "deal" && deck?.glosses !== undefined && deck.glosses.map((g, j) => (
-              <p key={"gl-" + j} data-testid="term-gloss" className="deck-disclosure"><strong>{g.term}</strong>: {g.gloss}</p>
+              <p key={"gl-" + j} data-testid="term-gloss" data-term={g.term} className="deck-disclosure"><strong>{g.term}</strong> — {g.gloss}</p>
             ))}
 
             <footer className="deck-slide-footer">

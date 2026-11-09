@@ -132,6 +132,15 @@ export interface GanttLaneLaid {
 // left to the controller (halt-and-ask), not taken here.
 const HELVETICA_ADVANCE = [280,280,350,550,550,890,660,190,330,330,390,580,280,330,280,280,550,550,550,550,550,550,550,550,550,550,280,280,580,580,580,550,1010,660,660,720,720,660,610,780,720,280,500,660,550,830,720,780,660,780,720,660,610,720,660,940,660,660,610,280,280,280,470,550,330,550,550,500,550,550,280,550,550,220,220,500,220,830,550,550,550,550,330,500,280,550,500,720,500,500,500,330,260,330,580];
 export const GANTT_PLOT_EM = 76;
+// v0.6.21 Task G(a) — the H3 surface-aware candidate, seated as a builder proposal (not applied).
+// The print plot is 225 mm at 6 pt type (106 em) against the SVG's 840 px at 11 px (76 em), so a
+// surface-aware budget would compose per surface. The Rotterdam demo of record answers
+// KEEP-OR-RECALIBRATE with KEEP: its one above-label (a 20.59 em label on a one-year bar of a
+// five-year window) still does not fit inside even at the print budget (19.6 em capacity), so the
+// shared 76 em measure proves nowhere needlessly tight on that fixture. Applying a per-surface
+// budget would re-compose this shared measure — a second composition — which the composed-once
+// discipline halts and asks about; the candidate is recorded here, not seated in the layout.
+export const GANTT_PLOT_EM_PRINT = 106;
 export function labelEm(label: string): number {
   let w = 0;
   for (const ch of label) {

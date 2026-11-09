@@ -109,9 +109,11 @@ describe("v0.6.18 AUD-13 and AUD-35: the full reset and the unsaved-change guard
     fireEvent.click(byAction("load-demo"));
     setUnit("millions");
     expect((document.querySelector('[data-testid="overview"] [data-field="startYear"]') as HTMLInputElement).value).toBe("2026");
-    // the entry unit is a display preference: changing it alone is not unsaved work
+    // v0.6.21 Task G(b) re-anchor: the entry-unit exclusion is retired — a unit switch alone marks the
+    // document dirty, so the guard stands and the confirmed reset restores the unit
     fireEvent.click(byAction("new-project"));
-    expect(document.querySelector('[data-testid="unsaved-guard"]')).toBeNull();
+    expect(document.querySelector('[data-testid="unsaved-guard"]')).toBeTruthy();
+    fireEvent.click(byAction("guard-confirm"));
     expect((document.querySelector('[data-field="entryUnit"]') as HTMLSelectElement).value).toBe("thousands");
     // with a real change the guard stands and the confirmed reset restores the unit too
     fireEvent.click(byAction("load-demo"));
@@ -157,7 +159,13 @@ describe("v0.6.18 AUD-14: the loaders' balloon axis respects the entry unit", ()
     for (const [unit, shown] of [["thousands", ["0", "8000", "16000"]], ["millions", ["0", "8", "16"]], ["ones", ["0", "8000000", "16000000"]]] as const) {
       render(<App />);
       setUnit(unit);
+      // v0.6.21 Task G(b) re-anchor: a unit switch alone is dirty now, so the loader waits on the
+      // guard (the thousands iteration changes nothing, so no guard there)
       fireEvent.click(byAction("load-demo"));
+      if (unit !== "thousands") {
+        expect(document.querySelector('[data-testid="unsaved-guard"]')).toBeTruthy();
+        fireEvent.click(byAction("guard-confirm"));
+      }
       fireEvent.click(byNav("scenarios"));
       expect(axis("balloon")).toEqual(shown);
       expect(axis("balloon").map((v) => entryToValue(Number(v), unit))).toEqual([0, 8000000, 16000000]);
@@ -174,7 +182,10 @@ describe("v0.6.18 AUD-14: the loaders' balloon axis respects the entry unit", ()
     document.body.innerHTML = "";
     render(<App />);
     setUnit("millions");
+    // v0.6.21 Task G(b) re-anchor: the unit switch alone is dirty now, so the loader waits on the guard
     fireEvent.click(byAction("load-solar-demo"));
+    expect(document.querySelector('[data-testid="unsaved-guard"]')).toBeTruthy();
+    fireEvent.click(byAction("guard-confirm"));
     fireEvent.click(byNav("scenarios"));
     expect(axis("balloon")).toEqual(["0", "1", "2"]);
   });

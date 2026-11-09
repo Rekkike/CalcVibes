@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "../src/App.js";
 import { demoProject } from "../src/state.js";
-import { computeModel } from "../src/engine.js";
+import { deckMoneyForDisplay, computeModel } from "../src/engine.js";
 import { serializeProject } from "../../core/src/fileio.js";
 
 // v0.6.7 re-anchor: the load-demo button now loads the port fixture, whose leveraged-solve
@@ -76,8 +76,9 @@ describe("chunk 5 web tasks 2-3: results panels and disclosures", () => {
     fireEvent.click(byNav("financing"));
     fireEvent.click(byField("facEnabled"));
     fireEvent.click(byNav("results"));
-    expect(byStat("equityOutlay").textContent).toBe("3139944");
-    expect(byStat("equityNpvAtWacc").textContent).toBe("1593384.3");
+    // v0.6.21 Task B re-anchor: the equity figures render in the reading form (SEK at unit thousands)
+    expect(byStat("equityOutlay").textContent).toBe(deckMoneyForDisplay(3139944, "SEK", "thousands"));
+    expect(byStat("equityNpvAtWacc").textContent).toBe(deckMoneyForDisplay(1593384.3, "SEK", "thousands"));
     const warning = document.querySelector('[data-testid="equity-ambiguity-warning"]');
     expect(warning && warning.textContent).toContain("56 sign changes");
     expect(warning && warning.textContent).toContain("may not be unique");
@@ -94,9 +95,10 @@ describe("chunk 5 web tasks 2-3: results panels and disclosures", () => {
     // (engine-emitted, script-verified). v0.6.14 re-anchor (the note unification): the municipal
     // note's annual installment of 1 000 000 (years 4–13) joins the combined service, so the
     // year-4 service reads 4 206 705.47; the final-year interest is the EIB facility's, unchanged.
-    expect(debt && debt.textContent).toContain("4206705.47");
-    expect(debt && debt.textContent).toContain("5099568.51"); // v0.6.14: the EIB principal 4 099 568.51 plus the note installment 1 000 000
-    expect(debt && debt.textContent).toContain("133349.53");
+    // v0.6.21 Task B re-anchor: the debt-schedule money cells render in the reading form (EUR at unit thousands, the program demo)
+    expect(debt && debt.textContent).toContain(deckMoneyForDisplay(4206705.47, "EUR", "thousands"));
+    expect(debt && debt.textContent).toContain(deckMoneyForDisplay(5099568.51, "EUR", "thousands")); // v0.6.14: the EIB principal 4 099 568.51 plus the note installment 1 000 000
+    expect(debt && debt.textContent).toContain(deckMoneyForDisplay(133349.53, "EUR", "thousands"));
     const dscr = document.querySelector('[data-testid="dscr-table"]');
     expect(dscr && dscr.textContent).toContain("4.1398");
     const minRow = dscr && dscr.querySelector('[data-dscr-min="true"]');

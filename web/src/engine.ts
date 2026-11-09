@@ -159,4 +159,15 @@ export function dscrTwoForDisplay(value: number): string {
   return roundForDisplay(value, 2).toFixed(2);
 }
 
-export const VERSION = "v0.6.20";
+// v0.6.21 Task C (Round 46 Supplement 7): the term glosses of record, verbatim. Each appraisal term
+// the audience may not share carries its one-line gloss on first appearance in the app's READ surfaces
+// and the deck's tiles, once per surface, with terminology identical across surfaces.
+export const TERM_GLOSSES: { term: string; gloss: string }[] = [
+  { term: "NPV", gloss: "the present value of the stream at the discount rate, in currency" },
+  { term: "IRR", gloss: "the discount rate that zeroes the net present value" },
+  { term: "MIRR", gloss: "the IRR recalculated with reinvestment at the stated rate rather than at the IRR itself" },
+  { term: "DSCR", gloss: "the cash available in a year divided by the debt service due that year, below 1.0 meaning the year's collections cannot pay the year's debt" },
+  { term: "WACC", gloss: "the weighted average cost of capital, the benchmark a positive NPV must clear" },
+];
+
+export const VERSION = "v0.6.21";

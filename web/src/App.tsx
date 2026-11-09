@@ -36,9 +36,10 @@ interface ProjectSnapshot {
   grantScales: number[] | null;
 }
 const DEFAULT_ENTRY_UNIT: EntryUnit = "thousands";
-// The entry unit is a display preference (it re-reads the same raw values): changing it is not unsaved work, so it stays
-// out of the dirty comparison; New project and a file Open still reset or sync it.
-const snapshotKey = (s: ProjectSnapshot): string => JSON.stringify({ ...s, entryUnit: null });
+// v0.6.21 Task G(b): the entry-unit exclusion is retired — the entry-unit switch joins the
+// unsaved-changes key, so a unit switch marks the document dirty (no silently lost unit switch).
+// New project and a file Open still reset or sync the unit.
+const snapshotKey = (s: ProjectSnapshot): string => JSON.stringify(s);
 const blankSnapshot = (): ProjectSnapshot => ({ inputs: blankProject(), startYear: null, entryUnit: DEFAULT_ENTRY_UNIT, targets: null, terms: null, balloons: null, grantScales: null });
 
 type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "timeline" | "results" | "scenarios" | "detail";
@@ -175,6 +176,8 @@ export function App() {
   const setTargetIrr = (v: string) => setInputs((p) => ({ ...p, targetIrr: parseFloat(v) || 0 }));
   const setTimeline = (tl: import("../../core/src/types.js").TimelineBlock) => setInputs((p) => ({ ...p, timeline: tl }));
   const setProjectLength = (v: number | null) => setInputs((p) => ({ ...p, projectLengthYears: v }));
+  // v0.6.21 Task E: the deck slide title overrides ride the project document (additive optional field, declared web-side)
+  const setDeckTitles = (t: Record<string, string>) => setInputs((p) => ({ ...p, deckTitles: t }) as ModelInputs);
   const setRepayment = (patch: Partial<ModelInputs["repayment"]>) =>
     setInputs((p) => ({ ...p, repayment: { ...p.repayment, ...patch } }));
   const setContracts = (contracts: import("../../core/src/types.js").ContractParams[]) =>
@@ -238,7 +241,8 @@ export function App() {
     const { buildDeckPdf } = await import("./pdf.js");
     const { deckSlides } = await import("./deck.js");
     const model = deckSlides(inputs, result, { startYear, entryUnit, scenarioTargets, scenarioTerms, scenarioBalloons, monthGrid });
-    const doc = buildDeckPdf(model, inputs.projectName || "project");
+    // v0.6.21 W33/W34: the PDF export follows the app theme select; the dark stage is the default (W34), light is the paper-and-toner option.
+    const doc = buildDeckPdf(model, inputs.projectName || "project", undefined, theme);
     doc.save(`${inputs.projectName || "project"}.pdf`);
   };
   const printDeck = () => { setPresOpen(true); };
@@ -262,7 +266,7 @@ export function App() {
   }, [issues]);
 
   if (presOpen) {
-    return <RootErrorBoundary><Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} monthGrid={monthGrid} /></RootErrorBoundary>;
+    return <RootErrorBoundary><Presentation inputs={inputs} result={result} onExit={() => setPresOpen(false)} startYear={startYear} entryUnit={entryUnit} scenarioTargets={scenarioTargets} scenarioTerms={scenarioTerms} scenarioBalloons={scenarioBalloons} monthGrid={monthGrid} theme={theme} /></RootErrorBoundary>;
   }
 
   return (
@@ -384,7 +388,7 @@ export function App() {
       <main>
         <RootErrorBoundary>
         {view === "overview" && (
-          <OverviewSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setStartYear={(v) => {
+          <OverviewSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setDeckTitles={setDeckTitles} setStartYear={(v) => {
             // v0.6.13 Task F (AUD-18): the writer refuses — symmetric with the file layer's
             // FILE-SETTINGS bound (null or a whole year between 1900 and 2200); a refused entry
             // never applies and the refusal follows.

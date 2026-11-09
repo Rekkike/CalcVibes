@@ -18,7 +18,7 @@ const CONTENT_BOTTOM = 185;
 const FIGURE_LINE_HEIGHT = 8;
 const DISCLOSURE_LINE_HEIGHT = 6;
 
-// v0.6.5 Task H/W16: the print palette — the stage palette never appears on the paper route.
+// v0.6.5 Task H/W16: the print palette — the stage palette never appeared on the paper route.
 // Every drawn element meets the contrast contract against the white page (>= 4.99:1 for the
 // ink family; the semantic ok/bad tones carry their meaning in print-darkened form).
 const PRINT_OK: [number, number, number] = [4, 120, 87]; // #047857
@@ -28,13 +28,135 @@ const PRINT_MUT: [number, number, number] = [50, 50, 50]; // caption ink on pape
 // the print donut/segment palette: every entry >= 4.99:1 on white
 const PRINT_DONUT_COLORS = ["#0074ba", "#047857", "#b45309", "#6d28d9", "#be123c", "#103558"];
 
-function printColorOf(index: number): string {
-  return PRINT_DONUT_COLORS[index % PRINT_DONUT_COLORS.length];
+// v0.6.21 Task A (findings W32, W33, W34) — the print-chart geometry contract and the theme mapping.
+// W32: the content band is 14..283 mm (unchanged); every paper-route chart body is bounded to
+// 20..277 mm, centered in that band (both midpoints 148.5 mm), with the bar width derived from the
+// available width and the slot count and a proportional inter-bar gap, so no chart can reach the
+// page edge at any fixture.
+export const PDF_CONTENT_LEFT = 14;
+export const PDF_CONTENT_RIGHT = 283;
+export const PDF_CHART_LEFT = 20;
+export const PDF_CHART_RIGHT = 277;
+export const PDF_CHART_WIDTH = PDF_CHART_RIGHT - PDF_CHART_LEFT; // 257 mm
+// The proportional inter-bar gap is 20 percent of the slot, so bars occupy 80 percent of it.
+export const PDF_BAR_GAP_SHARE = 0.2;
+export function chartSlots(count: number): { slot: number; gap: number; barW: number; x: (i: number) => number } {
+  const n = Math.max(1, count);
+  const slot = PDF_CHART_WIDTH / n;
+  const gap = slot * PDF_BAR_GAP_SHARE;
+  const barW = slot - gap;
+  // the bar group is centered in the body: the half-gap at each end keeps 20..277 the outer bounds
+  return { slot, gap, barW, x: (i: number) => PDF_CHART_LEFT + gap / 2 + i * slot };
+}
+
+// W33/W34: the PDF export's theme mapping. The stage vocabulary maps in full to the PDF surface —
+// the #081c33 page, the light inks, the stage chart colors — and the dark stage is the DEFAULT
+// (W34, superseding W33's light default); the light theme stays the explicit paper-and-toner option
+// (the PRINT_* vocabulary of record above). The W30-audited contrast set of record, all computed
+// against the stage #081c33: the peak label #ffffff at 17.15:1, the axis labels #e2e8f0 at 13.91:1,
+// the caption #cce9ff at 13.61:1, the crossing gold #e8b84b at 9.30:1, and the stage chart colors
+// #fb7185 and #34d399 at 6.37:1 and 8.92:1.
+export type DeckPdfTheme = "dark" | "light";
+export interface PdfThemePalette {
+  page: [number, number, number];
+  headerBand: [number, number, number];
+  headerText: [number, number, number];
+  ink: [number, number, number];
+  mut: [number, number, number];
+  caption: [number, number, number];
+  peak: [number, number, number];
+  onBar: [number, number, number];
+  hairline: [number, number, number];
+  gridline: [number, number, number];
+  connector: [number, number, number];
+  connectorSoft: [number, number, number];
+  dash: [number, number, number];
+  ground: [number, number, number];
+  ok: [number, number, number];
+  bad: [number, number, number];
+  gold: [number, number, number];
+  barPos: [number, number, number];
+  barNeg: [number, number, number];
+  capital: [number, number, number];
+  total: [number, number, number];
+  totalFill: [number, number, number];
+  donut: string[];
+  cardFill: [number, number, number];
+  cardLine: [number, number, number];
+  cardLabel: [number, number, number];
+}
+// The light paper route: exactly the PRINT_* vocabulary of record (white page, print inks).
+export const PDF_THEME_LIGHT: PdfThemePalette = {
+  page: [255, 255, 255],
+  headerBand: [16, 53, 88],
+  headerText: [255, 255, 255],
+  ink: [0, 0, 0],
+  mut: PRINT_MUT,
+  caption: PRINT_MUT,
+  peak: [0, 0, 0],
+  onBar: [255, 255, 255],
+  hairline: [229, 229, 234],
+  gridline: [240, 240, 243],
+  connector: [150, 150, 150],
+  connectorSoft: [170, 170, 170],
+  dash: [120, 120, 120],
+  ground: [60, 60, 60],
+  ok: PRINT_OK,
+  bad: PRINT_BAD,
+  gold: PRINT_GOLD,
+  barPos: PRINT_OK,
+  barNeg: PRINT_BAD,
+  capital: [0, 116, 186],
+  total: [16, 53, 88],
+  totalFill: [231, 236, 242],
+  donut: PRINT_DONUT_COLORS,
+  cardFill: [255, 255, 255],
+  cardLine: [229, 229, 234],
+  cardLabel: [113, 114, 115],
+};
+// The dark stage route: the #081c33 page, the light inks, the stage chart colors; the translucent
+// stage surfaces are composited over the page (rgba(30,41,59,0.6) -> (21,36,56), the
+// rgba(148,163,184,0.16) gridline -> (30,50,72), the rgba(148,163,184,0.45) zero line -> (71,89,111)).
+export const PDF_THEME_DARK: PdfThemePalette = {
+  page: [8, 28, 51], // #081c33
+  headerBand: [21, 36, 56],
+  headerText: [255, 255, 255],
+  ink: [255, 255, 255], // #ffffff at 17.15:1
+  mut: [226, 232, 240], // #e2e8f0 at 13.91:1 (axis labels)
+  caption: [204, 233, 255], // #cce9ff at 13.61:1
+  peak: [255, 255, 255], // #ffffff at 17.15:1 (the peak label)
+  onBar: [255, 255, 255],
+  hairline: [29, 58, 95], // #1d3a5f
+  gridline: [30, 50, 72],
+  connector: [71, 89, 111],
+  connectorSoft: [71, 89, 111],
+  dash: [71, 89, 111],
+  ground: [71, 89, 111],
+  ok: [52, 211, 153], // #34d399 at 8.92:1
+  bad: [251, 113, 133], // #fb7185 at 6.37:1
+  gold: [232, 184, 75], // #e8b84b at 9.30:1 (the crossing gold)
+  barPos: [52, 211, 153], // #34d399
+  barNeg: [251, 113, 133], // #fb7185
+  capital: [56, 189, 248], // #38bdf8, the stage accent at 8.01:1
+  total: [226, 232, 240], // #e2e8f0
+  totalFill: [21, 36, 56],
+  donut: ["#38bdf8", "#34d399", "#e8b84b", "#fb7185", "#c4b5fd", "#e2e8f0"],
+  cardFill: [21, 36, 56],
+  cardLine: [29, 58, 95],
+  cardLabel: [204, 233, 255],
+};
+
+function printColorOf(T: PdfThemePalette, index: number): string {
+  return T.donut[index % T.donut.length];
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 }
 
 // v0.6.5 Task C/W13: the composition donut on the print route — pie-slice polygons through
 // doc.lines, a white center circle, the center total, and direct labels beside the geometry.
-function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace): number {
+function drawPrintDonut(doc: jsPDF, T: PdfThemePalette, donut: DeckDonut, x: number, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace): number {
   const total = Math.max(1e-12, donut.segments.reduce((a, s) => a + s.value, 0));
   const cx = x + 22;
   const cy = y + 26;
@@ -42,13 +164,13 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
   const innerR = 11;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
   doc.text(donut.title, x, y + 4);
   doc.setFont("helvetica", "normal");
   if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(donut.title);
   let acc = 0;
   if (donut.segments.length <= 1) {
-    doc.setFillColor(printColorOf(0));
+    const zc = hexToRgb(printColorOf(T, 0)); doc.setFillColor(zc[0], zc[1], zc[2]);
     doc.circle(cx, cy, outerR, "F");
   } else {
     for (let i = 0; i < donut.segments.length; i++) {
@@ -78,37 +200,37 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
       const pex = cx + outerR * Math.cos(a1);
       const pey = cy + outerR * Math.sin(a1);
       path.push([cx - pex, cy - pey]);
-      doc.setFillColor(printColorOf(i));
+      const pc = hexToRgb(printColorOf(T, i)); doc.setFillColor(pc[0], pc[1], pc[2]);
       doc.lines(path, cx, cy, [1, 1], "F", true);
     }
   }
-  doc.setFillColor(255, 255, 255);
+  doc.setFillColor(T.page[0], T.page[1], T.page[2]);
   doc.circle(cx, cy, innerR, "F");
   doc.setFontSize(7);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
   const centerLines = doc.splitTextToSize(deckMoneyForDisplay(total, currency, unit), innerR * 2 - 2) as string[];
   doc.text(centerLines[centerLines.length - 1], cx, cy + 1, { align: "center" });
   if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(deckMoneyForDisplay(total, currency, unit));
   let labY = y + 12;
   donut.segments.forEach((s, si) => {
-    doc.setFillColor(printColorOf(si));
+    const pc = hexToRgb(printColorOf(T, si)); doc.setFillColor(pc[0], pc[1], pc[2]);
     doc.rect(x + 46, labY - 2.5, 3, 3, "F");
     doc.setFontSize(7);
-    doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+    doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
     // v0.6.18 Task B: the label carries the segment's share of the ring's own total (the deck model's
     // one-decimal string; the print route never recomputes it)
     const labelText = `${s.label} ${deckMoneyForDisplay(s.value, currency, unit)}${s.share !== undefined ? ` · ${s.share}` : ""}`;
     doc.text(labelText, x + 51, labY);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
     if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(labelText);
     labY += 5;
   });
   if (donut.disclosure !== undefined) {
     doc.setFontSize(7);
-    doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+    doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
     const dLines = doc.splitTextToSize(donut.disclosure, 120) as string[];
     doc.text(dLines, x, y + 48);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
     if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(donut.disclosure);
     return Math.max(58, 48 + dLines.length * 3 + 4);
   }
@@ -119,30 +241,31 @@ function drawPrintDonut(doc: jsPDF, donut: DeckDonut, x: number, y: number, curr
 // colors in print ink, the break-even target marked as the crossing with its caption.
 // v0.6.9 Task G (finding W29): the vertical geometry scales by `scale` (default 1) so the
 // scenarios slide can reserve its block heights and fit whole within the content band.
-function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace, scale = 1): number {
+function drawPrintScenarioTarget(doc: jsPDF, T: PdfThemePalette, tc: ScenarioTargetChart, y: number, currency: CurrencyCode, unit: EntryUnit, trace?: DeckPdfTrace, scale = 1): number {
   const n = Math.max(1, tc.points.length);
-  const barW = Math.min(20, 200 / n);
+  // v0.6.21 W32: re-bounded and centered under the geometry contract (the 20..220 band retired).
+  const geo = chartSlots(n);
   doc.setFontSize(8);
-  doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-  doc.text(tc.kicker, 20, y);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(T.caption[0], T.caption[1], T.caption[2]);
+  doc.text(tc.kicker, PDF_CHART_LEFT, y);
+  doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
   if (tc.mode === "solved") {
     const maxV = Math.max(1e-12, ...tc.points.map((p) => p.value));
     const baseline = y + 30 * scale;
-    doc.setDrawColor(229, 229, 234);
-    doc.line(20, baseline, 220, baseline);
+    doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
+    doc.line(PDF_CHART_LEFT, baseline, PDF_CHART_RIGHT, baseline);
     tc.points.forEach((p, i) => {
       const h = (Math.max(0, p.value) / maxV) * 22 * scale;
-      doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
-      doc.rect(20 + i * (barW + 2), baseline - h, barW, h, "F");
+      doc.setFillColor(T.barPos[0], T.barPos[1], T.barPos[2]);
+      doc.rect(geo.x(i), baseline - h, geo.barW, h, "F");
     });
     tc.points.forEach((p, i) => {
       doc.setFontSize(6);
-      doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-      doc.text(p.label, 20 + i * (barW + 2) + barW / 2, baseline + 4 * scale, { align: "center", maxWidth: barW + 2 });
+      doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
+      doc.text(p.label, geo.x(i) + geo.barW / 2, baseline + 4 * scale, { align: "center", maxWidth: geo.barW + 2 });
       const valText = deckMoneyForDisplay(p.value, currency, unit);
-      doc.text(valText, 20 + i * (barW + 2) + barW / 2, baseline + 8 * scale, { align: "center", maxWidth: barW + 6 });
-      doc.setTextColor(0, 0, 0);
+      doc.text(valText, geo.x(i) + geo.barW / 2, baseline + 8 * scale, { align: "center", maxWidth: geo.barW + 6 });
+      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
       if (trace) {
         trace.drawnFigures[trace.drawnFigures.length - 1]?.push(p.label);
         trace.drawnFigures[trace.drawnFigures.length - 1]?.push(valText);
@@ -156,32 +279,32 @@ function drawPrintScenarioTarget(doc: jsPDF, tc: ScenarioTargetChart, y: number,
     const h = (Math.abs(p.value) / maxAbs) * 12 * scale;
     const col = p.met ? PRINT_OK : PRINT_BAD;
     doc.setFillColor(col[0], col[1], col[2]);
-    if (p.value >= 0) doc.rect(20 + i * (barW + 2), zeroY - h, barW, h, "F");
-    else doc.rect(20 + i * (barW + 2), zeroY, barW, h, "F");
+    if (p.value >= 0) doc.rect(geo.x(i), zeroY - h, geo.barW, h, "F");
+    else doc.rect(geo.x(i), zeroY, geo.barW, h, "F");
   });
-  doc.setDrawColor(229, 229, 234);
-  doc.line(20, zeroY, 220, zeroY);
+  doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
+  doc.line(PDF_CHART_LEFT, zeroY, PDF_CHART_RIGHT, zeroY);
   if (tc.breakEvenTarget !== null && n > 0) {
     const first = tc.points[0].target;
     const last = tc.points[n - 1].target;
     const frac = tc.breakEvenTarget <= first ? 0 : tc.breakEvenTarget >= last ? 1 : (tc.breakEvenTarget - first) / (last - first);
-    const bx = 20 + frac * 200;
-    doc.setDrawColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+    const bx = PDF_CHART_LEFT + frac * PDF_CHART_WIDTH;
+    doc.setDrawColor(T.gold[0], T.gold[1], T.gold[2]);
     doc.setLineWidth(0.6);
     doc.line(bx, y + 8 * scale, bx, y + 30 * scale);
     doc.setLineWidth(0.2);
     const caption = `break-even at ${percentTwoForDisplay(tc.breakEvenTarget)}`;
     doc.setFontSize(7);
-    doc.setTextColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+    doc.setTextColor(T.gold[0], T.gold[1], T.gold[2]);
     doc.text(caption, bx, y + 34 * scale, { align: frac > 0.5 ? "right" : "left", maxWidth: 100 });
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
     if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(caption);
   }
   tc.points.forEach((p, i) => {
     doc.setFontSize(6);
-    doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
-    doc.text(`${p.label} ${p.met ? "met" : "not met"}`, 20 + i * (barW + 2) + barW / 2, y + 40 * scale, { align: "center", maxWidth: barW + 8 });
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
+    doc.text(`${p.label} ${p.met ? "met" : "not met"}`, geo.x(i) + geo.barW / 2, y + 40 * scale, { align: "center", maxWidth: geo.barW + 8 });
+    doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
     if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${p.label} ${p.met ? "met" : "not met"}`);
   });
   return 48 * scale;
@@ -205,7 +328,7 @@ const pdfFooterH = (g: DeckGantt) => {
   return base + Math.max(0, g.gateRows - 1) * GATE_ROW_PDF;
 };
 const pdfLaneH = (l: DeckGantt["lanes"][number]) => Math.max(l.rowLines.reduce((a, n) => a + pdfRowH(n), 0) + GANTT_PDF.rowPad, l.labelLines.length * 3.4 + 2);
-function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => number, trace?: DeckPdfTrace): number {
+function drawPrintGantt(doc: jsPDF, T: PdfThemePalette, g: DeckGantt, y0: number, nextPage: () => number, trace?: DeckPdfTrace): number {
   const { labelW, plotW, axisH, rowPad, barH, lineH } = GANTT_PDF;
   const footerH = pdfFooterH(g);
   const x0 = 20 + labelW;
@@ -241,9 +364,9 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
     const heights = seg.lanes.map(pdfLaneH);
     const lanesBottom = lanesTop + heights.reduce((a, h) => a + h, 0);
     doc.setFontSize(7);
-    doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+    doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
     for (const a of g.axis) {
-      doc.setDrawColor(229, 229, 234);
+      doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
       doc.line(xStart(a.year), lanesTop, xStart(a.year), lanesBottom);
       if ((a.year - first) % step === 0) {
         doc.text(a.label, xMid(a.year), seg.top + 4, { align: "center" });
@@ -252,17 +375,17 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
     }
     if (g.monthGrid !== undefined) {
       // the optional month gridlines (view state): hairlines in a lighter ink than the year lines
-      doc.setDrawColor(240, 240, 243);
+      doc.setDrawColor(T.gridline[0], T.gridline[1], T.gridline[2]);
       for (const p of g.monthGrid) doc.line(xAt(p), lanesTop, xAt(p), lanesBottom);
-      doc.setDrawColor(229, 229, 234);
+      doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
     }
     doc.line(xStart(first + n), lanesTop, xStart(first + n), lanesBottom);
     let ly = lanesTop;
     seg.lanes.forEach((lane, i) => {
-      doc.setDrawColor(150, 150, 150);
+      doc.setDrawColor(T.connector[0], T.connector[1], T.connector[2]);
       doc.line(x0, ly, x0 + plotW, ly);
       doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
       lane.labelLines.forEach((line, k) => {
         doc.text(line, 20, ly + heights[i] / 2 - ((lane.labelLines.length - 1) * 3.4) / 2 + 1.2 + k * 3.4);
       });
@@ -276,29 +399,29 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
         const bx = xAt(b.left) + 0.3;
         const bw = (b.right - b.left) * colW - 0.6;
         const by = rowTop + band;
-        doc.setFillColor(0, 116, 186);
+        doc.setFillColor(T.capital[0], T.capital[1], T.capital[2]);
         doc.rect(bx, by, bw, barH, "F");
         doc.setFontSize(6);
         if (b.labelMode === "inside") {
-          doc.setTextColor(255, 255, 255);
+          doc.setTextColor(T.onBar[0], T.onBar[1], T.onBar[2]);
           doc.text(b.label, bx + 1, by + barH / 2 + 0.8);
         } else {
-          doc.setTextColor(0, 0, 0);
+          doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
           b.lines.forEach((line, k) => doc.text(line, x0 + b.labelLeft * colW, rowTop + 2 + k * lineH));
         }
         push(b.label);
       }
       ly += heights[i];
     });
-    doc.setDrawColor(150, 150, 150);
+    doc.setDrawColor(T.connector[0], T.connector[1], T.connector[2]);
     doc.line(x0, lanesBottom, x0 + plotW, lanesBottom);
     for (const gate of g.gates) {
-      doc.setDrawColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+      doc.setDrawColor(T.gold[0], T.gold[1], T.gold[2]);
       doc.setLineWidth(0.6);
       doc.line(xAt(gate.pos), lanesTop - 2, xAt(gate.pos), lanesBottom + 2 + gate.row * GATE_ROW_PDF);
       doc.setLineWidth(0.2);
       doc.setFontSize(7);
-      doc.setTextColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+      doc.setTextColor(T.gold[0], T.gold[1], T.gold[2]);
       const code = gate.code ?? "Gate";
       doc.text(code, xAt(gate.pos), lanesBottom + 6 + gate.row * GATE_ROW_PDF, { align: "center" });
       push(code);
@@ -306,11 +429,11 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
     for (const m of g.milestones) {
       const cx = xAt(m.pos);
       const cy = lanesBottom + 11 + Math.max(0, g.gateRows - 1) * GATE_ROW_PDF + m.row * 9;
-      doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
+      doc.setFillColor(T.ok[0], T.ok[1], T.ok[2]);
       doc.lines([[2.5, 2.5], [-2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]], cx, cy - 2.5, [1, 1], "F", true);
       // the ordinal, centered beneath its diamond (7 pt; below the gate-code line, above the caption)
       doc.setFontSize(7);
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
       doc.text(String(m.ordinal), cx, cy + 5.7, { align: "center" });
     }
     endY = lanesBottom + footerH;
@@ -318,7 +441,7 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
   // the axis-honesty caption (the window against the program span; the omitted-marker disclosure)
   if (g.caption !== null) {
     doc.setFontSize(7);
-    doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+    doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
     const lines = doc.splitTextToSize(g.caption, 257) as string[];
     if (endY + lines.length * GANTT_PDF.capLine > CONTENT_BOTTOM) endY = nextPage();
     doc.text(lines, 20, endY + 2);
@@ -326,7 +449,7 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
     endY += lines.length * GANTT_PDF.capLine + 1;
   }
   doc.setDrawColor(0, 0, 0);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
   doc.setFontSize(12);
   return endY;
 }
@@ -336,11 +459,8 @@ function drawPrintGantt(doc: jsPDF, g: DeckGantt, y0: number, nextPage: () => nu
 // tick; the heavier total bar), and the stepped columns draw the group steps with the ground-standing
 // total. Both consume the same composed model as the Presentation (the group aggregation is never
 // recomputed here); the operating segment prints and the rows reconcile to the total.
-const PRINT_CAPITAL: [number, number, number] = [0, 116, 186]; // #0074ba
-const PRINT_TOTAL: [number, number, number] = [16, 53, 88]; // the deck navy
-
-function printBarColor(kind: DeckLedgerRow["kind"] | DeckStepColumn["kind"]): [number, number, number] {
-  return kind === "total" ? PRINT_TOTAL : PRINT_CAPITAL;
+function printBarColor(T: PdfThemePalette, kind: DeckLedgerRow["kind"] | DeckStepColumn["kind"]): [number, number, number] {
+  return kind === "total" ? T.total : T.capital;
 }
 
 function ledgerNameLines(doc: jsPDF, name: string): string[] {
@@ -352,14 +472,14 @@ function ledgerRowHeight(doc: jsPDF, r: DeckLedgerRow): number {
   return Math.max(5.2, ledgerNameLines(doc, r.name).length * 3 + 2.2);
 }
 
-function drawPrintLedgerRow(doc: jsPDF, r: DeckLedgerRow, y: number, trace?: DeckPdfTrace): number {
+function drawPrintLedgerRow(doc: jsPDF, T: PdfThemePalette, r: DeckLedgerRow, y: number, trace?: DeckPdfTrace): number {
   const x0 = 110;
   const plotW = 100;
   const lines = ledgerNameLines(doc, r.name);
   const h = Math.max(5.2, lines.length * 3 + 2.2);
   const mid = y + h / 2;
   doc.setFontSize(7);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
   if (r.kind === "total") doc.setFont("helvetica", "bold");
   doc.text(lines, 20, y + 3.4);
   doc.setFont("helvetica", "normal");
@@ -367,22 +487,22 @@ function drawPrintLedgerRow(doc: jsPDF, r: DeckLedgerRow, y: number, trace?: Dec
     const bx = x0 + (r.startPct / 100) * plotW;
     const bw = Math.max(0.35, (r.widthPct / 100) * plotW);
     const bh = r.kind === "total" ? 4.4 : 3.2;
-    const c = printBarColor(r.kind);
+    const c = printBarColor(T, r.kind);
     doc.setFillColor(c[0], c[1], c[2]);
     doc.rect(bx, mid - bh / 2, bw, bh, "F");
   }
   const endPct = r.startPct + r.widthPct;
   if (r.kind === "capital") {
     // the hairline connector from this bar's end to the next row's start
-    doc.setDrawColor(170, 170, 170);
+    doc.setDrawColor(T.connectorSoft[0], T.connectorSoft[1], T.connectorSoft[2]);
     doc.line(x0 + (endPct / 100) * plotW, mid + 1.6, x0 + (endPct / 100) * plotW, y + h + 1.6);
     doc.setDrawColor(0, 0, 0);
   }
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
   doc.text(r.value, x0 + (endPct / 100) * plotW + 2, mid + 0.9);
-  doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+  doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
   doc.text(r.share, 277, mid + 0.9, { align: "right" });
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
   if (trace) {
     const f = trace.drawnFigures[trace.drawnFigures.length - 1];
     f?.push(r.name);
@@ -392,7 +512,7 @@ function drawPrintLedgerRow(doc: jsPDF, r: DeckLedgerRow, y: number, trace?: Dec
   return h;
 }
 
-function drawPrintColumns(doc: jsPDF, columns: DeckStepColumn[], y: number, trace?: DeckPdfTrace): number {
+function drawPrintColumns(doc: jsPDF, T: PdfThemePalette, columns: DeckStepColumn[], y: number, trace?: DeckPdfTrace): number {
   const left = 20;
   const width = 257;
   const trackH = 26;
@@ -409,23 +529,23 @@ function drawPrintColumns(doc: jsPDF, columns: DeckStepColumn[], y: number, trac
     const by = yOf(c.bottomPct + c.heightPct);
     const bh = Math.max(0.35, (c.heightPct / 100) * trackH);
     if (c.kind === "total") {
-      doc.setDrawColor(PRINT_TOTAL[0], PRINT_TOTAL[1], PRINT_TOTAL[2]);
-      doc.setFillColor(231, 236, 242);
+      doc.setDrawColor(T.total[0], T.total[1], T.total[2]);
+      doc.setFillColor(T.totalFill[0], T.totalFill[1], T.totalFill[2]);
       doc.rect(bx, by, bw, bh, "FD");
       doc.setDrawColor(0, 0, 0);
     } else {
-      const col = printBarColor(c.kind);
+      const col = printBarColor(T, c.kind);
       doc.setFillColor(col[0], col[1], col[2]);
       doc.rect(bx, by, bw, bh, "F");
       // the dotted connector from this step's top to the next base (or the total's top)
-      doc.setDrawColor(120, 120, 120);
+      doc.setDrawColor(T.dash[0], T.dash[1], T.dash[2]);
       doc.setLineDashPattern([0.6, 0.8], 0);
       doc.line(bx + bw, by, bx + slot, by);
       doc.setLineDashPattern([], 0);
       doc.setDrawColor(0, 0, 0);
     }
     doc.setFontSize(7);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
     const label = c.kind === "total" ? `${c.name} ${c.value}` : c.value;
     doc.text(doc.splitTextToSize(label, slot * 0.95) as string[], bx + bw / 2, by - 1.6 - (c.kind === "total" ? 3 : 0), { align: "center" });
     if (trace) {
@@ -433,7 +553,7 @@ function drawPrintColumns(doc: jsPDF, columns: DeckStepColumn[], y: number, trac
       f?.push(c.value);
     }
   });
-  doc.setDrawColor(60, 60, 60);
+  doc.setDrawColor(T.ground[0], T.ground[1], T.ground[2]);
   doc.setLineWidth(0.5);
   doc.line(left, ground, left + width, ground);
   doc.setLineWidth(0.2);
@@ -450,14 +570,27 @@ function drawPrintColumns(doc: jsPDF, columns: DeckStepColumn[], y: number, trac
 }
 
 export function buildDeckPdf(model: DeckModel, projectName: string): jsPDF;
-export function buildDeckPdf(model: DeckModel, projectName: string, trace: DeckPdfTrace): jsPDF;
-export function buildDeckPdf(model: DeckModel, projectName: string, trace?: DeckPdfTrace): jsPDF {
+export function buildDeckPdf(model: DeckModel, projectName: string, trace?: DeckPdfTrace, theme?: DeckPdfTheme): jsPDF;
+// v0.6.21 W33/W34: the theme parameter defaults to "dark" — the dark stage is the PDF export's
+// DEFAULT (W34); "light" is the explicit paper-and-toner option (the PRINT_* vocabulary of record).
+export function buildDeckPdf(model: DeckModel, projectName: string, trace?: DeckPdfTrace, theme: DeckPdfTheme = "dark"): jsPDF {
+  const T = theme === "dark" ? PDF_THEME_DARK : PDF_THEME_LIGHT;
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
   const total = model.slides.length;
   let footerPage = 0;
+  const paintPage = () => {
+    doc.setFillColor(T.page[0], T.page[1], T.page[2]);
+    doc.rect(0, 0, 297, 210, "F");
+  };
+  const addPage = () => {
+    doc.addPage();
+    footerPage += 1;
+    paintPage();
+  };
+  paintPage();
   model.slides.forEach((slide) => {
     if (trace) trace.drawnFigures.push([]);
-    if (footerPage > 0) doc.addPage();
+    if (footerPage > 0) addPage();
     footerPage += 1;
     const slideFirstPage = footerPage;
     // v0.6.9 Task G (finding W29): the scenarios slide reserves its block heights before
@@ -489,12 +622,12 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       }
       doc.setFontSize(12);
     }
-    doc.setFillColor(16, 53, 88);
+    doc.setFillColor(T.headerBand[0], T.headerBand[1], T.headerBand[2]);
     doc.rect(0, 0, 297, 14, "F");
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(T.headerText[0], T.headerText[1], T.headerText[2]);
     doc.setFontSize(9);
     doc.text(projectName.toUpperCase(), 14, 9.5);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
     doc.setFontSize(24);
     if (trace) trace.drawnTitles.push(slide.title);
     doc.text(slide.title, 20, 30, { maxWidth: 257 });
@@ -502,13 +635,13 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     let y = CONTENT_TOP;
     // v0.6.13: the timeline slide draws its Gantt first, beneath the title.
     if (slide.gantt !== undefined) {
-      y = drawPrintGantt(doc, slide.gantt, y, () => { doc.addPage(); footerPage += 1; return CONTENT_TOP; }, trace) + 2;
+      y = drawPrintGantt(doc, T, slide.gantt, y, () => { addPage(); return CONTENT_TOP; }, trace) + 2;
     }
     // v0.6.5 Task I: the deal slide is verdict-led — the verdict draws first, before the tiles.
     if (slide.verdict !== undefined) {
       const lines = doc.splitTextToSize(`Verdict: ${slide.verdict}`, 257) as string[];
       const needed = DISCLOSURE_LINE_HEIGHT * lines.length;
-      if (y + needed > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+      if (y + needed > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.text(lines, 20, y + 4);
@@ -524,23 +657,23 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       const gap = 3;
       const rows = Math.ceil(slide.tiles.length / cols);
       for (let r = 0; r < rows; r++) {
-        if (y + cardH > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+        if (y + cardH > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
         for (let c = 0; c < cols; c++) {
           const t = slide.tiles[r * cols + c];
           if (t === undefined) break;
           const x = 20 + c * (cardW + gap);
-          doc.setDrawColor(229, 229, 234);
-          doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
+          doc.setFillColor(T.cardFill[0], T.cardFill[1], T.cardFill[2]);
           doc.roundedRect(x, y, cardW, cardH, 2, 2, "FD");
           doc.setFontSize(6);
-          doc.setTextColor(113, 114, 115);
+          doc.setTextColor(T.cardLabel[0], T.cardLabel[1], T.cardLabel[2]);
           doc.text(t.label.toUpperCase(), x + 3, y + 5, { maxWidth: cardW - 6 });
           doc.setFontSize(9);
-          const tv: [number, number, number] = t.tone === "ok" ? PRINT_OK : t.tone === "bad" ? PRINT_BAD : [0, 0, 0];
+          const tv: [number, number, number] = t.tone === "ok" ? T.ok : t.tone === "bad" ? T.bad : T.ink;
           doc.setTextColor(tv[0], tv[1], tv[2]);
           const valLines = doc.splitTextToSize(t.value, cardW - 6) as string[];
           doc.text(valLines[valLines.length - 1], x + cardW - 3, y + cardH - 3, { align: "right" });
-          doc.setTextColor(0, 0, 0);
+          doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
           if (trace) {
             trace.drawnFigures[trace.drawnFigures.length - 1]?.push(t.value);
             trace.drawnFigures[trace.drawnFigures.length - 1]?.push(t.label.toUpperCase());
@@ -553,10 +686,10 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     // v0.6.5 Task C/W13: the paired composition donuts join the print route.
     if (slide.donuts !== undefined && slide.donuts.length > 0) {
       for (let di = 0; di < slide.donuts.length; di += 2) {
-        if (y + 52 > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
-        const hLeft = drawPrintDonut(doc, slide.donuts[di], 20, y, model.currency ?? "SEK", model.unit ?? "ones", trace);
+        if (y + 52 > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
+        const hLeft = drawPrintDonut(doc, T, slide.donuts[di], 20, y, model.currency ?? "SEK", model.unit ?? "ones", trace);
         const right = slide.donuts[di + 1];
-        const hRight = right !== undefined ? drawPrintDonut(doc, right, 155, y, model.currency ?? "SEK", model.unit ?? "ones", trace) : 0;
+        const hRight = right !== undefined ? drawPrintDonut(doc, T, right, 155, y, model.currency ?? "SEK", model.unit ?? "ones", trace) : 0;
         y += Math.max(hLeft, hRight);
       }
     }
@@ -565,12 +698,11 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       const lines = doc.splitTextToSize(line, 220);
       const needed = FIGURE_LINE_HEIGHT * lines.length;
       if (allowBreak && y + needed > CONTENT_BOTTOM) {
-        doc.addPage();
-        footerPage += 1;
+        addPage();
         y = CONTENT_TOP;
       }
-      doc.setDrawColor(229, 229, 234);
-      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
+      doc.setFillColor(T.cardFill[0], T.cardFill[1], T.cardFill[2]);
       doc.roundedRect(18, y - 5, 221, needed + 3, 2, 2, "FD");
       doc.text(lines, 20, y);
       if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(fig.value);
@@ -581,7 +713,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       for (const d of slide.insights) {
         const lines = doc.splitTextToSize(`Insight: ${d}`, 220);
         const needed = DISCLOSURE_LINE_HEIGHT * lines.length;
-        if (y + needed > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+        if (y + needed > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
         doc.text(lines, 20, y);
         if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d);
         y += needed;
@@ -589,9 +721,9 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     }
     if (slide.solverScenario !== null && slide.solverScenario !== undefined) {
       doc.setFontSize(9);
-      doc.setTextColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+      doc.setTextColor(T.gold[0], T.gold[1], T.gold[2]);
       doc.text(slide.solverScenario.label, 24, y);
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
       doc.text(`Required solved rent: ${slide.solverScenario.requiredPayment ?? "not applicable"}`, 24, y + 6);
       if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.solverScenario.label);
       y += 12;
@@ -600,8 +732,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       const lines = doc.splitTextToSize(d, 220);
       const needed = DISCLOSURE_LINE_HEIGHT * lines.length;
       if (allowBreak && y + needed > CONTENT_BOTTOM) {
-        doc.addPage();
-        footerPage += 1;
+        addPage();
         y = CONTENT_TOP;
       }
       doc.text(lines, 20, y);
@@ -610,23 +741,23 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     }
     if (slide.summaryCharts !== undefined) {
       for (const sc of slide.summaryCharts) {
-        if (y + 45 > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+        if (y + 45 > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
         if (sc.kind === "hurdle" && sc.data.length >= 2) {
           const t = sc.data[0].value;
           const a = sc.data[1].value;
           doc.setFontSize(7);
           doc.setTextColor(50, 50, 50);
           doc.text(`Target ${t.toFixed(2)}%`, 24, y);
-          doc.setTextColor(0, 0, 0);
+          doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
           // v0.6.18 (AUD-10): a null achieved IRR reads "—" and draws no achieved dot
           const missing = sc.achievedMissing === true;
           const achievedText = missing ? "Achieved —" : `Achieved ${a.toFixed(2)}%`;
           doc.text(sc.solved === true ? "solved to the target" : missing ? "no achieved rate" : a >= t ? "clears the hurdle" : "below the hurdle", 120, y);
           doc.text(achievedText, 216, y, { align: "right" });
-          doc.setFillColor(0, 116, 186);
+          doc.setFillColor(T.capital[0], T.capital[1], T.capital[2]);
           doc.circle(40 + (t / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");
           if (!missing) {
-            const hc: [number, number, number] = a >= t ? PRINT_OK : PRINT_BAD;
+            const hc: [number, number, number] = a >= t ? T.ok : T.bad;
             doc.setFillColor(hc[0], hc[1], hc[2]);
             doc.circle(40 + (a / (Math.max(t, a) * 1.15)) * 160, y + 5, 1.4, "F");
           }
@@ -644,9 +775,9 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
             doc.setFontSize(7);
             doc.setTextColor(50, 50, 50);
             doc.text(`${d.label} ${sharePct}%`, 24, rowY);
-            doc.setFillColor(0, 116, 186);
+            doc.setFillColor(T.capital[0], T.capital[1], T.capital[2]);
             doc.rect(120, rowY - 3, Math.max(0.5, 100 * (d.value / chartTotal)), 4, "F");
-            doc.setTextColor(0, 0, 0);
+            doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
             doc.text(valText, 216, rowY, { align: "right" });
             if (trace) {
               trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${d.label} ${sharePct}%`);
@@ -657,11 +788,11 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           y = rowY + 2;
         } else if (sc.kind === "donut" && sc.data.length > 0) {
           const chartTotal = Math.max(1e-12, sc.data.reduce((a, d) => a + d.value, 0));
-          let xAcc = 20;
+          let xAcc = PDF_CHART_LEFT;
           sc.data.forEach((d, di) => {
             const frac = d.value / chartTotal;
-            const segW = 200 * frac;
-            doc.setFillColor(printColorOf(di));
+            const segW = PDF_CHART_WIDTH * frac;
+            const pc2 = hexToRgb(printColorOf(T, di)); doc.setFillColor(pc2[0], pc2[1], pc2[2]);
             doc.rect(xAcc, y, segW, 6, "F");
             xAcc += segW;
           });
@@ -679,22 +810,23 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         } else if (sc.kind === "bars" && sc.data.length > 0) {
           const chartMax = Math.max(1, ...sc.data.map((d) => d.value));
           const peakIdx = sc.data.findIndex((d) => d.value === chartMax);
-          const barW = Math.min(14, 200 / sc.data.length);
+          const geo = chartSlots(sc.data.length);
           sc.data.forEach((d, di) => {
             const h = (d.value / chartMax) * 26;
-            doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
-            doc.rect(20 + di * (barW + 2), y + 30 - h, barW, h, "F");
+            doc.setFillColor(T.barPos[0], T.barPos[1], T.barPos[2]);
+            doc.rect(geo.x(di), y + 30 - h, geo.barW, h, "F");
           });
           doc.setFontSize(6);
-          doc.setTextColor(113, 114, 115);
+          doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
           sc.data.forEach((d, di) => {
-            doc.text(d.label, 20 + di * (barW + 2) + barW / 2, y + 34, { align: "center", maxWidth: barW + 2 });
+            doc.text(d.label, geo.x(di) + geo.barW / 2, y + 34, { align: "center", maxWidth: geo.barW + 2 });
             if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
           });
           doc.setFontSize(8);
-          doc.setTextColor(0, 0, 0);
+          doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
           const peakText = deckMoneyForDisplay(chartMax, model.currency ?? "SEK", model.unit ?? "ones");
-          doc.text(peakText, 20 + peakIdx * (barW + 2) + barW / 2, y + 26 - (chartMax / chartMax) * 26 - 2, { align: "center" });
+          doc.setTextColor(T.peak[0], T.peak[1], T.peak[2]);
+          doc.text(peakText, geo.x(peakIdx) + geo.barW / 2, y + 26 - (chartMax / chartMax) * 26 - 2, { align: "center" });
           if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(peakText);
           y += 38;
         }
@@ -705,28 +837,32 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       const covData = slide.chart.data;
       const chartMax = Math.max(1, ...covData.map((d) => Math.abs(d.value)));
       const zeroY = y + 30;
-      doc.setDrawColor(229, 229, 234);
-      doc.line(20, zeroY, 220, zeroY);
+      // v0.6.21 W32: the coverage path re-bounded and centered under the geometry contract (the
+      // 20..220 band retired); the axis labels compose thinned like the deck's model
+      // (charts.tsx: every ceil(n/12)-th label), so a long span cannot crowd the axis.
+      const geo = chartSlots(covData.length);
+      const covLabelStep = Math.max(1, Math.ceil(covData.length / 12));
+      doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
+      doc.line(PDF_CHART_LEFT, zeroY, PDF_CHART_RIGHT, zeroY);
       covData.forEach((d, di) => {
         const barH = Math.min(22, (Math.abs(d.value) / chartMax) * 22);
-        const x = 20 + (di / Math.max(1, covData.length)) * 200;
-        const barW = 200 / Math.max(1, covData.length) - 1;
+        const x = geo.x(di);
+        const barW = geo.barW;
         if (d.value >= 0) {
-          doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
+          doc.setFillColor(T.barPos[0], T.barPos[1], T.barPos[2]);
           doc.rect(x, zeroY - barH, Math.max(0.5, barW), barH, "F");
         } else {
-          doc.setFillColor(PRINT_BAD[0], PRINT_BAD[1], PRINT_BAD[2]);
+          doc.setFillColor(T.barNeg[0], T.barNeg[1], T.barNeg[2]);
           doc.rect(x, zeroY, Math.max(0.5, barW), barH, "F");
         }
-        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
       });
-      doc.setDrawColor(PRINT_GOLD[0], PRINT_GOLD[1], PRINT_GOLD[2]);
+      doc.setDrawColor(T.gold[0], T.gold[1], T.gold[2]);
       covData.forEach((d, di) => {
-        const x = 20 + (di / Math.max(1, covData.length - 1)) * 200;
+        const x = PDF_CHART_LEFT + (di / Math.max(1, covData.length - 1)) * PDF_CHART_WIDTH;
         const yy = zeroY - (d.value / chartMax) * 22;
         if (di > 0) {
           const prev = covData[di - 1];
-          const px = 20 + ((di - 1) / Math.max(1, covData.length - 1)) * 200;
+          const px = PDF_CHART_LEFT + ((di - 1) / Math.max(1, covData.length - 1)) * PDF_CHART_WIDTH;
           const py = zeroY - (prev.value / chartMax) * 22;
           doc.line(px, py, x, yy);
         }
@@ -735,14 +871,16 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       // PRINT_MUT (12.82:1 against white) at font 7 — the pale 6pt ink (113,114,115, 4.82:1)
       // is retired at this, the print route's faintest surviving site.
       doc.setFontSize(7);
-      doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+      doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
       covData.forEach((d, di) => {
-        const x = 20 + (di / Math.max(1, covData.length - 1)) * 200;
+        if (di % covLabelStep !== 0) return;
+        const x = PDF_CHART_LEFT + (di / Math.max(1, covData.length - 1)) * PDF_CHART_WIDTH;
         doc.text(d.label, x, y + 36, { align: "center", maxWidth: 20 });
+        if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
       });
-      doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+      doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
       doc.text("The cumulative line crosses the axis where the outlay is covered.", 120, y + 42, { align: "center", maxWidth: 180 });
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
       y += 50;
     } else if (slide.chart && slide.chart.kind === "rows" && slide.chart.data.length > 0 && slide.waterfall === undefined) {
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
@@ -757,9 +895,9 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         doc.setFontSize(7);
         doc.setTextColor(50, 50, 50);
         doc.text(`${d.label} ${sharePct}%`, 24, rowY);
-        doc.setFillColor(0, 116, 186);
+        doc.setFillColor(T.capital[0], T.capital[1], T.capital[2]);
         doc.rect(120, rowY - 3, Math.max(0.5, 100 * (d.value / chartTotal)), 4, "F");
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
         doc.text(valText, 216, rowY, { align: "right" });
         if (trace) {
           trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${d.label} ${sharePct}%`);
@@ -771,7 +909,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     } else if (slide.chart && slide.chart.kind === "donut" && slide.chart.data.length > 0) {
       let accY = y;
       const chartTotal = Math.max(1e-12, slide.chart.data.reduce((a, d) => a + d.value, 0));
-      const colors = PRINT_DONUT_COLORS;
+      const colors = T.donut;
       const x0 = 240;
       slide.chart.data.forEach((d, di) => {
         const frac = d.value / chartTotal;
@@ -783,18 +921,21 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
         accY += 10;
       });
       doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
     } else if (slide.chart && slide.chart.kind === "bars" && slide.chart.data.length > 0) {
       // v0.6.18: the per-year bars carry their year labels (thinned on a long span) and the peak figure, drawn
       // from the deck model's series (the operations slide's yearly burn rides the same branch)
       const bars = slide.chart.data;
       const chartMax = Math.max(1, ...bars.map((d) => d.value));
-      const barW = Math.min(12, 220 / bars.length);
+      // v0.6.21 W32: the print-chart geometry contract — the chart body is bounded to 20..277 mm,
+      // centered in the 14..283 mm content band; the bar width derives from the available width and
+      // the slot count with a proportional inter-bar gap.
+      const geo = chartSlots(bars.length);
       const labelStep = Math.max(1, Math.ceil(bars.length / 14));
       const peakIdx = bars.findIndex((d) => d.value === chartMax);
       if (slide.chart.kicker !== undefined) {
         doc.setFontSize(8);
-        doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+        doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
         doc.text(slide.chart.kicker, 20, y);
         if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.chart.kicker);
         y += 4;
@@ -804,26 +945,26 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
           if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(slide.chart.periodNote);
           y += 4;
         }
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
         y += 1;
       }
       bars.forEach((d, di) => {
         const h = (d.value / chartMax) * 40;
-        doc.setFillColor(PRINT_OK[0], PRINT_OK[1], PRINT_OK[2]);
-        doc.rect(20 + di * (barW + 3), y + 44 - h, barW, h, "F");
+        doc.setFillColor(T.barPos[0], T.barPos[1], T.barPos[2]);
+        doc.rect(geo.x(di), y + 44 - h, geo.barW, h, "F");
       });
       doc.setFontSize(6);
-      doc.setTextColor(PRINT_MUT[0], PRINT_MUT[1], PRINT_MUT[2]);
+      doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
       bars.forEach((d, di) => {
         if (di % labelStep !== 0) return;
-        doc.text(d.label, 20 + di * (barW + 3) + barW / 2, y + 48, { align: "center" });
+        doc.text(d.label, geo.x(di) + geo.barW / 2, y + 48, { align: "center" });
         if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(d.label);
       });
       if (chartMax > 1 || bars.some((d) => d.value > 0)) {
         const peakText = deckMoneyForDisplay(chartMax, model.currency ?? "SEK", model.unit ?? "ones");
         doc.setFontSize(7);
-        doc.setTextColor(0, 0, 0);
-        doc.text(peakText, 20 + peakIdx * (barW + 3) + barW / 2, y + 44 - 40 - 1.5, { align: "center" });
+        doc.setTextColor(T.peak[0], T.peak[1], T.peak[2]);
+        doc.text(peakText, geo.x(peakIdx) + geo.barW / 2, y + 44 - 40 - 1.5, { align: "center" });
         if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(peakText);
       }
       doc.setFontSize(10);
@@ -834,7 +975,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       let edgeTop = y;
       const drawEdge = (to: number) => {
         // the closure edge: the 100 percent line runs through every ledger row
-        doc.setDrawColor(150, 150, 150);
+        doc.setDrawColor(T.connector[0], T.connector[1], T.connector[2]);
         doc.setLineDashPattern([0.8, 0.8], 0);
         doc.line(110 + 100, edgeTop, 110 + 100, to);
         doc.setLineDashPattern([], 0);
@@ -842,14 +983,14 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       };
       for (const r of slide.waterfall.rows) {
         const h = ledgerRowHeight(doc, r);
-        if (allowBreak && y + h > CONTENT_BOTTOM) { drawEdge(y); doc.addPage(); footerPage += 1; y = CONTENT_TOP; edgeTop = y; }
-        y += drawPrintLedgerRow(doc, r, y, trace);
+        if (allowBreak && y + h > CONTENT_BOTTOM) { drawEdge(y); addPage(); y = CONTENT_TOP; edgeTop = y; }
+        y += drawPrintLedgerRow(doc, T, r, y, trace);
       }
       drawEdge(y);
       y += 3;
       const colH = 8 + 26 + 4 + 7 + 3;
-      if (allowBreak && y + colH > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
-      y += drawPrintColumns(doc, slide.waterfall.columns, y, trace);
+      if (allowBreak && y + colH > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
+      y += drawPrintColumns(doc, T, slide.waterfall.columns, y, trace);
       doc.setFontSize(10);
     }
     // v0.6.10 Task G.5: the funding breakdown renders through the deck's PDF pipeline — after
@@ -870,7 +1011,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
       for (const line of fundingLines) {
         const wrapped = doc.splitTextToSize(line, 220) as string[];
         const needed = DISCLOSURE_LINE_HEIGHT * wrapped.length;
-        if (allowBreak && y + needed > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
+        if (allowBreak && y + needed > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
         doc.text(wrapped, 20, y);
         if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(line);
         y += needed;
@@ -881,12 +1022,13 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     // v0.6.9 Task G: the scenarios slide never breaks here — the reserved, scaled height
     // is guaranteed within the content band by the up-front measurement above.
     if (slide.targetChart !== undefined && slide.targetChart.points.length >= 2) {
-      if (allowBreak && y + 50 > CONTENT_BOTTOM) { doc.addPage(); footerPage += 1; y = CONTENT_TOP; }
-      y += drawPrintScenarioTarget(doc, slide.targetChart, y, model.currency ?? "SEK", model.unit ?? "ones", trace, sceChartScale);
+      if (allowBreak && y + 50 > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
+      y += drawPrintScenarioTarget(doc, T, slide.targetChart, y, model.currency ?? "SEK", model.unit ?? "ones", trace, sceChartScale);
     }
     doc.setFontSize(10);
-    doc.setDrawColor(229, 229, 234);
+    doc.setDrawColor(T.hairline[0], T.hairline[1], T.hairline[2]);
     doc.line(14, 190, 283, 190);
+    doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
     doc.text(`${projectName} — slide ${slideFirstPage} of ${total} slides — Generated from the live model`, 14, 195);
   });
   return doc;

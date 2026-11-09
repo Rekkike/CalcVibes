@@ -31,11 +31,12 @@ describe("AUD-12: the residual-mode select changes the model, not just a label",
   it("selecting Calculated on a posture-carrying project books the book-value residual", async () => {
     await openProject(withPosture());
     fireEvent.click(byNav("results"));
-    expect(stat("residualUsed")).toBe("0");
+    // v0.6.21 Task B re-anchor: the residual figure renders in the reading form ("0 kr" at unit ones)
+    expect(stat("residualUsed")).toBe("0 kr");
     fireEvent.click(byNav("appraisal"));
     fireEvent.change(byField("residualMode"), { target: { value: "calculated" } });
     fireEvent.click(byNav("results"));
-    expect(Number(stat("residualUsed")?.replace(/\s/g, "").replace(",", "."))).toBeGreaterThan(0);
+    expect(Number((stat("residualUsed") ?? "").replace(/[^\d,.-]/g, "").replace(",", "."))).toBeGreaterThan(0);
   });
 
   it("selecting Set amount back leaves the amount editable and live", async () => {

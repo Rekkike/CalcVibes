@@ -437,6 +437,13 @@ export function emptyTimeline(): TimelineBlock {
 export interface TimelineWindowExtension { firstYear?: number; lastYear?: number }
 export type TimelineBlockExt = TimelineBlock & { windowExtension?: TimelineWindowExtension };
 
+// v0.6.21 Task E: the author-overridable deck slide titles ride the project document as an additive
+// optional field, keyed by slide name. It is declared here, in the web layer, because this pass opens
+// no core file; the project file carries it through (the container checks judge only the known keys,
+// so an absent entry parses exactly as before — the back-compatibility pin).
+export interface DeckTitlesExt { deckTitles?: Record<string, string> }
+export const deckTitlesOf = (inputs: ModelInputs): Record<string, string> => (inputs as ModelInputs & DeckTitlesExt).deckTitles ?? {};
+
 // v0.6.13.2: an absent phases list reads as the curated defaults; the lane visibility rides through
 // untouched (an absent map stays absent: every lane is automatic).
 export function timelineOf(inputs: ModelInputs): TimelineBlockExt {

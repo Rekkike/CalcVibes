@@ -3,6 +3,7 @@ import type { ModelInputs } from "../../../core/src/types.js";
 import { scenarioResults, tornado } from "../../../core/src/scenarios.js";
 import { computeModel } from "../engine.js";
 import { moneyForDisplay, entryToValue, feeForDisplay } from "../engine.js";
+import { TermGloss } from "../TermGloss.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 
 type ListSetter = (v: number[] | null) => void;
@@ -24,6 +25,7 @@ function ScenarioListEditor(props: { label: string; values: number[] | null; onC
     <div data-testid={`scenario-list-${label}`} className="scenario-list">
       <h4>{label}</h4>
       <p data-testid={`scenario-axis-explanation-${label}`} className="muted">{AXIS_EXPLANATIONS[label]}</p>
+      {label === "target" && <TermGloss term="IRR" />}
       {current.map((v, i) => (
         <div key={i} className="scenario-list-row">
           <input

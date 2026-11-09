@@ -506,6 +506,9 @@
 }
 
 
+/* v0.6.21 Task C (Round 46 Supplement 7): the term glosses — styled to inform rather than alarm */
+.term-gloss { display: block; color: var(--mut); font-size: 12px; line-height: 1.35; margin-top: 2px; }
+
 /* ===== v0.5.4 Task C: the deck stage (Port of Gothenburg navy) ===== */
 [data-testid="presentation"] {
   --stage: #081c33;
