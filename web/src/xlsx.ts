@@ -97,6 +97,22 @@ export async function buildWorkbook(
     }
     flatInputs.push(["facilityOptions.leveragedSolve", opts.facilityOptions?.leveragedSolve ?? false]);
   }
+  // v0.6.21 Task F (the Round 102 deviation-3 ruling): the facility list is appended as audit rows —
+  // each facility's amount, rate, term, grace, and draw scope — so every facility (an amount-first or
+  // dated-draw one the legacy-shaped echo above cannot express) appears in the Inputs sheet honestly.
+  // The XLSX export otherwise stays raw.
+  if (authored.length > 0) {
+    for (const f of authored) {
+      flatInputs.push(
+        [`facilityAudit ${f.id} label`, f.label],
+        [`facilityAudit ${f.id} amount`, f.amount],
+        [`facilityAudit ${f.id} ratePct`, f.ratePct],
+        [`facilityAudit ${f.id} termYears`, f.termYears],
+        [`facilityAudit ${f.id} graceYears`, f.graceYears],
+        [`facilityAudit ${f.id} drawScope`, f.scope.kind === "general" ? "general" : `attached: ${f.scope.lineIds.join(", ")}`],
+      );
+    }
+  }
   if (inputs.contracts && inputs.contracts.length > 0) {
     for (const c of inputs.contracts) {
       flatInputs.push(
