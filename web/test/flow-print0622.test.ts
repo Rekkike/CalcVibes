@@ -78,7 +78,7 @@ describe("v0.6.22 Task E — the flow slide on the print route", () => {
     expect(flat2.some((f) => f.includes("3 of 10 years run a shortfall"))).toBe(true);
   });
 
-  it("NEGATIVE REMAINDER ON PAPER: a negative net remainder draws below the zero line in the print-bad tone, bounded to the chart body (v0.6.22.2 re-anchor of the degraded-bridge pin)", () => {
+  it("NEGATIVE REMAINDER ON PAPER: a negative net remainder draws left of the zero line in the print-bad tone, bounded to the chart body (v0.6.22.2 re-anchor of the degraded-bridge pin)", () => {
     reset();
     const flowSlide = deckSlides(demoProject(), computeModel(demoProject()), { startYear: null }).slides.find((s) => s.name === "flow")!;
     const synthetic: DeckSlide = {
@@ -87,9 +87,9 @@ describe("v0.6.22 Task E — the flow slide on the print route", () => {
         ...flowSlide.flow!,
         zeroPct: 100 * 60 / 160,
         steps: [
-          { id: "in", label: "Collected", kind: "in", raw: 100, value: "100 kr", detail: [], bad: false, bottomPct: 37.5, heightPct: 62.5, endPct: 100 },
-          { id: "out:Capital", label: "Capital", kind: "out", raw: -160, value: "-160 kr", detail: [], bad: false, bottomPct: 0, heightPct: 100, endPct: 0 },
-          { id: "remainder", label: "Remainder to equity", kind: "remainder", raw: -60, value: "-60 kr", detail: [], bad: true, bottomPct: 0, heightPct: 37.5, endPct: 0 },
+          { id: "in", label: "Collected", kind: "in", raw: 100, value: "100 kr", detail: [], bad: false, startPct: 37.5, spanPct: 62.5, endPct: 100 },
+          { id: "out:Capital", label: "Capital", kind: "out", raw: -160, value: "-160 kr", detail: [], bad: false, startPct: 0, spanPct: 100, endPct: 0 },
+          { id: "remainder", label: "Remainder to equity", kind: "remainder", raw: -60, value: "-60 kr", detail: [], bad: true, startPct: 0, spanPct: 37.5, endPct: 0 },
         ],
       },
     };

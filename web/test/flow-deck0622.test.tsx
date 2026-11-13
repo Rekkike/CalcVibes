@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
-import { composeFlowSlide, deckSlides, FLOW_LEDGER_CAP } from "../src/deck.js";
+import { composeFlowSlide, deckSlides, flowDetailText, FLOW_LEDGER_CAP } from "../src/deck.js";
 import { computeModel } from "../src/engine.js";
 import { composeFlow, demoProject, landNewbuildProject, shorePowerProgram, solarParkProject } from "../src/state.js";
 import type { FlowComposition } from "../src/state.js";
@@ -53,8 +53,8 @@ describe("v0.6.22 Task B — the flow slide", () => {
       ["out:Capital", "Capital", -7849860, "-7 849 860 kr"],
       ["remainder", "Remainder to equity", 5458795.754089092, "5 458 796 kr"],
     ]);
-    expect(sl.flow!.steps[0].detail.map((d) => d.text)).toEqual(["Payment stream 13 308 656 kr"]);
-    expect(sl.flow!.steps[2].detail).toEqual([{ text: "surplus years 12 833 347 kr", bad: false }, { text: "3 shortfall years -7 374 551 kr", bad: true }]);
+    expect(sl.flow!.steps[0].detail.map(flowDetailText)).toEqual(["Payment stream 13 308 656 kr"]);
+    expect(sl.flow!.steps[2].detail).toEqual([{ label: "surplus years", value: "12 833 347 kr", bad: false }, { label: "3 shortfall years", value: "-7 374 551 kr", bad: true }]);
     expect(sl.disclosures[0]).toContain("Cash is fungible");
     expect(sl.disclosures[1]).toBe("3 of 10 years run a shortfall totaling -7 374 551 kr; the remainder column is signed in every year and a shortfall is never smoothed or netted invisibly.");
   });
@@ -69,9 +69,9 @@ describe("v0.6.22 Task B — the flow slide", () => {
       ["out:Capital", -449000000],
       ["remainder", 84924579.31038983],
     ]);
-    expect(sl.flow!.steps[0].detail.map((d) => d.text)).toEqual(["Tariff (4 segments) €682 407 745", "Grant (3 segments) €173 500 000", "Interest-free note €0"]);
+    expect(sl.flow!.steps[0].detail.map(flowDetailText)).toEqual(["Tariff (4 segments) €682 407 745", "Grant (3 segments) €173 500 000", "Interest-free note €0"]);
     expect(sl.flow!.omittedSteps).toEqual(["Reinvestment"]);
-    expect(sl.flow!.caption).toBe("Read left to right in the coverage order: what the collections bring in, each use they cover in turn, and the signed remainder to equity. No reinvestment on this project. The horizon total nets 4 shortfall years against the surplus years; the per-year drill on the Flow surface shows each year.");
+    expect(sl.flow!.caption).toBe("Read top to bottom in the coverage order: what the collections bring in, each use they cover in turn, and the signed remainder to equity. No reinvestment on this project. The horizon total nets 4 shortfall years against the surplus years; the per-year drill on the Flow surface shows each year.");
     expect(sl.disclosures.some((d) => d.includes("netting to €0") || d.includes("nets to €0"))).toBe(true);
     // Task G: the capital/collections overlap years are disclosed by name (startYear 2026; script-verified: years 1, 3, 4, 5 carry both income and capital spend)
     expect(sl.disclosures.some((d) => d === "In 2026, 2028, 2029, 2030 the collections run alongside the year's capital spend; the matching shows both.")).toBe(true);
@@ -80,7 +80,7 @@ describe("v0.6.22 Task B — the flow slide", () => {
   it("LAND (script-verified): the two contract segments aggregate, the residual band stands alone, the signed shortfall", () => {
     const sl = flowSlideOf(landNewbuildProject());
     expect(sl.title).toBe("Covered on the horizon, 2 short years");
-    expect(sl.flow!.steps[0].detail.map((d) => d.text)).toEqual(["Contract (2 segments) NOK 971 205 821", "Residual NOK 161 363 636"]);
+    expect(sl.flow!.steps[0].detail.map(flowDetailText)).toEqual(["Contract (2 segments) NOK 971 205 821", "Residual NOK 161 363 636"]);
     expect(sl.flow!.omittedSteps).toEqual(["Debt service", "Reinvestment"]);
     expect(sl.body.find((b) => b.label === "Shortfall years' total")!.value).toBe("-NOK 420 000 000");
   });
@@ -145,7 +145,7 @@ describe("v0.6.22 Task B — the flow slide", () => {
     // v0.6.22.2 re-anchor: the coverage bridge — five steps on the program (collections, debt service, operating, capital, remainder), four connectors between them
     expect(slide.querySelector('[data-testid="flow-coverage"]')).toBeTruthy();
     expect(slide.querySelector('[data-testid="flow-caption"]')!.textContent).toContain("No reinvestment on this project.");
-    expect(slide.querySelectorAll('rect[data-flow-step]').length).toBe(5);
+    expect(slide.querySelectorAll('line[data-flow-step]').length).toBe(5);
     expect(slide.querySelectorAll('[data-flow-connector]').length).toBe(4);
     expect(slide.querySelector('[data-testid="flow-bands"]')).toBeNull();
     // the fungibility caption travels with the slide

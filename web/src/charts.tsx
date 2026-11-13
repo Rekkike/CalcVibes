@@ -507,86 +507,70 @@ export function GanttChart(props: { gantt: DeckGantt }) {
   );
 }
 
-// v0.6.22.2 — the flow figure: the COVERAGE BRIDGE, one renderer for the deck slide and the Plan
-// flow surface (the print route draws the same composed model in pdf.ts). The deck model composes every
-// percent once (composeFlowSlide); nothing financial is recomputed here. The grammar is the deck's
-// waterfall: stepped columns on one zero-based axis read left to right in the coverage order of record —
-// the collections in, each use out in turn, the signed remainder to equity closing the chain — with a
-// dotted connector carrying each running level into the next step and the zero line drawn. The marks
-// are SVG (bars, connectors, the zero line); the text is HTML beside them (the app's chart vocabulary:
-// no text inside the chart SVG): each step's value at its bar end and its name with the detail lines
-// directly beneath the plot, wrapping within the step's slot, never truncated, no legend. A negative
-// remainder renders below the zero line in the bad tone, and the shortfall years' line under it carries
-// the bad tone too (the honest asymmetry: nothing is smoothed or netted out of sight).
+// v0.6.22.2 — the flow figure: the COVERAGE BRIDGE, one renderer for the deck slide and the Plan flow surface
+// (the print route draws the same composed model in pdf.ts). The deck model composes every percent once
+// (composeFlowSlide); nothing financial is recomputed here. The grammar is the deck's waterfall in its row form
+// (the ledger rows): one row per step in the coverage order of record, read top to bottom — the collections
+// in, each use out in turn, the signed remainder to equity closing the chain. Each row is a text column (the
+// step's name and value, then its detail lines: the sources by kind on the collections row, the line count on
+// a use row, the surplus and shortfall years on the remainder) beside its track, where the bar floats on the
+// one zero-based horizontal axis shared by every row. A dotted connector carries each running level down into
+// the next row; the zero line runs through every track. The marks are SVG (the bar, the connector stubs, the
+// zero line); the text is HTML (no text inside the chart SVG), wrapping at every width with the figures kept
+// whole; no legend. A negative remainder reaches left of the zero line in the bad tone, and the shortfall
+// years' line carries the bad tone too (the honest asymmetry: nothing is smoothed or netted out of sight).
 export const FLOW_COVERAGE_GEO = {
-  // a bar takes this share of its slot, centered; the connector spans the gap between neighbours
-  barShare: 0.6,
+  // the bar's thickness in px, centered in its track
+  barH: 18,
 } as const;
+// a project-formatter figure kept whole on screen: its separators become non-breaking and a leading minus is
+// joined to the figure (display only; the characters the formatter emits are otherwise unchanged)
+export const wholeFigure = (v: string) => v.replace(/ /g, "\u00a0").replace(/^-/, "-\u2060");
 
 export function FlowCoverage(props: { flow: DeckFlow }) {
   const { flow } = props;
   const steps = flow.steps;
-  const n = Math.max(1, steps.length);
-  const slot = 100 / n;
-  const barW = slot * FLOW_COVERAGE_GEO.barShare;
-  const barX = (i: number) => i * slot + (slot - barW) / 2;
-  const yOf = (pct: number) => 100 - pct;
   const summary = steps.map((s) => `${s.label} ${s.value}`).join(", ");
   return (
-    <div data-testid="flow-coverage" data-form="coverage" className="chart-block flow-coverage">
-      <div className="flow-coverage-plot" data-flow-plot="true">
-        <svg className="flow-coverage-svg" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`Coverage bridge: ${summary}`}>
-          <line data-flow-zero="true" x1={0} x2={100} y1={yOf(flow.zeroPct)} y2={yOf(flow.zeroPct)} className="flow-coverage-zero" vectorEffect="non-scaling-stroke" />
-          {steps.map((s, i) => (
-            <rect
-              key={s.id}
-              data-flow-step={s.id}
-              data-flow-step-kind={s.kind}
-              data-flow-bad={s.bad ? "true" : "false"}
-              className={"flow-coverage-bar flow-coverage-" + s.kind + (s.bad ? " flow-coverage-bad" : "")}
-              x={barX(i)}
-              y={yOf(s.bottomPct + s.heightPct)}
-              width={barW}
-              height={s.heightPct}
-            />
-          ))}
-          {steps.slice(0, -1).map((s, i) => (
-            <line
-              key={"conn-" + s.id}
-              data-flow-connector={s.id}
-              className="flow-coverage-connector"
-              x1={barX(i) + barW}
-              x2={barX(i + 1)}
-              y1={yOf(s.endPct)}
-              y2={yOf(s.endPct)}
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-        </svg>
-        {steps.map((s, i) => {
-          const below = s.raw < 0 && s.kind !== "out";
-          return (
-            <span
-              key={"val-" + s.id}
-              data-flow-value={s.id}
-              className={"flow-coverage-value" + (s.bad ? " tone-bad" : "")}
-              style={below
-                ? { top: `calc(${yOf(s.bottomPct)}% + 4px)`, left: `${i * slot}%`, width: `${slot}%` }
-                : { bottom: `calc(${s.bottomPct + s.heightPct}% + 4px)`, left: `${i * slot}%`, width: `${slot}%` }}
-            >{s.value}</span>
-          );
-        })}
-      </div>
-      <div className="flow-coverage-names">
-        {steps.map((s) => (
-          <div key={s.id} data-flow-name={s.id} className="flow-coverage-name" style={{ width: `${slot}%` }}>
-            <span className="flow-coverage-label">{s.label}</span>
+    <div data-testid="flow-coverage" data-form="coverage" className="chart-block flow-coverage" role="figure" aria-label={`Coverage bridge: ${summary}`}>
+      {steps.map((s, i) => (
+        <div key={s.id} data-flow-row={s.id} data-flow-step-kind={s.kind} className={"flow-coverage-row flow-coverage-row-" + s.kind}>
+          <div data-flow-name={s.id} className="flow-coverage-text">
+            <div className="flow-coverage-head">
+              <span className="flow-coverage-label">{s.label}</span>
+              <span data-flow-value={s.id} className={"flow-coverage-value" + (s.bad ? " tone-bad" : "")}>{wholeFigure(s.value)}</span>
+            </div>
             {s.detail.map((d, k) => (
-              <span key={k} data-flow-detail={s.id} data-flow-detail-bad={d.bad ? "true" : "false"} className={"flow-coverage-detail" + (d.bad ? " tone-bad" : "")}>{d.text}</span>
+              <span key={k} data-flow-detail={s.id} data-flow-detail-bad={d.bad ? "true" : "false"} className={"flow-coverage-detail" + (d.bad ? " tone-bad" : "")}>
+                {d.label}{d.value !== "" && <> <span className="flow-coverage-figure">{wholeFigure(d.value)}</span></>}
+              </span>
             ))}
           </div>
-        ))}
-      </div>
+          <div className="flow-coverage-track">
+            <svg className="flow-coverage-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <line data-flow-zero="true" className="flow-coverage-zero" x1={flow.zeroPct} x2={flow.zeroPct} y1={0} y2={100} vectorEffect="non-scaling-stroke" />
+              {i > 0 && (
+                <line data-flow-connector-in={s.id} className="flow-coverage-connector" x1={steps[i - 1].endPct} x2={steps[i - 1].endPct} y1={0} y2={50} vectorEffect="non-scaling-stroke" />
+              )}
+              {i < steps.length - 1 && (
+                <line data-flow-connector={s.id} className="flow-coverage-connector" x1={s.endPct} x2={s.endPct} y1={50} y2={100} vectorEffect="non-scaling-stroke" />
+              )}
+              {/* the bar: a butt-capped stroke on the row's midline, its thickness fixed in px however the row stretches */}
+              <line
+                data-flow-step={s.id}
+                data-flow-bad={s.bad ? "true" : "false"}
+                className={"flow-coverage-bar flow-coverage-" + s.kind + (s.bad ? " flow-coverage-bad" : "")}
+                x1={s.startPct}
+                x2={s.startPct + s.spanPct}
+                y1={50}
+                y2={50}
+                strokeWidth={FLOW_COVERAGE_GEO.barH}
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

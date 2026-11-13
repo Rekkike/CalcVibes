@@ -174,9 +174,15 @@ export interface DeckWaterfall {
 // reinvestment, capital), and the signed remainder to equity. Everything composes ONCE in
 // composeFlowSlide below from composeFlow's allocation model; the renderers draw and never recompute.
 // The geometry is percent-based on one zero-based axis whose domain spans every running level and the
-// signed remainder (a horizon shortfall reaches below the zero line, never clipped).
+// signed remainder (a horizon shortfall reaches left of the zero line, never clipped). v0.6.22.2 renders it in
+// the row form of the waterfall grammar (the ledger rows): one row per step in the coverage order, read top to
+// bottom like a cash statement — the collections in first, each use out in turn, the remainder last — each row's
+// name, value and detail lines in its text column and its bar floating on the one shared horizontal axis, a
+// dotted connector carrying each running level down into the next row. Text at every width; nothing squeezed.
 export interface DeckFlowDetail {
-  text: string;
+  // the line reads `${label} ${value}`; the value is a project-formatter figure, kept whole on screen
+  label: string;
+  value: string;
   bad: boolean;
 }
 export interface DeckFlowStep {
@@ -192,10 +198,10 @@ export interface DeckFlowStep {
   // the bad tone)
   detail: DeckFlowDetail[];
   bad: boolean;
-  // geometry on the shared axis: percent from the axis bottom
-  bottomPct: number;
-  heightPct: number;
-  // the running level after this step (the connector into the next step leaves from here)
+  // geometry on the shared horizontal axis: the bar's start and span, percent from the axis's left end
+  startPct: number;
+  spanPct: number;
+  // the running level after this step (the connector into the next row leaves from here)
   endPct: number;
 }
 export interface DeckFlowLedgerRow {
@@ -209,7 +215,7 @@ export interface DeckFlowLedgerRow {
 }
 export interface DeckFlow {
   steps: DeckFlowStep[];
-  // the zero line's position, percent from the axis bottom (0 unless a running level or the remainder
+  // the zero line's position, percent from the axis's left end (0 unless a running level or the remainder
   // goes negative)
   zeroPct: number;
   caption: string;
@@ -1009,7 +1015,8 @@ export function composeFlowSlide(flow: ReturnType<typeof composeFlow>, money: (v
     if (ex !== undefined) { ex.net += s.total; ex.count += 1; } else kinds.push({ kind: s.kind, net: s.total, count: 1 });
   }
   const inDetail: DeckFlowDetail[] = kinds.map((k) => ({
-    text: `${flowSourceKindLabel(k.kind)}${k.count > 1 ? ` (${k.count} segments)` : ""} ${money(k.net)}`,
+    label: `${flowSourceKindLabel(k.kind)}${k.count > 1 ? ` (${k.count} segments)` : ""}`,
+    value: money(k.net),
     bad: k.net < 0,
   }));
   // the use buckets: the order of record first, then any further bucket the grids carry
@@ -1033,7 +1040,7 @@ export function composeFlowSlide(flow: ReturnType<typeof composeFlow>, money: (v
   const span = Math.max(1e-12, hi - lo);
   const pct = (v: number) => ((v - lo) / span) * 100;
   const steps: DeckFlowStep[] = [];
-  steps.push({ id: "in", label: "Collected", kind: "in", raw: incomeNet, value: money(incomeNet), detail: inDetail, bad: incomeNet < 0, bottomPct: pct(Math.min(0, incomeNet)), heightPct: pct(Math.max(0, incomeNet)) - pct(Math.min(0, incomeNet)), endPct: pct(incomeNet) });
+  steps.push({ id: "in", label: "Collected", kind: "in", raw: incomeNet, value: money(incomeNet), detail: inDetail, bad: incomeNet < 0, startPct: pct(Math.min(0, incomeNet)), spanPct: pct(Math.max(0, incomeNet)) - pct(Math.min(0, incomeNet)), endPct: pct(incomeNet) });
   running = incomeNet;
   for (const o of liveOuts) {
     const after = running - o.raw;
@@ -1043,21 +1050,21 @@ export function composeFlowSlide(flow: ReturnType<typeof composeFlow>, money: (v
       kind: "out",
       raw: -o.raw,
       value: money(-o.raw),
-      detail: [{ text: o.bucket === "Debt service" ? "the facilities' combined service" : `${o.lines} ${FLOW_STEP_NOUN[o.bucket] ?? "line"}${o.lines === 1 ? "" : "s"}`, bad: false }],
+      detail: [{ label: o.bucket === "Debt service" ? "the facilities' combined service" : `${o.lines} ${FLOW_STEP_NOUN[o.bucket] ?? "line"}${o.lines === 1 ? "" : "s"}`, value: "", bad: false }],
       bad: false,
-      bottomPct: pct(Math.min(after, running)),
-      heightPct: pct(Math.max(after, running)) - pct(Math.min(after, running)),
+      startPct: pct(Math.min(after, running)),
+      spanPct: pct(Math.max(after, running)) - pct(Math.min(after, running)),
       endPct: pct(after),
     });
     running = after;
   }
   const remDetail: DeckFlowDetail[] = flow.shortfallYears > 0
     ? [
-      { text: `surplus years ${money(flow.remainderSurplus)}`, bad: false },
-      { text: `${flow.shortfallYears} shortfall ${flow.shortfallYears === 1 ? "year" : "years"} ${money(flow.remainderShortfall)}`, bad: true },
+      { label: "surplus years", value: money(flow.remainderSurplus), bad: false },
+      { label: `${flow.shortfallYears} shortfall ${flow.shortfallYears === 1 ? "year" : "years"}`, value: money(flow.remainderShortfall), bad: true },
     ]
-    : [{ text: "a surplus in every year", bad: false }];
-  steps.push({ id: "remainder", label: "Remainder to equity", kind: "remainder", raw: rem, value: money(rem), detail: remDetail, bad: rem < 0, bottomPct: pct(Math.min(0, rem)), heightPct: pct(Math.max(0, rem)) - pct(Math.min(0, rem)), endPct: pct(rem) });
+    : [{ label: "a surplus in every year", value: "", bad: false }];
+  steps.push({ id: "remainder", label: "Remainder to equity", kind: "remainder", raw: rem, value: money(rem), detail: remDetail, bad: rem < 0, startPct: pct(Math.min(0, rem)), spanPct: pct(Math.max(0, rem)) - pct(Math.min(0, rem)), endPct: pct(rem) });
   // the ledger of authored pairings
   const ledger: DeckFlowLedgerRow[] = flow.pairings.slice(0, FLOW_LEDGER_CAP).map((p) => ({
     id: p.id, sourceLabel: p.sourceLabel, useLabel: p.useLabel, amount: money(p.amount), allocated: money(p.allocated), raw: p.amount, rawAllocated: p.allocated,
@@ -1065,7 +1072,7 @@ export function composeFlowSlide(flow: ReturnType<typeof composeFlow>, money: (v
   const ledgerOmitted = Math.max(0, flow.pairings.length - FLOW_LEDGER_CAP);
   // the caption: the reading order, the omitted steps by name, the timing the horizon total nets, the
   // pairings' effect, the ledger count
-  const captionParts: string[] = ["Read left to right in the coverage order: what the collections bring in, each use they cover in turn, and the signed remainder to equity."];
+  const captionParts: string[] = ["Read top to bottom in the coverage order: what the collections bring in, each use they cover in turn, and the signed remainder to equity."];
   if (omittedSteps.length > 0) {
     const names = omittedSteps.map((b) => b.toLowerCase());
     captionParts.push(`No ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`} on this project.`);
@@ -1132,3 +1139,6 @@ function flowSlide(inputs: ModelInputs, result: ModelResult, money: (v: number) 
 }
 
 export type { TariffRow };
+
+// The one text form of a detail line (the print route and the trace read it; the screen keeps the value whole).
+export const flowDetailText = (d: DeckFlowDetail): string => (d.value === "" ? d.label : `${d.label} ${d.value}`);

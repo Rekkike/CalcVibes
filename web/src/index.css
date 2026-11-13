@@ -1438,26 +1438,30 @@
 /* v0.6.22.1 Task A — the direct-label seating: the figure is one centered SVG block (the fixed-width
    label columns live in the gutters inside the viewBox, the below-figure swatch lists retired); the
    labels are SVG text seated with their bands. */
-/* v0.6.22.2: the coverage bridge (the flow figure on the deck slide and the Plan flow surface). SVG marks in a
-   stretchable plot; HTML text beside them: the values at the bar ends, the names and detail lines beneath,
-   wrapping within each step's slot (never truncated). Outs in a neutral ink, the collections in the accent,
-   the remainder in the ok tone, a negative remainder and the shortfall line in the bad tone. */
-.flow-coverage .flow-coverage-plot { position: relative; height: 220px; margin: 1.8rem 0 1.6rem; }
-[data-testid="presentation"] .flow-coverage .flow-coverage-plot { height: 240px; }
-.flow-coverage .flow-coverage-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.flow-coverage .flow-coverage-bar { fill: var(--accent, #0074ba); }
-.flow-coverage .flow-coverage-out { fill: #94a3b8; }
-.flow-coverage .flow-coverage-remainder { fill: #34d399; }
-.flow-coverage .flow-coverage-bad { fill: #e11d48; }
-[data-testid="presentation"] .flow-coverage .flow-coverage-in { fill: #38bdf8; }
-[data-testid="presentation"] .flow-coverage .flow-coverage-bad { fill: #fb7185; }
+/* v0.6.22.2: the coverage bridge (the flow figure on the deck slide and the Plan flow surface) in the row form of
+   the waterfall: one row per step, a text column (name and value, then the detail lines) beside a track where the
+   bar floats on the shared horizontal axis. The rows abut so the connector stubs and the zero line run through.
+   Text wraps at every width (the figures kept whole by non-breaking separators, never clipped). Outs in a neutral
+   ink, the collections in the accent, the remainder in the ok tone, a negative remainder and the shortfall line in
+   the bad tone. */
+.flow-coverage { margin: var(--space-2, 8px) 0; }
+.flow-coverage .flow-coverage-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); column-gap: 12px; align-items: stretch; }
+.flow-coverage .flow-coverage-text { padding: 6px 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.flow-coverage .flow-coverage-head { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 8px; font-size: 13px; line-height: 1.25; }
+.flow-coverage .flow-coverage-label { font-weight: 600; }
+.flow-coverage .flow-coverage-value { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.flow-coverage .flow-coverage-detail { font-size: 11.5px; line-height: 1.25; opacity: 0.85; overflow-wrap: anywhere; }
+.flow-coverage .flow-coverage-figure { font-variant-numeric: tabular-nums; }
+.flow-coverage .flow-coverage-track { position: relative; min-height: 30px; }
+.flow-coverage .flow-coverage-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.flow-coverage .flow-coverage-bar { stroke: var(--accent, #0074ba); stroke-linecap: butt; }
+.flow-coverage .flow-coverage-out { stroke: #94a3b8; }
+.flow-coverage .flow-coverage-remainder { stroke: #34d399; }
+.flow-coverage .flow-coverage-bad { stroke: #e11d48; }
+[data-testid="presentation"] .flow-coverage .flow-coverage-in { stroke: #38bdf8; }
+[data-testid="presentation"] .flow-coverage .flow-coverage-bad { stroke: #fb7185; }
 .flow-coverage .flow-coverage-zero { stroke: currentColor; stroke-width: 1.5; opacity: 0.75; }
 .flow-coverage .flow-coverage-connector { stroke: currentColor; stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.75; }
-.flow-coverage .flow-coverage-value { position: absolute; text-align: center; font-size: 12px; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.flow-coverage .flow-coverage-names { display: flex; align-items: flex-start; }
-.flow-coverage .flow-coverage-name { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 3px; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; }
-.flow-coverage .flow-coverage-label { font-weight: 600; }
-.flow-coverage .flow-coverage-detail { font-size: 11px; opacity: 0.85; font-variant-numeric: tabular-nums; }
 .flow-coverage .tone-bad { color: var(--bad, #e11d48); opacity: 1; }
 [data-testid="presentation"] .flow-coverage { color: #e2e8f0; }
 [data-testid="presentation"] .flow-coverage .tone-bad { color: #fb7185; }
