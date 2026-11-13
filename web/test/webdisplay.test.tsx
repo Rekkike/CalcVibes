@@ -64,6 +64,7 @@ describe("Task A3: NO-LEGEND / Task A4: consistency", () => {
     expect(document.querySelector(".app-root .legend")).toBeNull();
     for (const svg of Array.from(document.querySelectorAll('[data-testid="presentation"] svg'))) {
       if (svg.closest('[data-testid="gantt-chart"]') !== null) continue; // v0.6.13.1 re-anchor: the Gantt SVG labels with direct text
+      if (svg.closest('[data-testid="flow-bands"]') !== null) continue; // v0.6.22.1 re-anchor: the flow bands' direct labels are SVG text (the Gantt precedent)
       expect(svg.querySelector("text")).toBeNull();
     }
     for (const svg of Array.from(document.querySelectorAll(".app-root svg"))) {

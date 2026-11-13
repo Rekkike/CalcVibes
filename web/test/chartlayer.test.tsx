@@ -49,7 +49,7 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     }
   });
 
-  it("NO-VIEWBOX-TEXT: no text element inside any chart SVG in the deck scope (v0.6.13.1 re-anchor: the Gantt SVG labels its rows with direct text and is excluded)", () => {
+  it("NO-VIEWBOX-TEXT: no text element inside any chart SVG in the deck scope (v0.6.13.1 re-anchor: the Gantt SVG labels its rows with direct text and is excluded; v0.6.22.1 re-anchor: the flow bands seat their labels as SVG text inside/beside their bands, the Gantt precedent, and are excluded the same way)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     fireEvent.click(byAction("present"));
@@ -57,6 +57,7 @@ describe("Task C1/C2: COMPOSITION-ROWS / NO-VIEWBOX-TEXT / CHART-TRACE", () => {
     expect(svgs.length).toBeGreaterThan(0);
     for (const svg of Array.from(svgs)) {
       if (svg.closest('[data-testid="gantt-chart"]') !== null) continue;
+      if (svg.closest('[data-testid="flow-bands"]') !== null) continue; // v0.6.22.1 re-anchor: the flow bands' direct labels are SVG text (the Gantt precedent)
       expect(svg.querySelector("text")).toBeNull();
     }
     const kickers = document.querySelectorAll('[data-testid="presentation"] [data-testid="chart-kicker"]');
