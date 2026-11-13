@@ -165,41 +165,38 @@ export interface DeckWaterfall {
   columns: DeckStepColumn[];
 }
 
-// v0.6.22 Task B — the flow slide's composed chart model. Everything composes ONCE in
-// composeFlowSlide below from composeFlow's allocation model; the Presentation and the print route
-// render it and never recompute. Bands aggregate sources by collections-grid kind and uses by
-// bucket; the geometry is percent-based on one shared zero-based scale (the widest band spans the
-// plot), truthful widths, connectors only for nonzero flows.
-export interface DeckFlowBand {
-  key: string;
-  label: string;
-  raw: number;
-  value: string;
-  count: number;
-  signed: boolean;
-  // the band's geometry on the shared scale: percent from the plot top and height
-  topPct: number;
-  heightPct: number;
+// v0.6.22.2 — the flow slide's composed chart model: the COVERAGE BRIDGE, the primary form on every
+// surface (the deck slide, the Plan flow surface, the print route). The v0.6.22 two-band form with its
+// connector ribbons retires: the ribbons carried no readable pairing at deck or print scale and, under
+// the fungibility disclosure, implied a pairing specificity the model does not assert. The default
+// allocation IS a sequential coverage chain, so the chart reads that chain left to right: what the
+// collections bring in, each use they cover in the order of record (debt service, operating,
+// reinvestment, capital), and the signed remainder to equity. Everything composes ONCE in
+// composeFlowSlide below from composeFlow's allocation model; the renderers draw and never recompute.
+// The geometry is percent-based on one zero-based axis whose domain spans every running level and the
+// signed remainder (a horizon shortfall reaches below the zero line, never clipped).
+export interface DeckFlowDetail {
+  text: string;
+  bad: boolean;
 }
-export interface DeckFlowConnector {
-  sourceKey: string;
-  useKey: string;
-  raw: number;
-  value: string;
-  // ribbon geometry on the shared scale (percent from the plot top on each band)
-  sourceTopPct: number;
-  sourceHeightPct: number;
-  useTopPct: number;
-  useHeightPct: number;
-}
-export interface DeckFlowBridgeStep {
+export interface DeckFlowStep {
   id: string;
   label: string;
   kind: "in" | "out" | "remainder";
+  // the signed figure the step carries: the collections in (+), a use out (shown negative), the
+  // signed remainder
   raw: number;
   value: string;
+  // what the step is made of, as direct-label lines (the sources by kind on the collections step;
+  // the line count on a use step; the surplus and shortfall years on the remainder, the shortfall in
+  // the bad tone)
+  detail: DeckFlowDetail[];
+  bad: boolean;
+  // geometry on the shared axis: percent from the axis bottom
   bottomPct: number;
   heightPct: number;
+  // the running level after this step (the connector into the next step leaves from here)
+  endPct: number;
 }
 export interface DeckFlowLedgerRow {
   id: string;
@@ -211,14 +208,13 @@ export interface DeckFlowLedgerRow {
   rawAllocated: number;
 }
 export interface DeckFlow {
-  form: "bands" | "bridge";
-  incomeBands: DeckFlowBand[];
-  useBands: DeckFlowBand[];
-  connectors: DeckFlowConnector[];
-  omittedConnectors: number;
-  scaleRaw: number;
+  steps: DeckFlowStep[];
+  // the zero line's position, percent from the axis bottom (0 unless a running level or the remainder
+  // goes negative)
+  zeroPct: number;
   caption: string;
-  bridge: DeckFlowBridgeStep[];
+  // the use buckets with no flow on this project, named in the caption (omitted steps are never silent)
+  omittedSteps: string[];
   ledger: DeckFlowLedgerRow[];
   ledgerOmitted: number;
   remainderNet: number;
@@ -993,139 +989,94 @@ export function workspaceGantt(inputs: ModelInputs, result: ModelResult, startYe
 // surface): the allocation is a presentation of priority, not earmarked cash.
 export const FLOW_FUNGIBILITY_CAPTION = "Cash is fungible: this allocation is a presentation of priority, not earmarked cash. The default is in-year coverage \u2014 debt service first, then operating, then reinvestment, then the year's capital \u2014 with the signed remainder to equity.";
 
-// The pinned bounds of the two-band form: at most eight bands per side after kind aggregation, at
-// most thirty live connectors; beyond them the slide degrades to the sequential bridge. The
-// bracketed ledger holds at most twenty-four pairing rows.
-export const FLOW_MAX_BANDS = 8;
-export const FLOW_MAX_CONNECTORS = 30;
+// The bracketed ledger of authored pairings holds at most twenty-four rows.
 export const FLOW_LEDGER_CAP = 24;
+// The coverage order of record (composeFlow's default allocation), read as the bridge's steps.
+export const FLOW_COVERAGE_ORDER = ["Debt service", "Operating", "Reinvestment", "Capital"];
 
-// Composed once per build and consumed by the deck slide AND the app's flow surface (the composed-once
-// discipline: one allocation model, one slide-model helper, no consumer recomputes).
+// Composed once per build and consumed by the deck slide, the app's flow surface and the print route
+// (the composed-once discipline: one allocation model, one slide-model helper, no consumer recomputes).
 export function composeFlowSlide(flow: ReturnType<typeof composeFlow>, money: (v: number) => string): DeckFlow {
   const incomeNet = flow.sources.reduce((a, s) => a + s.total, 0);
   const usesTotal = flow.uses.filter((u) => u.key !== FLOW_EQUITY_USE).reduce((a, u) => a + u.total, 0);
-  // sources aggregated by collections-grid kind, uses by bucket; zero-raw bands drop out (the
-  // equity remainder band stays, signed)
-  const incomeBands: DeckFlowBand[] = [];
+  // the collections step's detail: the sources by kind, net over the horizon (the note nets to its
+  // true sum), in grid order; a kind of several segments names its count
+  const kinds: { kind: string; net: number; count: number }[] = [];
   for (const s of flow.sources) {
-    const ex = incomeBands.find((b) => b.key === s.kind);
-    if (ex !== undefined) {
-      ex.raw += s.gross;
-      ex.count += 1;
-      if (ex.raw === s.gross) ex.label = flowSourceKindLabel(s.kind); // first row sets the label
-    } else {
-      incomeBands.push({ key: s.kind, label: flowSourceKindLabel(s.kind), raw: s.gross, value: "", count: 1, signed: false, topPct: 0, heightPct: 0 });
-    }
+    const ex = kinds.find((k) => k.kind === s.kind);
+    if (ex !== undefined) { ex.net += s.total; ex.count += 1; } else kinds.push({ kind: s.kind, net: s.total, count: 1 });
   }
-  const useBands: DeckFlowBand[] = [];
-  for (const u of flow.uses) {
-    const bucket = u.key === FLOW_EQUITY_USE ? "Equity remainder" : u.key === FLOW_SERVICE_USE ? "Debt service" : flowUseBucketOf(u.key);
-    const ex = useBands.find((b) => b.key === bucket);
-    if (ex !== undefined) ex.raw += u.total;
-    else useBands.push({ key: bucket, label: bucket, raw: u.total, value: "", count: 1, signed: u.key === FLOW_EQUITY_USE, topPct: 0, heightPct: 0 });
-  }
-  // the equity remainder band carries the signed net remainder
-  const equityBand = useBands.find((b) => b.key === "Equity remainder");
-  if (equityBand !== undefined) {
-    equityBand.raw = flow.remainderNet;
-    equityBand.signed = true;
-  }
-  const liveIncome = incomeBands.filter((b) => b.raw > 0);
-  const liveUse = useBands.filter((b) => b.key === "Equity remainder" || b.raw > 0);
-  // connectors aggregated to kind -> bucket, nonzero flows only
-  const connAgg = new Map<string, DeckFlowConnector>();
-  for (const c of flow.connectors) {
-    const sKind = c.sourceKey.slice(0, c.sourceKey.indexOf(":"));
-    const bucket = c.useKey === FLOW_EQUITY_USE ? "Equity remainder" : c.useKey === FLOW_SERVICE_USE ? "Debt service" : flowUseBucketOf(c.useKey);
-    const k = `${sKind}->${bucket}`;
-    const ex = connAgg.get(k);
-    if (ex !== undefined) ex.raw += c.amount;
-    else connAgg.set(k, { sourceKey: sKind, useKey: bucket, raw: c.amount, value: "", sourceTopPct: 0, sourceHeightPct: 0, useTopPct: 0, useHeightPct: 0 });
-  }
-  const connectors = [...connAgg.values()].filter((c) => c.raw > 0);
-  const omittedConnectors = Math.max(0, liveIncome.length * liveUse.length - connectors.length);
-  // one shared zero-based scale: the widest band spans the plot
-  const incomeSum = liveIncome.reduce((a, b) => a + b.raw, 0);
-  const useSum = liveUse.reduce((a, b) => a + Math.abs(b.raw), 0);
-  const scaleRaw = Math.max(1e-12, incomeSum, useSum);
-  // band geometry (percent of the shared scale, stacked from the plot top)
-  let acc = 0;
-  for (const b of liveIncome) {
-    b.topPct = (acc / scaleRaw) * 100;
-    b.heightPct = (b.raw / scaleRaw) * 100;
-    b.value = money(b.raw);
-    if (b.count > 1) b.label = `${b.label} (${b.count} segments)`;
-    acc += b.raw;
-  }
-  acc = 0;
-  for (const b of liveUse) {
-    b.topPct = (acc / scaleRaw) * 100;
-    b.heightPct = (Math.abs(b.raw) / scaleRaw) * 100;
-    b.value = money(b.raw);
-    acc += Math.abs(b.raw);
-  }
-  // ribbon geometry: attachments ordered by the opposite band's order (layout only, no figures)
-  const useOrderIdx = new Map(liveUse.map((b, i) => [b.key, i]));
-  const srcOrderIdx = new Map(liveIncome.map((b, i) => [b.key, i]));
-  const srcOff = new Map(liveIncome.map((b) => [b.key, 0]));
-  const useOff = new Map(liveUse.map((b) => [b.key, 0]));
-  for (const c of [...connectors].sort((a, b) => (useOrderIdx.get(a.useKey) ?? 0) - (useOrderIdx.get(b.useKey) ?? 0))) {
-    c.sourceTopPct = (liveIncome.find((b) => b.key === c.sourceKey)!.topPct) + ((srcOff.get(c.sourceKey) ?? 0) / scaleRaw) * 100;
-    c.sourceHeightPct = (c.raw / scaleRaw) * 100;
-    srcOff.set(c.sourceKey, (srcOff.get(c.sourceKey) ?? 0) + c.raw);
-    c.value = money(c.raw);
-  }
-  for (const c of [...connectors].sort((a, b) => (srcOrderIdx.get(a.sourceKey) ?? 0) - (srcOrderIdx.get(b.sourceKey) ?? 0))) {
-    c.useTopPct = (liveUse.find((b) => b.key === c.useKey)!.topPct) + ((useOff.get(c.useKey) ?? 0) / scaleRaw) * 100;
-    c.useHeightPct = (c.raw / scaleRaw) * 100;
-    useOff.set(c.useKey, (useOff.get(c.useKey) ?? 0) + c.raw);
-  }
-  const withinBounds = liveIncome.length <= FLOW_MAX_BANDS && liveUse.length <= FLOW_MAX_BANDS && connectors.length <= FLOW_MAX_CONNECTORS;
-  // the sequential bridge: six fixed steps on the income scale, zero-based
-  const bridgeBuckets = ["Debt service", "Operating", "Reinvestment", "Capital"];
-  const bridgeSteps: DeckFlowBridgeStep[] = [];
-  const bridgeScale = Math.max(1e-12, incomeNet, usesTotal, Math.abs(flow.remainderNet));
-  bridgeSteps.push({ id: "in", label: "Collections in", kind: "in", raw: incomeNet, value: money(incomeNet), bottomPct: 0, heightPct: (incomeNet / bridgeScale) * 100 });
+  const inDetail: DeckFlowDetail[] = kinds.map((k) => ({
+    text: `${flowSourceKindLabel(k.kind)}${k.count > 1 ? ` (${k.count} segments)` : ""} ${money(k.net)}`,
+    bad: k.net < 0,
+  }));
+  // the use buckets: the order of record first, then any further bucket the grids carry
+  const bucketOf = (key: string) => (key === FLOW_SERVICE_USE ? "Debt service" : flowUseBucketOf(key));
+  const useRows = flow.uses.filter((u) => u.key !== FLOW_EQUITY_USE);
+  const buckets = [...FLOW_COVERAGE_ORDER, ...[...new Set(useRows.map((u) => bucketOf(u.key)))].filter((b) => !FLOW_COVERAGE_ORDER.includes(b))];
+  const outs = buckets.map((b) => {
+    const rows = useRows.filter((u) => bucketOf(u.key) === b);
+    return { bucket: b, raw: rows.reduce((a, u) => a + u.total, 0), lines: rows.filter((u) => u.total !== 0).length };
+  });
+  const liveOuts = outs.filter((o) => o.raw !== 0);
+  const omittedSteps = outs.filter((o) => o.raw === 0 && FLOW_COVERAGE_ORDER.includes(o.bucket)).map((o) => o.bucket);
+  // the running levels and the shared zero-based axis
+  const rem = flow.remainderNet;
+  const levels = [0, incomeNet];
   let running = incomeNet;
-  for (const bk of bridgeBuckets) {
-    const band = useBands.find((b) => b.key === bk);
-    const out = band !== undefined ? Math.max(0, band.raw) : 0;
-    const after = running - out;
-    bridgeSteps.push({ id: `out:${bk}`, label: `${bk} out`, kind: "out", raw: out, value: money(out), bottomPct: Math.max(0, after) / bridgeScale * 100, heightPct: out / bridgeScale * 100 });
+  for (const o of liveOuts) { running -= o.raw; levels.push(running); }
+  levels.push(rem);
+  const lo = Math.min(0, ...levels);
+  const hi = Math.max(0, ...levels);
+  const span = Math.max(1e-12, hi - lo);
+  const pct = (v: number) => ((v - lo) / span) * 100;
+  const steps: DeckFlowStep[] = [];
+  steps.push({ id: "in", label: "Collected", kind: "in", raw: incomeNet, value: money(incomeNet), detail: inDetail, bad: incomeNet < 0, bottomPct: pct(Math.min(0, incomeNet)), heightPct: pct(Math.max(0, incomeNet)) - pct(Math.min(0, incomeNet)), endPct: pct(incomeNet) });
+  running = incomeNet;
+  for (const o of liveOuts) {
+    const after = running - o.raw;
+    steps.push({
+      id: `out:${o.bucket}`,
+      label: o.bucket,
+      kind: "out",
+      raw: -o.raw,
+      value: money(-o.raw),
+      detail: o.bucket === "Debt service" ? [{ text: "the facilities' combined service", bad: false }] : [{ text: `${o.lines} ${o.lines === 1 ? "line" : "lines"}`, bad: false }],
+      bad: false,
+      bottomPct: pct(Math.min(after, running)),
+      heightPct: pct(Math.max(after, running)) - pct(Math.min(after, running)),
+      endPct: pct(after),
+    });
     running = after;
   }
-  const rem = flow.remainderNet;
-  bridgeSteps.push({ id: "remainder", label: "Remainder to equity", kind: "remainder", raw: rem, value: money(rem), bottomPct: Math.min(0, rem) / bridgeScale * 100, heightPct: Math.abs(rem) / bridgeScale * 100 });
+  const remDetail: DeckFlowDetail[] = flow.shortfallYears > 0
+    ? [
+      { text: `surplus years ${money(flow.remainderSurplus)}`, bad: false },
+      { text: `${flow.shortfallYears} shortfall ${flow.shortfallYears === 1 ? "year" : "years"} ${money(flow.remainderShortfall)}`, bad: true },
+    ]
+    : [{ text: "a surplus in every year", bad: false }];
+  steps.push({ id: "remainder", label: "Remainder to equity", kind: "remainder", raw: rem, value: money(rem), detail: remDetail, bad: rem < 0, bottomPct: pct(Math.min(0, rem)), heightPct: pct(Math.max(0, rem)) - pct(Math.min(0, rem)), endPct: pct(rem) });
   // the ledger of authored pairings
   const ledger: DeckFlowLedgerRow[] = flow.pairings.slice(0, FLOW_LEDGER_CAP).map((p) => ({
     id: p.id, sourceLabel: p.sourceLabel, useLabel: p.useLabel, amount: money(p.amount), allocated: money(p.allocated), raw: p.amount, rawAllocated: p.allocated,
   }));
   const ledgerOmitted = Math.max(0, flow.pairings.length - FLOW_LEDGER_CAP);
-  // the captions
-  const captionParts: string[] = [];
-  if (withinBounds) {
-    const segNotes = liveIncome.filter((b) => b.count > 1).map((b) => `${b.count} ${flowSourceKindLabel(b.key).toLowerCase()} segments in one band`);
-    if (segNotes.length > 0) captionParts.push(`Sources aggregated by kind: ${segNotes.join("; ")}.`);
-    if (omittedConnectors > 0) captionParts.push(`${omittedConnectors} zero-width ${omittedConnectors === 1 ? "connector is" : "connectors are"} omitted, never drawn as hairlines.`);
-    captionParts.push("The per-source, per-year matching is on the Flow surface in the app.");
-  } else {
-    captionParts.push(`The two-band form exceeds its bounds (${liveIncome.length} income bands, ${liveUse.length} use bands, ${connectors.length} live connectors); the bridge shows the horizon aggregate. The per-source, per-year matching is on the Flow surface in the app.`);
-  }
+  // the caption: the reading order, the omitted steps by name, the timing the horizon total nets, the
+  // pairings' effect, the ledger count
+  const captionParts: string[] = ["Read left to right in the coverage order: what the collections bring in, each use they cover in turn, and the signed remainder to equity."];
+  if (omittedSteps.length > 0) captionParts.push(`No ${omittedSteps.map((b) => b.toLowerCase()).join(" or ")} on this project.`);
+  if (flow.shortfallYears > 0) captionParts.push(`The horizon total nets ${flow.shortfallYears} shortfall ${flow.shortfallYears === 1 ? "year" : "years"} against the surplus years; the per-year drill on the Flow surface shows each year.`);
+  if (flow.pairings.length > 0) captionParts.push(`The authored ${flow.pairings.length === 1 ? "pairing changes" : "pairings change"} which source covers which use, never these totals.`);
   if (ledgerOmitted > 0) captionParts.push(`${ledgerOmitted} authored ${ledgerOmitted === 1 ? "pairing is" : "pairings are"} beyond the ${FLOW_LEDGER_CAP}-row ledger; the app holds the full list.`);
   return {
-    form: withinBounds ? "bands" : "bridge",
-    incomeBands: liveIncome,
-    useBands: liveUse,
-    connectors,
-    omittedConnectors,
-    scaleRaw,
+    steps,
+    zeroPct: pct(0),
     caption: captionParts.join(" "),
-    bridge: bridgeSteps,
+    omittedSteps,
     ledger,
     ledgerOmitted,
-    remainderNet: flow.remainderNet,
-    remainderNetValue: money(flow.remainderNet),
+    remainderNet: rem,
+    remainderNetValue: money(rem),
     surplusRaw: flow.remainderSurplus,
     surplusValue: money(flow.remainderSurplus),
     shortfallRaw: flow.remainderShortfall,
@@ -1161,7 +1112,7 @@ function flowSlide(inputs: ModelInputs, result: ModelResult, money: (v: number) 
     disclosures.push(`${flow.shortfallYears} of ${flow.years.length} years run a shortfall totaling ${f.shortfallValue}; the remainder column is signed in every year and a shortfall is never smoothed or netted invisibly.`);
   }
   if (flow.pairings.length > 0) {
-    disclosures.push(`The ${flow.pairings.length} authored ${flow.pairings.length === 1 ? "pairing" : "pairings"} listed below ${flow.pairings.length === 1 ? "replaces" : "replace"} the default where drawn (horizon-level amounts, satisfied cumulatively across years).`);
+    disclosures.push(`The ${flow.pairings.length} authored ${flow.pairings.length === 1 ? "pairing" : "pairings"} listed below ${flow.pairings.length === 1 ? "replaces" : "replace"} the default where drawn (horizon-level amounts, satisfied cumulatively across years); ${flow.pairings.length === 1 ? "it changes" : "they change"} which source covers which use, never the bridge's totals.`);
   }
   const noteSource = flow.sources.find((s) => s.kind === "funding-loan");
   if (noteSource !== undefined) {

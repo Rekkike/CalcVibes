@@ -1,8 +1,6 @@
 import type { LineTotal, YearlyRow } from "../../core/src/types.js";
-import type { ReactNode } from "react";
-import type { DeckFlow, DeckFlowBand, DeckGantt, DeckWaterfall } from "./deck.js";
+import type { DeckFlow, DeckGantt, DeckWaterfall } from "./deck.js";
 import { percentOneForDisplay } from "./engine.js";
-import { labelEm, wrapLabelEm } from "./ganttLayout.js";
 
 export const CHART_COLORS = {
   costBar: "#fb7185",
@@ -509,177 +507,84 @@ export function GanttChart(props: { gantt: DeckGantt }) {
   );
 }
 
-// v0.6.22 Task B — the flow slide's two renderers. Geometry in SVG on one shared zero-based scale
-// (the deck model composes the percents; nothing financial is recomputed here). v0.6.22.1 Task A —
-// the direct-label seating: every band segment's name and value seat with its band as SVG text (the
-// Gantt labelMode precedent; one label vocabulary on this surface), inside the band box when the
-// rendered segment height admits the text at the established size, otherwise in the fixed-width
-// label column directly beside its band — the income labels left of the income band, the use labels
-// right of the use band, outside the ribbon space so a label never collides with a connector — each
-// label vertically aligned to its segment through the same yAt/hAt mapping that draws the geometry.
-// The two-band connected composition: the income band on the left, the use band on the right,
-// truthful widths, ribbons only for nonzero flows; a signed (negative) equity band and its label
-// render in the bad tone. The whole figure is one SVG block, centered in its container.
-export const FLOW_BAND_COLORS = ["#38bdf8", "#34d399", "#e8b84b", "#c4b5fd", "#fb7185", "#22d3ee", "#a3e635", "#f0abfc"];
-
-// The flow figure's geometry constants (exported for the pins). The plot mapping is unchanged from
-// v0.6.22 (top, plotH, one shared zero-based scale); the frame stays symmetric — equal band widths,
-// equal gutters. The fixed-width label column is the Gantt's labelW of record; the ribbon space is
-// the gap between the band boxes the labels never enter. The established label size is the Gantt's
-// 11 px inside-label; ONE admission rule for both bands: a segment admits its label inside the band
-// box when its rendered height hAt(heightPct) is at least labelMinH — an 11 px line with the Gantt's
-// +4 baseline offset and its descent needs h/2 + 4 + 3 <= h, i.e. h >= 14.
-export const FLOW_BANDS_GEO = {
-  top: 24,
-  plotH: 360,
-  bottomPad: 12,
-  labelColW: 150,
-  ribbonW: 240,
-  bandMinW: 56,
-  bandInset: 5,
-  labelGap: 10,
-  labelFont: 11,
-  labelMinH: 14,
-  lineH: 13,
+// v0.6.22.2 — the flow figure: the COVERAGE BRIDGE, one renderer for the deck slide and the Plan
+// flow surface (the print route draws the same composed model in pdf.ts). The deck model composes every
+// percent once (composeFlowSlide); nothing financial is recomputed here. The grammar is the deck's
+// waterfall: stepped columns on one zero-based axis read left to right in the coverage order of record —
+// the collections in, each use out in turn, the signed remainder to equity closing the chain — with a
+// dotted connector carrying each running level into the next step and the zero line drawn. The marks
+// are SVG (bars, connectors, the zero line); the text is HTML beside them (the app's chart vocabulary:
+// no text inside the chart SVG): each step's value at its bar end and its name with the detail lines
+// directly beneath the plot, wrapping within the step's slot, never truncated, no legend. A negative
+// remainder renders below the zero line in the bad tone, and the shortfall years' line under it carries
+// the bad tone too (the honest asymmetry: nothing is smoothed or netted out of sight).
+export const FLOW_COVERAGE_GEO = {
+  // a bar takes this share of its slot, centered; the connector spans the gap between neighbours
+  barShare: 0.6,
 } as const;
 
-export function FlowBands(props: { flow: DeckFlow }) {
+export function FlowCoverage(props: { flow: DeckFlow }) {
   const { flow } = props;
-  const G = FLOW_BANDS_GEO;
-  const allBands = [...flow.incomeBands, ...flow.useBands];
-  // The band box is sized to the widest label line, measured per the Gantt's labelEm discipline (the
-  // Helvetica advances scale with the type size): every label fits inside its band box on one line
-  // at the established size, so the inside seating never overflows the band box.
-  const bandW = Math.max(G.bandMinW, ...allBands.map((b) => Math.ceil(labelEm(`${b.label} ${b.value}`) * G.labelFont) + 2 * G.bandInset));
-  const W = 2 * G.labelColW + 2 * bandW + G.ribbonW;
-  const top = G.top;
-  const plotH = G.plotH;
-  const xLeft = G.labelColW;
-  const xRight = W - G.labelColW - bandW;
-  const yAt = (pct: number) => top + (pct / 100) * plotH;
-  const hAt = (pct: number) => (pct / 100) * plotH;
-  const midY = (b: DeckFlowBand) => yAt(b.topPct) + hAt(b.heightPct) / 2;
-  const admitsInside = (b: DeckFlowBand) => hAt(b.heightPct) >= G.labelMinH;
-  const labelText = (b: DeckFlowBand) => `${b.label} ${b.value}`;
-  // One label renderer for both bands: inside the band box when the segment height admits the text,
-  // otherwise the beside label column, vertically aligned to the segment through midY.
-  const renderLabel = (b: DeckFlowBand, side: "income" | "use") => {
-    const bad = b.signed && b.raw < 0;
-    const inside = admitsInside(b);
-    const mode = inside ? "inside" : "beside";
-    const testid = side === "income" ? "data-flow-income-label" : "data-flow-use-label";
-    const cls = "flow-label " + (inside ? "flow-label-inside" : "flow-label-beside") + (bad ? " flow-label-bad" : "");
-    const group = (children: ReactNode) => (
-      <g key={b.key} {...{ [testid]: b.key }} data-side={side} data-label-mode={mode} data-signed={b.signed ? "true" : "false"} className={"flow-label-group" + (bad ? " flow-label-bad" : "")}>
-        {children}
-      </g>
-    );
-    if (inside) {
-      const cx = side === "income" ? xLeft + bandW / 2 : xRight + bandW / 2;
-      return group(
-        <text data-flow-label-line="0" x={cx} y={midY(b) + 4} textAnchor="middle" fontSize={G.labelFont} className={cls}>{labelText(b)}</text>
-      );
-    }
-    const lines = wrapLabelEm(labelText(b), (G.labelColW - 12) / G.labelFont);
-    const x = side === "income" ? xLeft - G.labelGap : xRight + bandW + G.labelGap;
-    const anchor = side === "income" ? "end" : "start";
-    const firstY = midY(b) - ((lines.length - 1) * G.lineH) / 2 + 4;
-    return group(
-      lines.map((line, k) => (
-        <text key={k} data-flow-label-line={String(k)} x={x} y={firstY + k * G.lineH} textAnchor={anchor} fontSize={G.labelFont} className={cls}>{line}</text>
-      ))
-    );
-  };
+  const steps = flow.steps;
+  const n = Math.max(1, steps.length);
+  const slot = 100 / n;
+  const barW = slot * FLOW_COVERAGE_GEO.barShare;
+  const barX = (i: number) => i * slot + (slot - barW) / 2;
+  const yOf = (pct: number) => 100 - pct;
+  const summary = steps.map((s) => `${s.label} ${s.value}`).join(", ");
   return (
-    <div data-testid="flow-bands" data-form="bands" className="chart-block flow-chart">
-      <svg viewBox={`0 0 ${W} ${top + plotH + G.bottomPad}`} className="flow-svg" role="img" aria-label="What the collections pay for">
-        {flow.connectors.map((c) => {
-          const si = flow.incomeBands.findIndex((b) => b.key === c.sourceKey);
-          const color = FLOW_BAND_COLORS[((si % FLOW_BAND_COLORS.length) + FLOW_BAND_COLORS.length) % FLOW_BAND_COLORS.length];
-          const sx1 = xLeft + bandW;
-          const sy1 = yAt(c.sourceTopPct);
-          const sy2 = sy1 + hAt(c.sourceHeightPct);
-          const ux1 = xRight;
-          const uy1 = yAt(c.useTopPct);
-          const uy2 = uy1 + hAt(c.useHeightPct);
-          const mx = (sx1 + ux1) / 2;
+    <div data-testid="flow-coverage" data-form="coverage" className="chart-block flow-coverage">
+      <div className="flow-coverage-plot" data-flow-plot="true">
+        <svg className="flow-coverage-svg" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`Coverage bridge: ${summary}`}>
+          <line data-flow-zero="true" x1={0} x2={100} y1={yOf(flow.zeroPct)} y2={yOf(flow.zeroPct)} className="flow-coverage-zero" vectorEffect="non-scaling-stroke" />
+          {steps.map((s, i) => (
+            <rect
+              key={s.id}
+              data-flow-step={s.id}
+              data-flow-step-kind={s.kind}
+              data-flow-bad={s.bad ? "true" : "false"}
+              className={"flow-coverage-bar flow-coverage-" + s.kind + (s.bad ? " flow-coverage-bad" : "")}
+              x={barX(i)}
+              y={yOf(s.bottomPct + s.heightPct)}
+              width={barW}
+              height={s.heightPct}
+            />
+          ))}
+          {steps.slice(0, -1).map((s, i) => (
+            <line
+              key={"conn-" + s.id}
+              data-flow-connector={s.id}
+              className="flow-coverage-connector"
+              x1={barX(i) + barW}
+              x2={barX(i + 1)}
+              y1={yOf(s.endPct)}
+              y2={yOf(s.endPct)}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+        {steps.map((s, i) => {
+          const below = s.raw < 0 && s.kind !== "out";
           return (
-            <path
-              key={`${c.sourceKey}->${c.useKey}`}
-              data-flow-connector={`${c.sourceKey}->${c.useKey}`}
-              d={`M ${sx1} ${sy1} C ${mx} ${sy1}, ${mx} ${uy1}, ${ux1} ${uy1} L ${ux1} ${uy2} C ${mx} ${uy2}, ${mx} ${sy2}, ${sx1} ${sy2} Z`}
-              fill={color}
-              className="flow-connector"
-            >
-              <title>{`${c.sourceKey} \u2192 ${c.useKey}: ${c.value}`}</title>
-            </path>
+            <span
+              key={"val-" + s.id}
+              data-flow-value={s.id}
+              className={"flow-coverage-value" + (s.bad ? " tone-bad" : "")}
+              style={below
+                ? { top: `calc(${yOf(s.bottomPct)}% + 4px)`, left: `${i * slot}%`, width: `${slot}%` }
+                : { bottom: `calc(${s.bottomPct + s.heightPct}% + 4px)`, left: `${i * slot}%`, width: `${slot}%` }}
+            >{s.value}</span>
           );
         })}
-        {flow.incomeBands.map((b, i) => (
-          <rect
-            key={b.key}
-            data-flow-income-band={b.key}
-            data-band-count={b.count}
-            x={xLeft}
-            y={yAt(b.topPct)}
-            width={bandW}
-            height={Math.max(0.5, hAt(b.heightPct))}
-            fill={FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length]}
-            className="flow-band flow-band-income"
-          >
-            <title>{`${b.label}: ${b.value}`}</title>
-          </rect>
-        ))}
-        {flow.useBands.map((b, i) => (
-          <rect
-            key={b.key}
-            data-flow-use-band={b.key}
-            data-signed={b.signed ? "true" : "false"}
-            x={xRight}
-            y={yAt(b.topPct)}
-            width={bandW}
-            height={Math.max(0.5, hAt(b.heightPct))}
-            className={"flow-band flow-band-use" + (b.signed && b.raw < 0 ? " flow-band-bad" : "")}
-            fill={b.signed && b.raw < 0 ? "#fb7185" : FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length]}
-          >
-            <title>{`${b.label}: ${b.value}`}</title>
-          </rect>
-        ))}
-        {flow.incomeBands.map((b) => renderLabel(b, "income"))}
-        {flow.useBands.map((b) => renderLabel(b, "use"))}
-      </svg>
-    </div>
-  );
-}
-
-// v0.6.22 Task B — the sequential bridge, the degradation form of the flow slide: six fixed steps
-// (collections in, debt service out, operating out, reinvestment out, capital out, the remainder),
-// zero-based on the income scale, the signed remainder drawn below the ground in the bad tone when
-// negative. HTML stepped columns on the deck model's composed percents, like the cost waterfall.
-export function FlowBridge(props: { flow: import("./deck.js").DeckFlow }) {
-  const { flow } = props;
-  const steps = flow.bridge;
-  const n = steps.length;
-  const slot = 100 / n;
-  return (
-    <div data-testid="flow-bridge" data-form="bridge" className="chart-block flow-bridge">
-      <div className="waterfall-track flow-bridge-track">
-        {steps.map((s, i) => (
-          <div
-            key={s.id}
-            data-flow-step={s.id}
-            data-flow-kind={s.kind}
-            className={"flow-step flow-step-" + s.kind + (s.kind === "remainder" && s.raw < 0 ? " flow-step-bad" : "")}
-            style={{ bottom: `${s.bottomPct}%`, height: `${Math.max(0.4, s.heightPct)}%`, left: `${i * slot}%`, width: `${0.6 * slot}%` }}
-          />
-        ))}
       </div>
-      <div data-flow-ground="true" className="waterfall-ground" />
-      <div className="waterfall-names">
-        {steps.map((s, i) => (
-          <span key={s.id} data-flow-step-name={s.id} className="waterfall-name" style={{ width: `${slot}%` }} title={`${s.label} ${s.value}`}>
-            {s.label} <span className={"flow-step-value" + (s.kind === "remainder" && s.raw < 0 ? " tone-bad" : "")}>{s.value}</span>
-          </span>
+      <div className="flow-coverage-names">
+        {steps.map((s) => (
+          <div key={s.id} data-flow-name={s.id} className="flow-coverage-name" style={{ width: `${slot}%` }}>
+            <span className="flow-coverage-label">{s.label}</span>
+            {s.detail.map((d, k) => (
+              <span key={k} data-flow-detail={s.id} data-flow-detail-bad={d.bad ? "true" : "false"} className={"flow-coverage-detail" + (d.bad ? " tone-bad" : "")}>{d.text}</span>
+            ))}
+          </div>
         ))}
       </div>
     </div>

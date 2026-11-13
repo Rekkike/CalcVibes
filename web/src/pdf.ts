@@ -1,8 +1,7 @@
 import { jsPDF } from "jspdf";
 import { deckMoneyForDisplay, percentTwoForDisplay } from "./engine.js";
 import type { CurrencyCode, EntryUnit } from "./engine.js";
-import type { DeckModel, DeckDonut, DeckFlow, DeckFlowBand, DeckGantt, DeckLedgerRow, DeckStepColumn, ScenarioTargetChart } from "./deck.js";
-import { labelEm } from "./ganttLayout.js";
+import type { DeckModel, DeckDonut, DeckFlow, DeckGantt, DeckLedgerRow, DeckStepColumn, ScenarioTargetChart } from "./deck.js";
 
 export interface DeckPdfTrace {
   drawnTitles: string[];
@@ -570,131 +569,104 @@ function drawPrintColumns(doc: jsPDF, T: PdfThemePalette, columns: DeckStepColum
   return labelRoom + trackH + 4 + namesH + 3;
 }
 
-// v0.6.22 Task E — the flow slide on the print route (the plot height is sized so the slide's body figures, disclosures and chart fit one page): the rect-based equivalent of the slide's
-// primary chart, drawn from the same composed slot (the deck model's flow), bounded per the W32
-// geometry contract (the chart body 20..277 mm, centered in the 14..283 mm band). The two-band form
-// draws the two band columns and the connector rects on the shared zero-based scale; the bridge
-// draws the six fixed steps; the signed (negative) equity remainder renders in the print-bad tone;
-// omitted connectors stay omitted and counted in the caption; the authored pairings print as the
-// bracketed ledger lines beneath. Nothing is recomputed here. The plot height is sized so the
-// slide's body figures, disclosures and chart fit one page.
-// v0.6.22.1 Task B — the same direct-label seating on paper as the app renderer, within the W32
-// geometry contract: the chart body 20..277 mm holds the two fixed-width label columns, the two band
-// boxes and the ribbon space between them (the labels never enter the ribbon space, so a label never
-// collides with a connector). The same admission rule as the app renderer, at the print route's
-// established 6 pt: a segment admits its label inside the band rect when its rendered height
-// hAt(heightPct) is at least FLOW_PRINT_LABEL_MIN_H; otherwise the label seats in the label column
-// directly beside its band (income labels left of the income band, use labels right of the use band),
-// vertically aligned to its segment through the same yAt/hAt mapping. One page per slide is kept; no
-// legend block exists on the paper route.
-export const FLOW_PRINT_PLOT_H = 26; // sized so the slide's body figures, disclosures and chart fit one page
+// v0.6.22.2 — the flow slide on the print route: the COVERAGE BRIDGE, the rect-based equivalent of the
+// deck slide's primary chart, drawn from the same composed slot (the deck model's flow; nothing is
+// recomputed here) and bounded per the W32 geometry contract (every mark and every text call inside the
+// chart body 20..277 mm). The steps sit in equal slots across the chart body in the coverage order of
+// record; each bar spans its composed percents on the one zero-based axis; a dashed connector carries each
+// running level into the next step; the zero line is drawn; the value prints above its bar end (below it
+// for a negative remainder); the name and the detail lines print beneath the plot, wrapped to the slot,
+// never truncated, no legend. A negative remainder and the shortfall years' line print in the bad tone.
+// The caption and the bracketed ledger of authored pairings print beneath.
+export const FLOW_PRINT_PLOT_H = 22; // sized so the slide's body figures, disclosures and chart fit one page
 export const FLOW_PRINT_LABEL_PT = 6; // the flow print route's established label size
-export const FLOW_PRINT_LABEL_MIN_H = (FLOW_PRINT_LABEL_PT * 25.4) / 72 + 1; // one 6 pt line with the print baseline offset (+1) is admitted when h/2 + 1 + descent <= h
-const FLOW_PRINT_LABEL_COL_W = 40; // the fixed-width label column inside the chart body (20..277 mm)
-const FLOW_PRINT_BAND_INSET = 1;
-const FLOW_PRINT_BAND_MIN_W = 14; // the standing v0.6.22 print band width (floor)
 export const FLOW_PRINT_LINE_H = (FLOW_PRINT_LABEL_PT * 25.4 * 1.15) / 72; // jsPDF's line height at 6 pt (lineHeightFactor 1.15)
+const FLOW_PRINT_VALUE_ROOM = 4; // the room above the plot for a value over the tallest bar
+const FLOW_PRINT_BELOW_ROOM = 4; // the room under the plot for a value beneath a negative remainder
+export const FLOW_PRINT_BAR_SHARE = 0.6;
+function flowPrintNameLines(doc: jsPDF, flow: DeckFlow): { text: string; bad: boolean; head: boolean }[][] {
+  const slot = PDF_CHART_WIDTH / Math.max(1, flow.steps.length);
+  doc.setFontSize(FLOW_PRINT_LABEL_PT);
+  return flow.steps.map((s) => {
+    const out: { text: string; bad: boolean; head: boolean }[] = [];
+    for (const line of doc.splitTextToSize(s.label, slot * 0.95) as string[]) out.push({ text: line, bad: false, head: true });
+    for (const d of s.detail) for (const line of doc.splitTextToSize(d.text, slot * 0.95) as string[]) out.push({ text: line, bad: d.bad, head: false });
+    return out;
+  });
+}
+// The height the flow block takes on the page (the chart, the names, the caption and the ledger), so the
+// page-break decision reads the same composition the drawing uses.
+export function flowPrintHeight(doc: jsPDF, flow: DeckFlow): number {
+  const names = flowPrintNameLines(doc, flow);
+  const nameH = Math.max(0, ...names.map((l) => l.length)) * FLOW_PRINT_LINE_H;
+  doc.setFontSize(7);
+  const capLines = (doc.splitTextToSize(flow.caption, PDF_CHART_WIDTH) as string[]).length;
+  const ledgerLines = flow.ledger.reduce((a, r) => a + (doc.splitTextToSize(`${r.sourceLabel} -> ${r.useLabel}: ${r.amount} (allocated ${r.allocated})`, PDF_CHART_WIDTH) as string[]).length, 0);
+  return FLOW_PRINT_VALUE_ROOM + FLOW_PRINT_PLOT_H + FLOW_PRINT_BELOW_ROOM + 2 + nameH + 4 + capLines * 3.4 + 2 + ledgerLines * 3.4 + (flow.ledgerOmitted > 0 ? 3.4 : 0) + 2;
+}
 function drawPrintFlow(doc: jsPDF, T: PdfThemePalette, flow: DeckFlow, y: number, trace?: DeckPdfTrace): number {
-  const plotH = FLOW_PRINT_PLOT_H;
-  const ptMm = 25.4 / 72;
-  // the band box is sized to the widest label line, measured per the Gantt's labelEm discipline, so
-  // the inside seating never overflows the band rect at the established 6 pt
-  const allBands = [...flow.incomeBands, ...flow.useBands];
-  const bandW = Math.max(FLOW_PRINT_BAND_MIN_W, ...allBands.map((b) => Math.ceil(labelEm(`${b.label} ${b.value}`) * FLOW_PRINT_LABEL_PT * ptMm) + 2 * FLOW_PRINT_BAND_INSET));
-  const xLeft = PDF_CHART_LEFT + FLOW_PRINT_LABEL_COL_W;
-  const xRight = PDF_CHART_RIGHT - FLOW_PRINT_LABEL_COL_W - bandW;
-  const yAt = (pct: number) => y + (pct / 100) * plotH;
-  const hAt = (pct: number) => (pct / 100) * plotH;
-  const midY = (b: DeckFlowBand) => yAt(b.topPct) + hAt(b.heightPct) / 2;
-  const admitsInside = (b: DeckFlowBand) => hAt(b.heightPct) >= FLOW_PRINT_LABEL_MIN_H;
   const startY = y;
-  if (flow.form === "bands") {
-    // the connector rects first (beneath the bands), spanning the gap between the band columns
-    for (const c of flow.connectors) {
-      const sy = yAt(c.sourceTopPct);
-      const sh = Math.max(0.4, hAt(c.sourceHeightPct));
-      const uy = yAt(c.useTopPct);
-      const uh = Math.max(0.4, hAt(c.useHeightPct));
-      const cy = uy + uh / 2;
-      doc.setFillColor(T.connectorSoft[0], T.connectorSoft[1], T.connectorSoft[2]);
-      doc.rect(xLeft + bandW, Math.min(sy, cy) - 0, xRight - (xLeft + bandW), Math.max(sh, uh) * 0.5, "F");
-      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${c.sourceKey}->${c.useKey} ${c.value}`);
-    }
-    // one label renderer for both bands: inside the band rect when the segment height admits the
-    // text at 6 pt, otherwise the beside label column, vertically aligned through midY
-    const printLabel = (b: DeckFlowBand, side: "income" | "use", bandX: number) => {
-      const bad = b.signed && b.raw < 0;
-      const text = `${b.label} ${b.value}`;
-      doc.setFontSize(FLOW_PRINT_LABEL_PT);
-      const inside = admitsInside(b);
-      if (inside) {
-        doc.setTextColor(T.onBar[0], T.onBar[1], T.onBar[2]);
-        const lines = doc.splitTextToSize(text, bandW - 2 * FLOW_PRINT_BAND_INSET) as string[];
-        const firstY = midY(b) + 1 - ((lines.length - 1) * FLOW_PRINT_LINE_H) / 2;
-        doc.text(lines, bandX + bandW / 2, firstY, { align: "center", maxWidth: bandW - 2 * FLOW_PRINT_BAND_INSET });
-      } else {
-        const ink = side === "use" && bad ? T.bad : T.mut;
-        doc.setTextColor(ink[0], ink[1], ink[2]);
-        const colMax = FLOW_PRINT_LABEL_COL_W - 4;
-        const lines = doc.splitTextToSize(text, colMax) as string[];
-        const firstY = midY(b) + 1 - ((lines.length - 1) * FLOW_PRINT_LINE_H) / 2;
-        if (side === "income") doc.text(lines, bandX - 2, firstY, { align: "right", maxWidth: colMax });
-        else doc.text(lines, bandX + bandW + 2, firstY, { align: "left", maxWidth: colMax });
-      }
-      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
-      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(text);
-    };
-    flow.incomeBands.forEach((b, i) => {
-      const pc = hexToRgb(printColorOf(T, i));
-      doc.setFillColor(pc[0], pc[1], pc[2]);
-      doc.rect(xLeft, yAt(b.topPct), bandW, Math.max(0.4, hAt(b.heightPct)), "F");
-      printLabel(b, "income", xLeft);
+  const push = (t: string) => { if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(t); };
+  const plotH = FLOW_PRINT_PLOT_H;
+  const top = y + FLOW_PRINT_VALUE_ROOM;
+  const yAt = (pct: number) => top + plotH * (1 - pct / 100);
+  const n = Math.max(1, flow.steps.length);
+  const slot = PDF_CHART_WIDTH / n;
+  const barW = slot * FLOW_PRINT_BAR_SHARE;
+  const barX = (i: number) => PDF_CHART_LEFT + i * slot + (slot - barW) / 2;
+  // the zero line
+  doc.setDrawColor(T.ground[0], T.ground[1], T.ground[2]);
+  doc.setLineWidth(0.3);
+  doc.line(PDF_CHART_LEFT, yAt(flow.zeroPct), PDF_CHART_RIGHT, yAt(flow.zeroPct));
+  // the bars
+  flow.steps.forEach((s, i) => {
+    const fill = s.bad ? T.bad : s.kind === "in" ? T.capital : s.kind === "out" ? T.mut : T.ok;
+    doc.setFillColor(fill[0], fill[1], fill[2]);
+    doc.rect(barX(i), yAt(s.bottomPct + s.heightPct), barW, Math.max(0.3, (s.heightPct / 100) * plotH), "F");
+  });
+  // the dashed connectors carrying each running level into the next step
+  doc.setDrawColor(T.mut[0], T.mut[1], T.mut[2]);
+  doc.setLineWidth(0.2);
+  doc.setLineDashPattern([0.6, 0.8], 0);
+  flow.steps.slice(0, -1).forEach((s, i) => {
+    doc.line(barX(i) + barW, yAt(s.endPct), barX(i + 1), yAt(s.endPct));
+  });
+  doc.setLineDashPattern([], 0);
+  // the values at the bar ends
+  doc.setFontSize(FLOW_PRINT_LABEL_PT);
+  flow.steps.forEach((s, i) => {
+    const below = s.raw < 0 && s.kind !== "out";
+    const ink = s.bad ? T.bad : T.ink;
+    doc.setTextColor(ink[0], ink[1], ink[2]);
+    const vy = below ? yAt(s.bottomPct) + 2.6 : yAt(s.bottomPct + s.heightPct) - 1;
+    doc.text(s.value, PDF_CHART_LEFT + i * slot + slot / 2, vy, { align: "center", maxWidth: slot * 0.95 });
+    push(s.value);
+  });
+  // the names and the detail lines beneath the plot, wrapped to the slot
+  const names = flowPrintNameLines(doc, flow);
+  const namesTop = top + plotH + FLOW_PRINT_BELOW_ROOM + 2;
+  names.forEach((lines, i) => {
+    lines.forEach((l, k) => {
+      const ink = l.bad ? T.bad : l.head ? T.ink : T.mut;
+      doc.setTextColor(ink[0], ink[1], ink[2]);
+      doc.text(l.text, PDF_CHART_LEFT + i * slot + slot / 2, namesTop + k * FLOW_PRINT_LINE_H, { align: "center", maxWidth: slot * 0.95 });
+      push(l.text);
     });
-    flow.useBands.forEach((b, i) => {
-      const bad = b.signed && b.raw < 0;
-      if (bad) doc.setFillColor(T.bad[0], T.bad[1], T.bad[2]);
-      else {
-        const pc = hexToRgb(printColorOf(T, i));
-        doc.setFillColor(pc[0], pc[1], pc[2]);
-      }
-      doc.rect(xRight, yAt(b.topPct), bandW, Math.max(0.4, hAt(b.heightPct)), "F");
-      printLabel(b, "use", xRight);
-    });
-  } else {
-    // the bridge: six fixed stepped rects on the income scale, zero-based at the ground line
-    const ground = y + plotH;
-    const slot = PDF_CHART_WIDTH / flow.bridge.length;
-    const barW = slot * 0.8;
-    flow.bridge.forEach((s, i) => {
-      const h = (s.heightPct / 100) * plotH;
-      const bottom = (s.bottomPct / 100) * plotH;
-      const bad = s.kind === "remainder" && s.raw < 0;
-      if (s.kind === "in") doc.setFillColor(T.capital[0], T.capital[1], T.capital[2]);
-      else if (s.kind === "out") doc.setFillColor(T.barNeg[0], T.barNeg[1], T.barNeg[2]);
-      else doc.setFillColor(bad ? T.bad[0] : T.ok[0], bad ? T.bad[1] : T.ok[1], bad ? T.bad[2] : T.ok[2]);
-      doc.rect(PDF_CHART_LEFT + slot / 2 - barW / 2 + i * slot, ground - bottom - h, barW, Math.max(0.4, h), "F");
-      doc.setFontSize(6);
-      doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
-      doc.text(`${s.label} ${s.value}`, PDF_CHART_LEFT + i * slot + slot / 2, ground + 4, { align: "center", maxWidth: slot });
-      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
-      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${s.label} ${s.value}`);
-    });
-    doc.setDrawColor(T.ground[0], T.ground[1], T.ground[2]);
-    doc.line(PDF_CHART_LEFT, ground, PDF_CHART_RIGHT, ground);
-  }
-  let yy = y + plotH + 8;
-  // the caption (the aggregation / degradation / omission counts) and the bracketed ledger lines
+  });
+  const nameH = Math.max(0, ...names.map((l) => l.length)) * FLOW_PRINT_LINE_H;
+  let yy = namesTop + nameH + 4;
+  // the caption and the bracketed ledger lines
   doc.setFontSize(7);
   doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
   const capLines = doc.splitTextToSize(flow.caption, PDF_CHART_WIDTH) as string[];
   doc.text(capLines, PDF_CHART_LEFT, yy);
-  if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(flow.caption);
+  push(flow.caption);
   yy += capLines.length * 3.4 + 2;
   for (const r of flow.ledger) {
     const line = `${r.sourceLabel} -> ${r.useLabel}: ${r.amount} (allocated ${r.allocated})`;
     const wrapped = doc.splitTextToSize(line, PDF_CHART_WIDTH) as string[];
     doc.text(wrapped, PDF_CHART_LEFT, yy);
-    if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(line);
+    push(line);
     yy += wrapped.length * 3.4;
   }
   if (flow.ledgerOmitted > 0) {
@@ -1133,7 +1105,7 @@ export function buildDeckPdf(model: DeckModel, projectName: string, trace?: Deck
     // v0.6.22 Task E: the flow slide's primary chart draws on the print route from the same
     // composed slot, bounded per the W32 geometry contract.
     if (slide.flow !== undefined) {
-      const flowH = FLOW_PRINT_PLOT_H + 8 + 3.4 * (doc.splitTextToSize(slide.flow.caption, PDF_CHART_WIDTH) as string[]).length + 2 + slide.flow.ledger.length * 3.4 + 6;
+      const flowH = flowPrintHeight(doc, slide.flow);
       if (allowBreak && y + flowH > CONTENT_BOTTOM) { addPage(); y = CONTENT_TOP; }
       y += drawPrintFlow(doc, T, slide.flow, y, trace);
       doc.setFontSize(10);

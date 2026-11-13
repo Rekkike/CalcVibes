@@ -1,10 +1,10 @@
 import type { ModelInputs, ModelResult } from "../../../core/src/types.js";
-import { composeFlow, flowOf, nextId, yearHeader, FLOW_EQUITY_USE, FLOW_SERVICE_USE } from "../state.js";
+import { composeFlow, flowOf, flowSourceKindLabel, nextId, yearHeader, FLOW_EQUITY_USE, FLOW_SERVICE_USE } from "../state.js";
 import type { FlowPairing } from "../state.js";
 import { moneyForDisplay } from "../engine.js";
 import type { CurrencyCode, EntryUnit } from "../engine.js";
 import { MoneyEditor } from "../MoneyEditor.js";
-import { FlowBands, FlowBridge } from "../charts.js";
+import { FlowCoverage } from "../charts.js";
 import { composeFlowSlide, FLOW_FUNGIBILITY_CAPTION } from "../deck.js";
 
 // v0.6.22 Task C — the Plan flow surface: the composed reading and the authored editor in one place.
@@ -64,8 +64,8 @@ export function FlowSection(props: {
       <div className="flow-surface-grid">
         <div>
           <h3>The composition over the horizon</h3>
-          <div data-testid="flow-composition" data-form={view.form}>
-            {view.form === "bands" ? <FlowBands flow={view} /> : <FlowBridge flow={view} />}
+          <div data-testid="flow-composition" data-form="coverage">
+            <FlowCoverage flow={view} />
           </div>
           <p className="muted" data-testid="flow-caption">{view.caption}</p>
           <dl data-testid="flow-summary">
@@ -93,14 +93,14 @@ export function FlowSection(props: {
                 <tbody>
                   {incomeKinds.map((k) => (
                     <tr key={`in:${k}`} data-flow-drill-row={`in:${k}`}>
-                      <td className="grid-name-col sticky-col">Out — {k}</td>
+                      <td className="grid-name-col sticky-col">From {flowSourceKindLabel(k)}</td>
                       {flow.years.map((y) => <td key={y.year} className="table-value-cell">{(v => v === 0 ? "—" : money(v))(allocFromKind(k, y.year))}</td>)}
                       <td className="table-value-cell">{money(flow.sources.filter((s) => s.kind === k).reduce((a, s) => a + s.gross, 0))}</td>
                     </tr>
                   ))}
                   {useBuckets.map((b) => (
                     <tr key={`use:${b}`} data-flow-drill-row={`use:${b}`}>
-                      <td className="grid-name-col sticky-col">In — {b}</td>
+                      <td className="grid-name-col sticky-col">To {b}</td>
                       {flow.years.map((y) => <td key={y.year} className="table-value-cell">{(v => v === 0 ? "—" : money(v))(allocToBucket(b, y.year))}</td>)}
                       <td className="table-value-cell">{money(flow.uses.filter((u) => u.key !== FLOW_EQUITY_USE && bucketOf(u.key) === b).reduce((a, u) => a + u.total, 0))}</td>
                     </tr>
@@ -118,6 +118,7 @@ export function FlowSection(props: {
         <div>
           <h3>Authored pairings</h3>
           <p className="muted">An authored pairing replaces the default where drawn: a horizon-level amount, satisfied first in authored order and cumulatively across years. The default then fills the rest.</p>
+          <p className="muted" data-testid="flow-pairing-effect">A pairing changes which source covers which use (the drill&apos;s From and To rows show it), never the coverage bridge&apos;s totals: the bridge aggregates every source into the collections step.</p>
           {flow.refusals.length > 0 && (
             <ul data-testid="flow-refusals">
               {flow.refusals.map((r, i) => (
