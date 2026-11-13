@@ -34,7 +34,7 @@ const onlyFlow = (inputs: ModelInputs): DeckModel => {
 };
 
 describe("v0.6.22 Task E — the flow slide on the print route", () => {
-  it("PROGRAM: the flow slide prints its primary chart from the composed slot — the caption, the band labels and the connector entries in the trace", () => {
+  it("PROGRAM: the flow slide prints its primary chart (v0.6.22.2: the coverage bridge) from the composed slot, every rect bounded to the chart body", () => {
     reset();
     const model = onlyFlow(shorePowerProgram());
     const doc = buildDeckPdf(model, "Program", undefined, "dark");
@@ -42,14 +42,14 @@ describe("v0.6.22 Task E — the flow slide on the print route", () => {
     expect(out.length).toBeGreaterThan(1000);
     // W32: every chart rect on the flow page is bounded to 20..277 mm (the page and header bands excluded)
     const chartRects = rec.rects.filter((r) => Number(r[0]) > 0 && Number(r[1]) >= 14);
-    expect(chartRects.length).toBeGreaterThan(10);
+    expect(chartRects.length).toBeGreaterThanOrEqual(5); // the five program steps (and the page's other chart blocks)
     for (const r of chartRects) {
       expect(Number(r[0])).toBeGreaterThanOrEqual(PDF_CHART_LEFT - 1e-9);
       expect(Number(r[0]) + Number(r[2])).toBeLessThanOrEqual(PDF_CHART_RIGHT + 1e-9);
     }
   });
 
-  it("PROGRAM: the band and connector figures render through the deck formatters in the drawn texts", () => {
+  it("PROGRAM: the step figures render through the deck formatters in the drawn texts (v0.6.22.2 re-anchor: the step values and detail lines replace the band and connector texts)", () => {
     reset();
     const model = onlyFlow(shorePowerProgram());
     const trace: DeckPdfTrace = { drawnTitles: [], drawnFigures: [] };
@@ -58,9 +58,9 @@ describe("v0.6.22 Task E — the flow slide on the print route", () => {
     expect(trace!.drawnTitles).toContain("Covered on the horizon, 4 short years");
     expect(flat.some((f) => f.includes("Tariff (4 segments) €682 407 745"))).toBe(true);
     expect(flat.some((f) => f.includes("Grant (3 segments) €173 500 000"))).toBe(true);
-    expect(flat.some((f) => f.includes("Debt service €142 733 166"))).toBe(true);
-    expect(flat.some((f) => f.includes("tariff->Debt service €142 733 166"))).toBe(true);
-    expect(flat.some((f) => f.includes("5 zero-width connectors are omitted"))).toBe(true);
+    expect(flat).toContain("-€142 733 166");
+    expect(flat).toContain("Debt service");
+    expect(flat.some((f) => f.includes("No reinvestment on this project."))).toBe(true);
     expect(flat.some((f) => f.includes("Cash is fungible"))).toBe(true);
     expect(flat.some((f) => f.includes("4 of 23 years run a shortfall totaling -€307 492 953"))).toBe(true);
   });
@@ -78,21 +78,18 @@ describe("v0.6.22 Task E — the flow slide on the print route", () => {
     expect(flat2.some((f) => f.includes("3 of 10 years run a shortfall"))).toBe(true);
   });
 
-  it("DEGRADED BRIDGE ON PAPER: a negative net remainder draws in the print-bad tone, bounded to the chart body", () => {
+  it("NEGATIVE REMAINDER ON PAPER: a negative net remainder draws left of the zero line in the print-bad tone, bounded to the chart body (v0.6.22.2 re-anchor of the degraded-bridge pin)", () => {
     reset();
     const flowSlide = deckSlides(demoProject(), computeModel(demoProject()), { startYear: null }).slides.find((s) => s.name === "flow")!;
     const synthetic: DeckSlide = {
       ...flowSlide,
       flow: {
         ...flowSlide.flow!,
-        form: "bridge",
-        bridge: [
-          { id: "in", label: "Collections in", kind: "in", raw: 100, value: "100 kr", bottomPct: 0, heightPct: 100 },
-          { id: "out:Debt service", label: "Debt service out", kind: "out", raw: 0, value: "0 kr", bottomPct: 100, heightPct: 0 },
-          { id: "out:Operating", label: "Operating out", kind: "out", raw: 0, value: "0 kr", bottomPct: 100, heightPct: 0 },
-          { id: "out:Reinvestment", label: "Reinvestment out", kind: "out", raw: 0, value: "0 kr", bottomPct: 100, heightPct: 0 },
-          { id: "out:Capital", label: "Capital out", kind: "out", raw: 160, value: "-160 kr", bottomPct: 0, heightPct: 160 },
-          { id: "remainder", label: "Remainder to equity", kind: "remainder", raw: -60, value: "-60 kr", bottomPct: -60, heightPct: 60 },
+        zeroPct: 100 * 60 / 160,
+        steps: [
+          { id: "in", label: "Collected", kind: "in", raw: 100, value: "100 kr", detail: [], bad: false, startPct: 37.5, spanPct: 62.5, endPct: 100 },
+          { id: "out:Capital", label: "Capital", kind: "out", raw: -160, value: "-160 kr", detail: [], bad: false, startPct: 0, spanPct: 100, endPct: 0 },
+          { id: "remainder", label: "Remainder to equity", kind: "remainder", raw: -60, value: "-60 kr", detail: [], bad: true, startPct: 0, spanPct: 37.5, endPct: 0 },
         ],
       },
     };

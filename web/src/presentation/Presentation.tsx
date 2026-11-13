@@ -5,7 +5,7 @@ import { deckSlides } from "../deck.js";
 import type { ScenarioTargetChart } from "../deck.js";
 import { deckMoneyForDisplay, feeForDisplay, percentTwoForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, LedgerWaterfall, HurdlePlot, ScenarioComparisonBars, GanttChart, FlowBands, FlowBridge } from "../charts.js";
+import { CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, LedgerWaterfall, HurdlePlot, ScenarioComparisonBars, GanttChart, FlowCoverage } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 
@@ -272,12 +272,11 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
             )}
             {sl.name === "flow" && sl.flow !== undefined && (
               <div data-testid="deck-chart-slot" data-slide-chart="flow">
-                {/* v0.6.22 Task B: the flow slide renders the deck model's composed flow (composed
-                    once in deck.ts from composeFlow; nothing is recomputed here) — one primary chart,
-                    the two-band composition within the pinned bounds, the bridge beyond them, and
-                    the bracketed ledger of authored pairings beneath. */}
+                {/* v0.6.22.2: the flow slide renders the deck model's composed coverage bridge (composed
+                    once in deck.ts from composeFlow; nothing is recomputed here) — the one primary chart,
+                    its reading caption, and the bracketed ledger of authored pairings beneath. */}
+                <FlowCoverage flow={sl.flow} />
                 <p data-testid="flow-caption" className="deck-disclosure">{sl.flow.caption}</p>
-                {sl.flow.form === "bands" ? <FlowBands flow={sl.flow} /> : <FlowBridge flow={sl.flow} />}
                 {sl.flow.ledger.length > 0 && (
                   <div data-testid="flow-ledger" className="chart-block ledger">
                     <p data-testid="chart-kicker" className="chart-kicker">Authored pairings — replacing the default where drawn</p>

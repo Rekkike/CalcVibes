@@ -30,9 +30,10 @@ describe("v0.6.22 Task C — the Plan flow surface", () => {
     const surface = q('[data-testid="flow-surface"]');
     expect(surface).toBeTruthy();
     expect(q('[data-testid="flow-fungibility"]').textContent).toContain("Cash is fungible");
-    expect(q('[data-testid="flow-composition"]').getAttribute("data-form")).toBe("bands");
-    expect(q('[data-testid="flow-bands"]')).toBeTruthy();
-    expect(q('[data-testid="flow-caption"]').textContent).toContain("Flow surface in the app");
+    // v0.6.22.2 re-anchor: the coverage bridge is the surface's composition (the two-band form retired)
+    expect(q('[data-testid="flow-composition"]').getAttribute("data-form")).toBe("coverage");
+    expect(q('[data-testid="flow-coverage"]')).toBeTruthy();
+    expect(q('[data-testid="flow-caption"]').textContent).toContain("the per-year drill on the Flow surface shows each year");
     expect(q('[data-stat="flow-remainder"]').textContent).toBeTruthy();
     // the W25 parity ruling: the drill rides the editor-scroll wrapper with the sticky name column
     const scroll = q('[data-testid="flow-drill-scroll"]');
@@ -48,26 +49,20 @@ describe("v0.6.22 Task C — the Plan flow surface", () => {
     expect(q(".flow-surface-grid")).toBeTruthy();
   });
 
-  it("DRILL-TO-AGGREGATE: the drill rows reconcile to the composed aggregation by construction", () => {
+  it("DRILL-TO-AGGREGATE: the drill reconciles to the composed bridge by construction (v0.6.22.2 re-anchor: the bridge's steps replace the bands and connectors)", () => {
     const inputs = shorePowerProgram();
     const result = computeModel(inputs);
     const flow = composeFlow(inputs, result);
     const view = composeFlowSlide(flow, (v) => String(v));
-    // per-year bucket allocations sum to the aggregated connectors per bucket
-    const bucketOf = (useKey: string) => (useKey === "equity:remainder" ? "Equity remainder" : useKey === "financing:service" ? "Debt service" : ({ operating: "Operating", maintenance: "Operating", reinvestment: "Reinvestment", cost: "Capital" } as Record<string, string>)[useKey.slice(0, useKey.indexOf(":"))] ?? useKey);
-    for (const band of view.useBands) {
-      const fromYears = flow.years.reduce((a, y) => a + y.allocations.filter((x) => bucketOf(x.useKey) === band.key).reduce((b, x) => b + x.amount, 0), 0);
-      const fromConn = view.connectors.filter((c) => c.useKey === band.key).reduce((a, c) => a + c.raw, 0);
-      expect(fromYears).toBeCloseTo(fromConn, 6); // every band: the per-year drill sums to its aggregated connectors
-      if (band.key !== "Equity remainder" && band.raw > 0) {
-        expect(fromConn).toBeCloseTo(Math.min(band.raw, flow.connectors.filter((c) => bucketOf(c.useKey) === band.key).reduce((a, c) => a + c.amount, 0)), 6);
-      }
+    const bucketOf = (useKey: string) => (useKey === "financing:service" ? "Debt service" : ({ operating: "Operating", maintenance: "Operating", reinvestment: "Reinvestment", cost: "Capital" } as Record<string, string>)[useKey.slice(0, useKey.indexOf(":"))]);
+    // each use step carries the bucket's horizon total, signed out
+    for (const st of view.steps.filter((x) => x.kind === "out")) {
+      const total = flow.uses.filter((u) => u.key !== "equity:remainder" && bucketOf(u.key) === st.label).reduce((a, u) => a + u.total, 0);
+      expect(st.raw).toBeCloseTo(-total, 6);
     }
-    // the income side: per-year kind outflows sum to the band raws
-    for (const band of view.incomeBands) {
-      const fromYears = flow.years.reduce((a, y) => a + y.allocations.filter((x) => x.sourceKey.startsWith(band.key + ":")).reduce((b, x) => b + x.amount, 0), 0);
-      expect(fromYears).toBeCloseTo(band.raw, 6);
-    }
+    // the collections step is the sources' net sum; the remainder step is the drill's signed remainder row summed
+    expect(view.steps[0].raw).toBeCloseTo(flow.sources.reduce((a, x) => a + x.total, 0), 6);
+    expect(view.steps[view.steps.length - 1].raw).toBeCloseTo(flow.years.reduce((a, y) => a + y.remainder, 0), 6);
   });
 
   it("EDITOR: add pairing (nextId, default selects), the amount refusal at zero, the amount write through the MoneyEditor at the entry unit, source and use selects, remove", () => {
@@ -103,9 +98,11 @@ describe("v0.6.22 Task C — the Plan flow surface", () => {
     render(<App />);
     fireEvent.click(q('[data-action="load-demo"]'));
     fireEvent.click(q('[data-nav="flow"]'));
-    expect(q('[data-flow-income-label="grant"]')).toBeTruthy();
-    expect(q('[data-flow-income-label="funding-loan"]')).toBeTruthy();
-    expect(q('[data-flow-use-label="Debt service"]')).toBeTruthy();
+    // v0.6.22.2 re-anchor: the sources ride as the collections step's detail lines; debt service is its own step
+    const detail = qa('[data-flow-detail="in"]').map((d) => d.textContent ?? "");
+    expect(detail.some((d) => d.startsWith("Grant (3 segments)"))).toBe(true);
+    expect(detail.some((d) => d.startsWith("Interest-free note"))).toBe(true);
+    expect(q('[data-flow-step="out:Debt service"]')).toBeTruthy();
     // the year-3 overlap is disclosed in the summary: 4 shortfall years on the program
     expect(q('[data-testid="flow-shortfall-note"]').textContent).toContain("4 of 23 years run a shortfall");
   });

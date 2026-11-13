@@ -1438,22 +1438,33 @@
 /* v0.6.22.1 Task A — the direct-label seating: the figure is one centered SVG block (the fixed-width
    label columns live in the gutters inside the viewBox, the below-figure swatch lists retired); the
    labels are SVG text seated with their bands. */
-.flow-chart .flow-svg { display: block; width: 100%; max-width: 56rem; height: auto; margin-inline: auto; }
-.flow-chart .flow-connector { opacity: 0.55; }
-.flow-chart .flow-label { fill: var(--ink); font-variant-numeric: tabular-nums; }
-[data-testid="presentation"] .flow-chart .flow-label { fill: #e2e8f0; }
-.app-root .flow-chart .flow-label-bad { fill: var(--bad); }
-[data-testid="presentation"] .flow-chart .flow-label-bad { fill: #fb7185; }
-.app-root .flow-chart .flow-label-inside, [data-testid="presentation"] .flow-chart .flow-label-inside { fill: #081c33; }
-.flow-bridge .flow-bridge-track { position: relative; height: 220px; width: 100%; margin-top: 0.6rem; }
-.flow-bridge .flow-step { position: absolute; border-radius: 3px 3px 0 0; background: var(--accent, #0074ba); }
-[data-testid="presentation"] .flow-bridge .flow-step { background: #38bdf8; }
-.flow-bridge .flow-step-out { background: #fb7185; }
-[data-testid="presentation"] .flow-bridge .flow-step-out { background: #fb7185; }
-.flow-bridge .flow-step-remainder { background: #34d399; }
-[data-testid="presentation"] .flow-bridge .flow-step-remainder { background: #34d399; }
-.flow-bridge .flow-step-bad { background: #e11d48; }
-.flow-bridge .flow-step-value { font-variant-numeric: tabular-nums; }
+/* v0.6.22.2: the coverage bridge (the flow figure on the deck slide and the Plan flow surface) in the row form of
+   the waterfall: one row per step, a text column (name and value, then the detail lines) beside a track where the
+   bar floats on the shared horizontal axis. The rows abut so the connector stubs and the zero line run through.
+   Text wraps at every width (the figures kept whole by non-breaking separators, never clipped). Outs in a neutral
+   ink, the collections in the accent, the remainder in the ok tone, a negative remainder and the shortfall line in
+   the bad tone. */
+.flow-coverage { margin: var(--space-2, 8px) 0; }
+.flow-coverage .flow-coverage-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); column-gap: 12px; align-items: stretch; }
+.flow-coverage .flow-coverage-text { padding: 6px 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.flow-coverage .flow-coverage-head { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 8px; font-size: 13px; line-height: 1.25; }
+.flow-coverage .flow-coverage-label { font-weight: 600; }
+.flow-coverage .flow-coverage-value { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.flow-coverage .flow-coverage-detail { font-size: 11.5px; line-height: 1.25; opacity: 0.85; overflow-wrap: anywhere; }
+.flow-coverage .flow-coverage-figure { font-variant-numeric: tabular-nums; }
+.flow-coverage .flow-coverage-track { position: relative; min-height: 30px; }
+.flow-coverage .flow-coverage-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.flow-coverage .flow-coverage-bar { stroke: var(--accent, #0074ba); stroke-linecap: butt; }
+.flow-coverage .flow-coverage-out { stroke: #94a3b8; }
+.flow-coverage .flow-coverage-remainder { stroke: #34d399; }
+.flow-coverage .flow-coverage-bad { stroke: #e11d48; }
+[data-testid="presentation"] .flow-coverage .flow-coverage-in { stroke: #38bdf8; }
+[data-testid="presentation"] .flow-coverage .flow-coverage-bad { stroke: #fb7185; }
+.flow-coverage .flow-coverage-zero { stroke: currentColor; stroke-width: 1.5; opacity: 0.75; }
+.flow-coverage .flow-coverage-connector { stroke: currentColor; stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.75; }
+.flow-coverage .tone-bad { color: var(--bad, #e11d48); opacity: 1; }
+[data-testid="presentation"] .flow-coverage { color: #e2e8f0; }
+[data-testid="presentation"] .flow-coverage .tone-bad { color: #fb7185; }
 
 /* The Plan flow surface (v0.6.22 Task C): the composed reading and the authored editor in one
    place; the W24 two-column layout at the wide breakpoint, stacking at phone width; the drill

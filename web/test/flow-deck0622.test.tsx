@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { App } from "../src/App.js";
-import { composeFlowSlide, deckSlides, FLOW_LEDGER_CAP, FLOW_MAX_BANDS, FLOW_MAX_CONNECTORS } from "../src/deck.js";
+import { composeFlowSlide, deckSlides, flowDetailText, FLOW_LEDGER_CAP } from "../src/deck.js";
 import { computeModel } from "../src/engine.js";
 import { composeFlow, demoProject, landNewbuildProject, shorePowerProgram, solarParkProject } from "../src/state.js";
 import type { FlowComposition } from "../src/state.js";
 import type { ModelInputs } from "../../core/src/types.js";
 
+// v0.6.22.2 re-anchor: the coverage bridge is the slide's one primary form; the two-band form, its connectors and
+// its bounds retired (the band and connector pins below are re-anchored to the bridge's steps; every script-verified
+// figure of record stands).
 // v0.6.22 Task B/F — the flow deck slide: the two-band connected composition within the pinned
 // bounds (at most 8 bands per side after kind aggregation, at most 30 live connectors), the
 // sequential bridge as the degradation form (six fixed steps), the bracketed ledger capped at 24
@@ -34,7 +37,7 @@ describe("v0.6.22 Task B — the flow slide", () => {
     expect(solar.slides.find((s) => s.name === "flow")!.kickerNumber).toBe("05"); // after the operations slide
   });
 
-  it("TEMPLATE (script-verified): the action title, the body figures, the signed shortfall disclosure, the bands form", () => {
+  it("TEMPLATE (script-verified): the action title, the body figures, the signed shortfall disclosure, the coverage bridge", () => {
     const sl = flowSlideOf(demoProject());
     expect(sl.title).toBe("Covered on the horizon, 3 short years"); // the action title within the 40-char headline bound
     expect(sl.body.map((b) => [b.label, b.value])).toEqual([
@@ -45,43 +48,30 @@ describe("v0.6.22 Task B — the flow slide", () => {
       ["Surplus years' remainder", "12 833 347 kr"],
       ["Shortfall years' total", "-7 374 551 kr"],
     ]);
-    expect(sl.flow!.form).toBe("bands");
-    expect(sl.flow!.incomeBands.map((b) => [b.key, b.label, b.raw])).toEqual([["payments", "Payment stream", 13308655.754089093]]);
-    expect(sl.flow!.useBands.map((b) => [b.key, b.raw, b.signed])).toEqual([["Capital", 7849860, false], ["Equity remainder", 5458795.754089092, true]]);
-    expect(sl.flow!.connectors.map((c) => [c.sourceKey, c.useKey, c.raw])).toEqual([
-      ["payments", "Capital", 475309.1340746104],
-      ["payments", "Equity remainder", 12833346.620014483],
+    expect(sl.flow!.steps.map((x) => [x.id, x.label, x.raw, x.value])).toEqual([
+      ["in", "Collected", 13308655.754089093, "13 308 656 kr"],
+      ["out:Capital", "Capital", -7849860, "-7 849 860 kr"],
+      ["remainder", "Remainder to equity", 5458795.754089092, "5 458 796 kr"],
     ]);
+    expect(sl.flow!.steps[0].detail.map(flowDetailText)).toEqual(["Payment stream 13 308 656 kr"]);
+    expect(sl.flow!.steps[2].detail).toEqual([{ label: "surplus years", value: "12 833 347 kr", bad: false }, { label: "3 shortfall years", value: "-7 374 551 kr", bad: true }]);
     expect(sl.disclosures[0]).toContain("Cash is fungible");
     expect(sl.disclosures[1]).toBe("3 of 10 years run a shortfall totaling -7 374 551 kr; the remainder column is signed in every year and a shortfall is never smoothed or netted invisibly.");
   });
 
-  it("PROGRAM (script-verified): the kind aggregation (4 tariff and 3 grant segments in one band each), the omitted zero-width connectors counted in the caption, the note band", () => {
+  it("PROGRAM (script-verified): the kind aggregation (4 tariff and 3 grant segments named on the collections step), the omitted reinvestment step named in the caption, the note netting to zero", () => {
     const sl = flowSlideOf(shorePowerProgram());
     expect(sl.title).toBe("Covered on the horizon, 4 short years");
-    expect(sl.flow!.form).toBe("bands");
-    expect(sl.flow!.incomeBands.map((b) => [b.key, b.label, b.raw, b.count])).toEqual([
-      ["tariff", "Tariff (4 segments)", 682407745.339823, 4],
-      ["grant", "Grant (3 segments)", 173500000, 3],
-      ["funding-loan", "Interest-free note", 10000000, 1],
+    expect(sl.flow!.steps.map((x) => [x.id, x.raw])).toEqual([
+      ["in", 855907745.339823],
+      ["out:Debt service", -142733166.0294332],
+      ["out:Operating", -179250000],
+      ["out:Capital", -449000000],
+      ["remainder", 84924579.31038983],
     ]);
-    expect(sl.flow!.useBands.map((b) => [b.key, b.raw])).toEqual([
-      ["Capital", 449000000],
-      ["Operating", 179250000],
-      ["Debt service", 142733166.0294332],
-      ["Equity remainder", 84924579.31038983],
-    ]);
-    expect(sl.flow!.connectors.map((c) => [c.sourceKey, c.useKey, c.raw])).toEqual([
-      ["grant", "Capital", 87836318.20757927],
-      ["funding-loan", "Capital", 10000000],
-      ["tariff", "Capital", 44670729.19042404],
-      ["tariff", "Debt service", 142733166.0294332],
-      ["tariff", "Operating", 179250000],
-      ["grant", "Equity remainder", 85663681.79242073],
-      ["tariff", "Equity remainder", 315753850.1199658],
-    ]);
-    expect(sl.flow!.omittedConnectors).toBe(5);
-    expect(sl.flow!.caption).toBe("Sources aggregated by kind: 4 tariff segments in one band; 3 grant segments in one band. 5 zero-width connectors are omitted, never drawn as hairlines. The per-source, per-year matching is on the Flow surface in the app.");
+    expect(sl.flow!.steps[0].detail.map(flowDetailText)).toEqual(["Tariff (4 segments) €682 407 745", "Grant (3 segments) €173 500 000", "Interest-free note €0"]);
+    expect(sl.flow!.omittedSteps).toEqual(["Reinvestment"]);
+    expect(sl.flow!.caption).toBe("Read top to bottom in the coverage order: what the collections bring in, each use they cover in turn, and the signed remainder to equity. No reinvestment on this project. The horizon total nets 4 shortfall years against the surplus years; the per-year drill on the Flow surface shows each year.");
     expect(sl.disclosures.some((d) => d.includes("netting to €0") || d.includes("nets to €0"))).toBe(true);
     // Task G: the capital/collections overlap years are disclosed by name (startYear 2026; script-verified: years 1, 3, 4, 5 carry both income and capital spend)
     expect(sl.disclosures.some((d) => d === "In 2026, 2028, 2029, 2030 the collections run alongside the year's capital spend; the matching shows both.")).toBe(true);
@@ -90,8 +80,8 @@ describe("v0.6.22 Task B — the flow slide", () => {
   it("LAND (script-verified): the two contract segments aggregate, the residual band stands alone, the signed shortfall", () => {
     const sl = flowSlideOf(landNewbuildProject());
     expect(sl.title).toBe("Covered on the horizon, 2 short years");
-    expect(sl.flow!.incomeBands.map((b) => [b.key, b.label, b.count])).toEqual([["contract", "Contract (2 segments)", 2], ["residual", "Residual", 1]]);
-    expect(sl.flow!.omittedConnectors).toBe(3);
+    expect(sl.flow!.steps[0].detail.map(flowDetailText)).toEqual(["Contract (2 segments) NOK 971 205 821", "Residual NOK 161 363 636"]);
+    expect(sl.flow!.omittedSteps).toEqual(["Debt service", "Reinvestment"]);
     expect(sl.body.find((b) => b.label === "Shortfall years' total")!.value).toBe("-NOK 420 000 000");
   });
 
@@ -121,48 +111,24 @@ describe("v0.6.22 Task B — the flow slide", () => {
       expect(sl.flow!.shortfallYears).toBe(flow.shortfallYears);
       expect(sl.flow!.incomeNet).toBe(flow.sources.reduce((a, s) => a + s.total, 0));
       expect(sl.flow!.incomeNet).toBeCloseTo(result.totalCollected, 6); // the slide's income is the engine's totalCollected
-      // the band raws reconcile to the model's gross flows and the connectors to the model's allocations
-      expect(sl.flow!.incomeBands.reduce((a, b) => a + b.raw, 0)).toBeCloseTo(flow.sources.reduce((a, s) => a + s.gross, 0), 6);
-      expect(sl.flow!.connectors.reduce((a, c) => a + c.raw, 0)).toBeCloseTo(flow.connectors.reduce((a, c) => a + c.amount, 0), 6);
-      // the bridge's six fixed steps reconcile to the same totals
-      expect(sl.flow!.bridge.length).toBe(6);
-      expect(sl.flow!.bridge[0].raw).toBe(sl.flow!.incomeNet);
-      expect(sl.flow!.bridge[5].raw).toBe(flow.remainderNet);
+      // the bridge's steps reconcile to the same totals: collections in, the uses out, the signed remainder
+      const steps = sl.flow!.steps;
+      expect(steps[0].raw).toBe(sl.flow!.incomeNet);
+      expect(steps[steps.length - 1].raw).toBe(flow.remainderNet);
+      expect(-steps.filter((x) => x.kind === "out").reduce((a, x) => a + x.raw, 0)).toBeCloseTo(sl.flow!.usesTotal, 6);
     }
   });
 
-  it("BOUNDS: beyond 30 live connectors or 8 bands per side the slide degrades to the bridge with its naming caption; the ledger caps at 24 rows with its counting caption", () => {
-    const fake = (nConn: number, nBands: number, nPairs: number): FlowComposition => {
-      const sources = Array.from({ length: nBands }, (_, i) => ({ key: `k${i}:s${i}`, label: `S${i}`, kind: `k${i}`, total: 100, gross: 100 }));
-      const bucketKeys = ["cost:c1", "operating:o1", "reinvestment:r1", "financing:service"];
-      const uses = [
-        { key: "cost:c1", label: "C1", kind: "cost", total: 50, gross: 50 },
-        { key: "operating:o1", label: "O1", kind: "operating", total: 50, gross: 50 },
-        { key: "reinvestment:r1", label: "R1", kind: "reinvestment", total: 50, gross: 50 },
-        { key: "financing:service", label: "Debt service", kind: "financing", total: 50, gross: 50 },
-        { key: "equity:remainder", label: "Equity remainder", kind: "equity", total: 0, gross: 0 },
-      ];
-      // distinct (kind, bucket) pairs: kind i % nBands against bucket floor(i / nBands)
-      const connectors = Array.from({ length: nConn }, (_, i) => ({ sourceKey: `k${i % nBands}:s${i % nBands}`, useKey: bucketKeys[Math.floor(i / nBands) % bucketKeys.length], amount: 10 }));
-      return {
-        sources, uses, useOrder: ["cost:c1"], years: [], connectors,
-        remainderNet: 50, remainderSurplus: 50, remainderShortfall: 0, shortfallYears: 0,
-        pairings: Array.from({ length: nPairs }, (_, i) => ({ id: `f${i}`, sourceId: `k0:s0`, sourceLabel: "S0", useId: "cost:c1", useLabel: "C1", amount: 5, allocated: 5, remaining: 0 })),
-        refusals: [],
-      };
-    };
-    const within = composeFlowSlide(fake(FLOW_MAX_CONNECTORS, FLOW_MAX_BANDS, 0), money);
-    expect(within.form).toBe("bands");
-    expect(within.connectors.length).toBeLessThanOrEqual(FLOW_MAX_CONNECTORS);
-    const overConn = composeFlowSlide(fake(FLOW_MAX_CONNECTORS + 1, FLOW_MAX_BANDS, 0), money);
-    expect(overConn.form).toBe("bridge");
-    expect(overConn.caption).toContain("exceeds its bounds");
-    expect(overConn.caption).toContain("31 live connectors");
-    expect(overConn.bridge.length).toBe(6);
-    const overBands = composeFlowSlide(fake(2, FLOW_MAX_BANDS + 1, 0), money);
-    expect(overBands.form).toBe("bridge");
-    expect(overBands.caption).toContain("9 income bands");
-    const capped = composeFlowSlide(fake(1, 1, FLOW_LEDGER_CAP + 6), money);
+  it("LEDGER CAP: the ledger caps at 24 rows with its counting caption (v0.6.22.2 re-anchor: the band bounds retired with the two-band form)", () => {
+    const fake = (nPairs: number): FlowComposition => ({
+      sources: [{ key: "k0:s0", label: "S0", kind: "k0", total: 100, gross: 100 }],
+      uses: [{ key: "cost:c1", label: "C1", kind: "cost", total: 50, gross: 50 }, { key: "equity:remainder", label: "Equity remainder", kind: "equity", total: 0, gross: 0 }],
+      useOrder: ["cost:c1"], years: [], connectors: [],
+      remainderNet: 50, remainderSurplus: 50, remainderShortfall: 0, shortfallYears: 0,
+      pairings: Array.from({ length: nPairs }, (_, i) => ({ id: `f${i}`, sourceId: "k0:s0", sourceLabel: "S0", useId: "cost:c1", useLabel: "C1", amount: 5, allocated: 5, remaining: 0 })),
+      refusals: [],
+    });
+    const capped = composeFlowSlide(fake(FLOW_LEDGER_CAP + 6), money);
     expect(capped.ledger.length).toBe(FLOW_LEDGER_CAP);
     expect(capped.ledgerOmitted).toBe(6);
     expect(capped.caption).toContain("6 authored pairings are beyond the 24-row ledger");
@@ -176,11 +142,12 @@ describe("v0.6.22 Task B — the flow slide", () => {
     fireEvent.click(document.querySelector('[data-action="present"]') as HTMLElement);
     const slide = document.querySelector('[data-slide-name="flow"]') as HTMLElement;
     expect(slide).toBeTruthy();
-    expect(slide.querySelector('[data-testid="flow-bands"]')).toBeTruthy();
-    expect(slide.querySelector('[data-testid="flow-caption"]')!.textContent).toContain("4 tariff segments in one band");
-    expect(slide.querySelectorAll('[data-flow-connector]').length).toBe(7);
-    expect(slide.querySelectorAll('[data-flow-income-band]').length).toBe(3);
-    expect(slide.querySelectorAll('[data-flow-use-band]').length).toBe(4);
+    // v0.6.22.2 re-anchor: the coverage bridge — five steps on the program (collections, debt service, operating, capital, remainder), four connectors between them
+    expect(slide.querySelector('[data-testid="flow-coverage"]')).toBeTruthy();
+    expect(slide.querySelector('[data-testid="flow-caption"]')!.textContent).toContain("No reinvestment on this project.");
+    expect(slide.querySelectorAll('line[data-flow-step]').length).toBe(5);
+    expect(slide.querySelectorAll('[data-flow-connector]').length).toBe(4);
+    expect(slide.querySelector('[data-testid="flow-bands"]')).toBeNull();
     // the fungibility caption travels with the slide
     const disclosures = Array.from(slide.querySelectorAll(".deck-disclosure")).map((d) => d.textContent ?? "");
     expect(disclosures.some((d) => d.includes("Cash is fungible"))).toBe(true);
