@@ -192,7 +192,6 @@ describe("Task R1: TILE-GRID / TONE-RENDER / STAGE-CHART-LEGIBILITY / RESPONSIVE
     for (const svg of Array.from(document.querySelectorAll('[data-testid="presentation"] svg'))) {
       expect(svg.getAttribute("width")).toBeNull();
       if (svg.closest('[data-testid="gantt-chart"]') !== null) continue; // v0.6.13.1 re-anchor: the Gantt SVG labels with direct text
-      if (svg.closest('[data-testid="flow-bands"]') !== null) continue; // v0.6.22.1 re-anchor: the flow bands' direct labels are SVG text (the Gantt precedent)
       expect(svg.querySelector("text")).toBeNull();
     }
   });

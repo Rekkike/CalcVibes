@@ -993,6 +993,8 @@ export const FLOW_FUNGIBILITY_CAPTION = "Cash is fungible: this allocation is a 
 export const FLOW_LEDGER_CAP = 24;
 // The coverage order of record (composeFlow's default allocation), read as the bridge's steps.
 export const FLOW_COVERAGE_ORDER = ["Debt service", "Operating", "Reinvestment", "Capital"];
+// the noun a use step's line count reads in
+const FLOW_STEP_NOUN: Record<string, string> = { Operating: "operating line", Reinvestment: "reinvestment", Capital: "cost line" };
 
 // Composed once per build and consumed by the deck slide, the app's flow surface and the print route
 // (the composed-once discipline: one allocation model, one slide-model helper, no consumer recomputes).
@@ -1041,7 +1043,7 @@ export function composeFlowSlide(flow: ReturnType<typeof composeFlow>, money: (v
       kind: "out",
       raw: -o.raw,
       value: money(-o.raw),
-      detail: o.bucket === "Debt service" ? [{ text: "the facilities' combined service", bad: false }] : [{ text: `${o.lines} ${o.lines === 1 ? "line" : "lines"}`, bad: false }],
+      detail: [{ text: o.bucket === "Debt service" ? "the facilities' combined service" : `${o.lines} ${FLOW_STEP_NOUN[o.bucket] ?? "line"}${o.lines === 1 ? "" : "s"}`, bad: false }],
       bad: false,
       bottomPct: pct(Math.min(after, running)),
       heightPct: pct(Math.max(after, running)) - pct(Math.min(after, running)),
@@ -1064,7 +1066,10 @@ export function composeFlowSlide(flow: ReturnType<typeof composeFlow>, money: (v
   // the caption: the reading order, the omitted steps by name, the timing the horizon total nets, the
   // pairings' effect, the ledger count
   const captionParts: string[] = ["Read left to right in the coverage order: what the collections bring in, each use they cover in turn, and the signed remainder to equity."];
-  if (omittedSteps.length > 0) captionParts.push(`No ${omittedSteps.map((b) => b.toLowerCase()).join(" or ")} on this project.`);
+  if (omittedSteps.length > 0) {
+    const names = omittedSteps.map((b) => b.toLowerCase());
+    captionParts.push(`No ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`} on this project.`);
+  }
   if (flow.shortfallYears > 0) captionParts.push(`The horizon total nets ${flow.shortfallYears} shortfall ${flow.shortfallYears === 1 ? "year" : "years"} against the surplus years; the per-year drill on the Flow surface shows each year.`);
   if (flow.pairings.length > 0) captionParts.push(`The authored ${flow.pairings.length === 1 ? "pairing changes" : "pairings change"} which source covers which use, never these totals.`);
   if (ledgerOmitted > 0) captionParts.push(`${ledgerOmitted} authored ${ledgerOmitted === 1 ? "pairing is" : "pairings are"} beyond the ${FLOW_LEDGER_CAP}-row ledger; the app holds the full list.`);
