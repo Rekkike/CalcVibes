@@ -577,7 +577,7 @@ function drawPrintColumns(doc: jsPDF, T: PdfThemePalette, columns: DeckStepColum
 // omitted connectors stay omitted and counted in the caption; the authored pairings print as the
 // bracketed ledger lines beneath. Nothing is recomputed here. The plot height is sized so the
 // slide's body figures, disclosures and chart fit one page.
-const FLOW_PRINT_PLOT_H = 40;
+const FLOW_PRINT_PLOT_H = 26; // sized so the slide's body figures, disclosures and chart fit one page
 function drawPrintFlow(doc: jsPDF, T: PdfThemePalette, flow: DeckFlow, y: number, trace?: DeckPdfTrace): number {
   const plotH = FLOW_PRINT_PLOT_H;
   const bandW = 14;

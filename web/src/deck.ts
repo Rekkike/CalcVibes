@@ -1167,6 +1167,11 @@ function flowSlide(inputs: ModelInputs, result: ModelResult, money: (v: number) 
   if (noteSource !== undefined) {
     disclosures.push(`The interest-free note's advance is a source in its draw year and its installments reduce the later years' income; it nets to ${money(noteSource.total)} over the horizon.`);
   }
+  // Task G: the capital/collections overlap years are disclosed by name (the program demo's year 3).
+  const overlapYears = flow.years.filter((y) => y.income > 0 && y.allocations.some((a) => a.useKey.startsWith("cost:"))).map((y) => y.year);
+  if (overlapYears.length > 0) {
+    disclosures.push(`In ${overlapYears.map((y) => yearHeader(y, startYear)).join(", ")} the collections run alongside the year's capital spend; the matching shows both.`);
+  }
   return { name: "flow", title, body, disclosures, flow: f };
 }
 

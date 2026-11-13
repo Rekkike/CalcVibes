@@ -83,6 +83,8 @@ describe("v0.6.22 Task B — the flow slide", () => {
     expect(sl.flow!.omittedConnectors).toBe(5);
     expect(sl.flow!.caption).toBe("Sources aggregated by kind: 4 tariff segments in one band; 3 grant segments in one band. 5 zero-width connectors are omitted, never drawn as hairlines. The per-source, per-year matching is on the Flow surface in the app.");
     expect(sl.disclosures.some((d) => d.includes("netting to €0") || d.includes("nets to €0"))).toBe(true);
+    // Task G: the capital/collections overlap years are disclosed by name (startYear 2026; script-verified: years 1, 3, 4, 5 carry both income and capital spend)
+    expect(sl.disclosures.some((d) => d === "In 2026, 2028, 2029, 2030 the collections run alongside the year's capital spend; the matching shows both.")).toBe(true);
   });
 
   it("LAND (script-verified): the two contract segments aggregate, the residual band stands alone, the signed shortfall", () => {

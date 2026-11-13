@@ -170,4 +170,4 @@ export const TERM_GLOSSES: { term: string; gloss: string }[] = [
   { term: "WACC", gloss: "the weighted average cost of capital, the benchmark a positive NPV must clear" },
 ];
 
-export const VERSION = "v0.6.21";
+export const VERSION = "v0.6.22";
