@@ -1,7 +1,8 @@
 import { jsPDF } from "jspdf";
 import { deckMoneyForDisplay, percentTwoForDisplay } from "./engine.js";
 import type { CurrencyCode, EntryUnit } from "./engine.js";
-import type { DeckModel, DeckDonut, DeckFlow, DeckGantt, DeckLedgerRow, DeckStepColumn, ScenarioTargetChart } from "./deck.js";
+import type { DeckModel, DeckDonut, DeckFlow, DeckFlowBand, DeckGantt, DeckLedgerRow, DeckStepColumn, ScenarioTargetChart } from "./deck.js";
+import { labelEm } from "./ganttLayout.js";
 
 export interface DeckPdfTrace {
   drawnTitles: string[];
@@ -577,14 +578,35 @@ function drawPrintColumns(doc: jsPDF, T: PdfThemePalette, columns: DeckStepColum
 // omitted connectors stay omitted and counted in the caption; the authored pairings print as the
 // bracketed ledger lines beneath. Nothing is recomputed here. The plot height is sized so the
 // slide's body figures, disclosures and chart fit one page.
+// v0.6.22.1 Task B — the same direct-label seating on paper as the app renderer, within the W32
+// geometry contract: the chart body 20..277 mm holds the two fixed-width label columns, the two band
+// boxes and the ribbon space between them (the labels never enter the ribbon space, so a label never
+// collides with a connector). The same admission rule as the app renderer, at the print route's
+// established 6 pt: a segment admits its label inside the band rect when its rendered height
+// hAt(heightPct) is at least FLOW_PRINT_LABEL_MIN_H; otherwise the label seats in the label column
+// directly beside its band (income labels left of the income band, use labels right of the use band),
+// vertically aligned to its segment through the same yAt/hAt mapping. One page per slide is kept; no
+// legend block exists on the paper route.
 const FLOW_PRINT_PLOT_H = 26; // sized so the slide's body figures, disclosures and chart fit one page
+export const FLOW_PRINT_LABEL_PT = 6; // the flow print route's established label size
+export const FLOW_PRINT_LABEL_MIN_H = (FLOW_PRINT_LABEL_PT * 25.4) / 72 + 1; // one 6 pt line with the print baseline offset (+1) is admitted when h/2 + 1 + descent <= h
+const FLOW_PRINT_LABEL_COL_W = 40; // the fixed-width label column inside the chart body (20..277 mm)
+const FLOW_PRINT_BAND_INSET = 1;
+const FLOW_PRINT_BAND_MIN_W = 14; // the standing v0.6.22 print band width (floor)
+const FLOW_PRINT_LINE_H = (FLOW_PRINT_LABEL_PT * 25.4 * 1.15) / 72; // jsPDF's line height at 6 pt (lineHeightFactor 1.15)
 function drawPrintFlow(doc: jsPDF, T: PdfThemePalette, flow: DeckFlow, y: number, trace?: DeckPdfTrace): number {
   const plotH = FLOW_PRINT_PLOT_H;
-  const bandW = 14;
-  const xLeft = PDF_CHART_LEFT;
-  const xRight = PDF_CHART_RIGHT - bandW;
+  const ptMm = 25.4 / 72;
+  // the band box is sized to the widest label line, measured per the Gantt's labelEm discipline, so
+  // the inside seating never overflows the band rect at the established 6 pt
+  const allBands = [...flow.incomeBands, ...flow.useBands];
+  const bandW = Math.max(FLOW_PRINT_BAND_MIN_W, ...allBands.map((b) => Math.ceil(labelEm(`${b.label} ${b.value}`) * FLOW_PRINT_LABEL_PT * ptMm) + 2 * FLOW_PRINT_BAND_INSET));
+  const xLeft = PDF_CHART_LEFT + FLOW_PRINT_LABEL_COL_W;
+  const xRight = PDF_CHART_RIGHT - FLOW_PRINT_LABEL_COL_W - bandW;
   const yAt = (pct: number) => y + (pct / 100) * plotH;
   const hAt = (pct: number) => (pct / 100) * plotH;
+  const midY = (b: DeckFlowBand) => yAt(b.topPct) + hAt(b.heightPct) / 2;
+  const admitsInside = (b: DeckFlowBand) => hAt(b.heightPct) >= FLOW_PRINT_LABEL_MIN_H;
   const startY = y;
   if (flow.form === "bands") {
     // the connector rects first (beneath the bands), spanning the gap between the band columns
@@ -598,15 +620,35 @@ function drawPrintFlow(doc: jsPDF, T: PdfThemePalette, flow: DeckFlow, y: number
       doc.rect(xLeft + bandW, Math.min(sy, cy) - 0, xRight - (xLeft + bandW), Math.max(sh, uh) * 0.5, "F");
       if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${c.sourceKey}->${c.useKey} ${c.value}`);
     }
+    // one label renderer for both bands: inside the band rect when the segment height admits the
+    // text at 6 pt, otherwise the beside label column, vertically aligned through midY
+    const printLabel = (b: DeckFlowBand, side: "income" | "use", bandX: number) => {
+      const bad = b.signed && b.raw < 0;
+      const text = `${b.label} ${b.value}`;
+      doc.setFontSize(FLOW_PRINT_LABEL_PT);
+      const inside = admitsInside(b);
+      if (inside) {
+        doc.setTextColor(T.onBar[0], T.onBar[1], T.onBar[2]);
+        const lines = doc.splitTextToSize(text, bandW - 2 * FLOW_PRINT_BAND_INSET) as string[];
+        const firstY = midY(b) + 1 - ((lines.length - 1) * FLOW_PRINT_LINE_H) / 2;
+        doc.text(lines, bandX + bandW / 2, firstY, { align: "center", maxWidth: bandW - 2 * FLOW_PRINT_BAND_INSET });
+      } else {
+        const ink = side === "use" && bad ? T.bad : T.mut;
+        doc.setTextColor(ink[0], ink[1], ink[2]);
+        const colMax = FLOW_PRINT_LABEL_COL_W - 4;
+        const lines = doc.splitTextToSize(text, colMax) as string[];
+        const firstY = midY(b) + 1 - ((lines.length - 1) * FLOW_PRINT_LINE_H) / 2;
+        if (side === "income") doc.text(lines, bandX - 2, firstY, { align: "right", maxWidth: colMax });
+        else doc.text(lines, bandX + bandW + 2, firstY, { align: "left", maxWidth: colMax });
+      }
+      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
+      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(text);
+    };
     flow.incomeBands.forEach((b, i) => {
       const pc = hexToRgb(printColorOf(T, i));
       doc.setFillColor(pc[0], pc[1], pc[2]);
       doc.rect(xLeft, yAt(b.topPct), bandW, Math.max(0.4, hAt(b.heightPct)), "F");
-      doc.setFontSize(6);
-      doc.setTextColor(T.mut[0], T.mut[1], T.mut[2]);
-      doc.text(`${b.label} ${b.value}`, xLeft - 2, yAt(b.topPct) + hAt(b.heightPct) / 2 + 1, { align: "right", maxWidth: 0 });
-      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
-      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${b.label} ${b.value}`);
+      printLabel(b, "income", xLeft);
     });
     flow.useBands.forEach((b, i) => {
       const bad = b.signed && b.raw < 0;
@@ -616,11 +658,7 @@ function drawPrintFlow(doc: jsPDF, T: PdfThemePalette, flow: DeckFlow, y: number
         doc.setFillColor(pc[0], pc[1], pc[2]);
       }
       doc.rect(xRight, yAt(b.topPct), bandW, Math.max(0.4, hAt(b.heightPct)), "F");
-      doc.setFontSize(6);
-      doc.setTextColor(bad ? T.bad[0] : T.mut[0], bad ? T.bad[1] : T.mut[1], bad ? T.bad[2] : T.mut[2]);
-      doc.text(`${b.label} ${b.value}`, xRight + bandW + 2, yAt(b.topPct) + hAt(b.heightPct) / 2 + 1, { maxWidth: 40 });
-      doc.setTextColor(T.ink[0], T.ink[1], T.ink[2]);
-      if (trace) trace.drawnFigures[trace.drawnFigures.length - 1]?.push(`${b.label} ${b.value}`);
+      printLabel(b, "use", xRight);
     });
   } else {
     // the bridge: six fixed stepped rects on the income scale, zero-based at the ground line
