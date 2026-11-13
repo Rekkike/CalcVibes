@@ -1,6 +1,8 @@
 import type { LineTotal, YearlyRow } from "../../core/src/types.js";
-import type { DeckGantt, DeckWaterfall } from "./deck.js";
+import type { ReactNode } from "react";
+import type { DeckFlow, DeckFlowBand, DeckGantt, DeckWaterfall } from "./deck.js";
 import { percentOneForDisplay } from "./engine.js";
+import { labelEm, wrapLabelEm } from "./ganttLayout.js";
 
 export const CHART_COLORS = {
   costBar: "#fb7185",
@@ -508,25 +510,89 @@ export function GanttChart(props: { gantt: DeckGantt }) {
 }
 
 // v0.6.22 Task B — the flow slide's two renderers. Geometry in SVG on one shared zero-based scale
-// (the deck model composes the percents; nothing financial is recomputed here), labels in HTML,
-// direct labels over legends. The two-band connected composition: the income band on the left, the
-// use band on the right, truthful widths, ribbons only for nonzero flows; a signed (negative) equity
-// band renders in the bad tone.
+// (the deck model composes the percents; nothing financial is recomputed here). v0.6.22.1 Task A —
+// the direct-label seating: every band segment's name and value seat with its band as SVG text (the
+// Gantt labelMode precedent; one label vocabulary on this surface), inside the band box when the
+// rendered segment height admits the text at the established size, otherwise in the fixed-width
+// label column directly beside its band — the income labels left of the income band, the use labels
+// right of the use band, outside the ribbon space so a label never collides with a connector — each
+// label vertically aligned to its segment through the same yAt/hAt mapping that draws the geometry.
+// The two-band connected composition: the income band on the left, the use band on the right,
+// truthful widths, ribbons only for nonzero flows; a signed (negative) equity band and its label
+// render in the bad tone. The whole figure is one SVG block, centered in its container.
 export const FLOW_BAND_COLORS = ["#38bdf8", "#34d399", "#e8b84b", "#c4b5fd", "#fb7185", "#22d3ee", "#a3e635", "#f0abfc"];
 
-export function FlowBands(props: { flow: import("./deck.js").DeckFlow }) {
+// The flow figure's geometry constants (exported for the pins). The plot mapping is unchanged from
+// v0.6.22 (top, plotH, one shared zero-based scale); the frame stays symmetric — equal band widths,
+// equal gutters. The fixed-width label column is the Gantt's labelW of record; the ribbon space is
+// the gap between the band boxes the labels never enter. The established label size is the Gantt's
+// 11 px inside-label; ONE admission rule for both bands: a segment admits its label inside the band
+// box when its rendered height hAt(heightPct) is at least labelMinH — an 11 px line with the Gantt's
+// +4 baseline offset and its descent needs h/2 + 4 + 3 <= h, i.e. h >= 14.
+export const FLOW_BANDS_GEO = {
+  top: 24,
+  plotH: 360,
+  bottomPad: 12,
+  labelColW: 150,
+  ribbonW: 240,
+  bandMinW: 56,
+  bandInset: 5,
+  labelGap: 10,
+  labelFont: 11,
+  labelMinH: 14,
+  lineH: 13,
+} as const;
+
+export function FlowBands(props: { flow: DeckFlow }) {
   const { flow } = props;
-  const W = 800;
-  const top = 24;
-  const plotH = 360;
-  const bandW = 56;
-  const xLeft = 70;
-  const xRight = W - 70 - bandW;
+  const G = FLOW_BANDS_GEO;
+  const allBands = [...flow.incomeBands, ...flow.useBands];
+  // The band box is sized to the widest label line, measured per the Gantt's labelEm discipline (the
+  // Helvetica advances scale with the type size): every label fits inside its band box on one line
+  // at the established size, so the inside seating never overflows the band box.
+  const bandW = Math.max(G.bandMinW, ...allBands.map((b) => Math.ceil(labelEm(`${b.label} ${b.value}`) * G.labelFont) + 2 * G.bandInset));
+  const W = 2 * G.labelColW + 2 * bandW + G.ribbonW;
+  const top = G.top;
+  const plotH = G.plotH;
+  const xLeft = G.labelColW;
+  const xRight = W - G.labelColW - bandW;
   const yAt = (pct: number) => top + (pct / 100) * plotH;
   const hAt = (pct: number) => (pct / 100) * plotH;
+  const midY = (b: DeckFlowBand) => yAt(b.topPct) + hAt(b.heightPct) / 2;
+  const admitsInside = (b: DeckFlowBand) => hAt(b.heightPct) >= G.labelMinH;
+  const labelText = (b: DeckFlowBand) => `${b.label} ${b.value}`;
+  // One label renderer for both bands: inside the band box when the segment height admits the text,
+  // otherwise the beside label column, vertically aligned to the segment through midY.
+  const renderLabel = (b: DeckFlowBand, side: "income" | "use") => {
+    const bad = b.signed && b.raw < 0;
+    const inside = admitsInside(b);
+    const mode = inside ? "inside" : "beside";
+    const testid = side === "income" ? "data-flow-income-label" : "data-flow-use-label";
+    const cls = "flow-label " + (inside ? "flow-label-inside" : "flow-label-beside") + (bad ? " flow-label-bad" : "");
+    const group = (children: ReactNode) => (
+      <g key={b.key} {...{ [testid]: b.key }} data-side={side} data-label-mode={mode} data-signed={b.signed ? "true" : "false"} className={"flow-label-group" + (bad ? " flow-label-bad" : "")}>
+        {children}
+      </g>
+    );
+    if (inside) {
+      const cx = side === "income" ? xLeft + bandW / 2 : xRight + bandW / 2;
+      return group(
+        <text data-flow-label-line="0" x={cx} y={midY(b) + 4} textAnchor="middle" fontSize={G.labelFont} className={cls}>{labelText(b)}</text>
+      );
+    }
+    const lines = wrapLabelEm(labelText(b), (G.labelColW - 12) / G.labelFont);
+    const x = side === "income" ? xLeft - G.labelGap : xRight + bandW + G.labelGap;
+    const anchor = side === "income" ? "end" : "start";
+    const firstY = midY(b) - ((lines.length - 1) * G.lineH) / 2 + 4;
+    return group(
+      lines.map((line, k) => (
+        <text key={k} data-flow-label-line={String(k)} x={x} y={firstY + k * G.lineH} textAnchor={anchor} fontSize={G.labelFont} className={cls}>{line}</text>
+      ))
+    );
+  };
   return (
     <div data-testid="flow-bands" data-form="bands" className="chart-block flow-chart">
-      <svg viewBox={`0 0 ${W} ${top + plotH + 8}`} className="flow-svg" role="img" aria-label="What the collections pay for">
+      <svg viewBox={`0 0 ${W} ${top + plotH + G.bottomPad}`} className="flow-svg" role="img" aria-label="What the collections pay for">
         {flow.connectors.map((c) => {
           const si = flow.incomeBands.findIndex((b) => b.key === c.sourceKey);
           const color = FLOW_BAND_COLORS[((si % FLOW_BAND_COLORS.length) + FLOW_BAND_COLORS.length) % FLOW_BAND_COLORS.length];
@@ -579,27 +645,9 @@ export function FlowBands(props: { flow: import("./deck.js").DeckFlow }) {
             <title>{`${b.label}: ${b.value}`}</title>
           </rect>
         ))}
+        {flow.incomeBands.map((b) => renderLabel(b, "income"))}
+        {flow.useBands.map((b) => renderLabel(b, "use"))}
       </svg>
-      <div className="flow-labels">
-        <ul data-testid="flow-income-labels" className="flow-label-col">
-          {flow.incomeBands.map((b, i) => (
-            <li key={b.key} data-flow-income-label={b.key}>
-              <span className="flow-swatch" style={{ background: FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length] }} />
-              <span className="row-name">{b.label}</span>
-              <span className="row-value">{b.value}</span>
-            </li>
-          ))}
-        </ul>
-        <ul data-testid="flow-use-labels" className="flow-label-col">
-          {flow.useBands.map((b, i) => (
-            <li key={b.key} data-flow-use-label={b.key} data-signed={b.signed ? "true" : "false"}>
-              <span className="flow-swatch" style={{ background: b.signed && b.raw < 0 ? "#fb7185" : FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length] }} />
-              <span className="row-name">{b.label}</span>
-              <span className={"row-value" + (b.signed && b.raw < 0 ? " tone-bad" : "")}>{b.value}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }
