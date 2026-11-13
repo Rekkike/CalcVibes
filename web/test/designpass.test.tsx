@@ -6,7 +6,7 @@ const byAction = (v: string) => document.querySelector('[data-action="' + v + '"
 const byNav = (v: string) => document.querySelector('[data-nav="' + v + '"]') as HTMLElement;
 
 describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", () => {
-  it("NAV-PRESERVED: all twelve views render inside their four groups and each navigates on one click (v0.6.10: the funding view joins the finance group; v0.6.13: the timeline view joins the new plan group between finance and read)", () => {
+  it("NAV-PRESERVED: all thirteen views render inside their four groups and each navigates on one click (v0.6.10: the funding view joins the finance group; v0.6.13: the timeline view joins the new plan group between finance and read; v0.6.22: the flow view joins the plan group beside timeline)", () => {
     render(<App />);
     fireEvent.click(byAction("load-demo"));
     const groups = document.querySelectorAll(".nav-group");
@@ -16,7 +16,7 @@ describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", ()
     const read = document.querySelector('[data-nav-group="read"]') as HTMLElement;
     const plan = document.querySelector('[data-nav-group="plan"]') as HTMLElement;
     expect(Array.from(groups).map((g) => g.getAttribute("data-nav-group"))).toEqual(["model", "finance", "plan", "read"]);
-    expect(Array.from(plan.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav"))).toEqual(["timeline"]);
+    expect(Array.from(plan.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav"))).toEqual(["timeline", "flow"]); // v0.6.22 re-anchor
     expect(Array.from(model.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
       .toEqual(["overview", "costs", "operating", "repayment", "tariff"]);
     expect(Array.from(finance.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
@@ -24,7 +24,7 @@ describe("Task A: NAV-PRESERVED / CONTROLS-PRESERVED / START-YEAR-RELOCATED", ()
     expect(Array.from(read.querySelectorAll("[data-nav]")).map((b) => b.getAttribute("data-nav")))
       .toEqual(["results", "scenarios", "detail"]);
     expect(model.querySelector('[data-nav="costs"]')?.textContent).toBe("Cost model");
-    for (const v of ["overview", "costs", "operating", "repayment", "tariff", "funding", "financing", "appraisal", "timeline", "results", "scenarios", "detail"]) {
+    for (const v of ["overview", "costs", "operating", "repayment", "tariff", "funding", "financing", "appraisal", "timeline", "flow", "results", "scenarios", "detail"]) {
       fireEvent.click(byNav(v));
       expect(byNav(v).className).toContain("active");
     }
@@ -151,15 +151,15 @@ describe("Task B (continued): the not-met answer branch", () => {
 });
 
 describe("Task C: COVERAGE-SLIDE / WATERFALL-BUILD / HURDLE-TRACE / TONE-SEMANTICS / TAKEAWAY-KICKERS", () => {
-  it("COVERAGE-SLIDE: the deck counts seven slides; the coverage slide sits between recovery and returns with the engine cumulative curve", async () => {
+  it("COVERAGE-SLIDE: the deck counts eight slides; the coverage slide sits between flow and returns with the engine cumulative curve", async () => { // v0.6.22 re-anchor: the flow slide composes after recovery
     const { demoProject } = await import("../src/state.js");
     const { computeModel, deckYearsForDisplay } = await import("../src/engine.js");
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
-    expect(deck.slides.length).toBe(7);
-    expect(deck.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "recovery", "coverage", "returns", "deal"]);
-    const coverage = deck.slides[4];
+    expect(deck.slides.length).toBe(8);
+    expect(deck.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "recovery", "flow", "coverage", "returns", "deal"]);
+    const coverage = deck.slides[5];
     expect(coverage.title).toBe("Coverage");
     expect(coverage.chart?.kind).toBe("coverage");
     expect(coverage.chart?.data.length).toBe(result.yearly.length);

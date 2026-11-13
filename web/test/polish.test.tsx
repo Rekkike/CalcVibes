@@ -65,7 +65,7 @@ describe("Task C: PRINT-DESIGN / PDF-DESIGN", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
-    expect(doc.getNumberOfPages()).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor
     expect(model.slides[2].waterfall?.rows.filter((r) => r.kind === "capital").length).toBe(3); // v0.6.18 Task J.1: the dead rows-chart field retired
     expect(model.slides[3].chart?.data.length).toBe(10);
   });
@@ -79,8 +79,8 @@ describe("Task D: INSIGHT-BREAKEVEN / INSIGHT-NULL / VERDICT / GLOSSES", () => {
     const { deckYearsForDisplay } = await import("../src/engine.js");
     const result = computeModel(demoProject());
     const deck = deckSlides(demoProject(), result, { startYear: null });
-    expect(deck.slides[4].title).toBe("Coverage");
-    const coverage = deck.slides[4].body;
+    expect(deck.slides[5].title).toBe("Coverage");
+    const coverage = deck.slides[5].body;
     const breakEven = coverage.find((f) => f.label === "Break-even year")!;
     const { yearHeader } = await import("../src/state.js");
     expect(breakEven.value).toBe(yearHeader(Math.ceil(result.paybackYears as number), null));
@@ -96,8 +96,8 @@ describe("Task D: INSIGHT-BREAKEVEN / INSIGHT-NULL / VERDICT / GLOSSES", () => {
     const fixedResult = computeModel(fixedInputs);
     expect(fixedResult.paybackYears).toBeNull();
     const deck = deckSlides(fixedInputs, fixedResult, { startYear: null });
-    expect(deck.slides[4].title).toBe("Coverage — not within the horizon");
-    expect(deck.slides[4].body.find((f) => f.label === "Break-even year")?.value).toBe("not within the horizon");
+    expect(deck.slides[5].title).toBe("Coverage — not within the horizon");
+    expect(deck.slides[5].body.find((f) => f.label === "Break-even year")?.value).toBe("not within the horizon");
   });
 
   it("VERDICT-YES on the goal-met case; the glosses render on the deck", () => {
@@ -185,8 +185,8 @@ describe("Task G: SUMMARY-TILES / SUMMARY-CHARTS / SUMMARY-EDGES", () => {
     const { deckSlides } = await import("../src/deck.js");
     const result = computeModel(blankProject());
     const deck = deckSlides(blankProject(), result, { startYear: null });
-    const tiles = deck.slides[6].tiles ?? [];
+    const tiles = deck.slides[7].tiles ?? [];
     expect(tiles.find((t) => t.label === "Total cost")?.value).toBe("0 kr");
-    expect(deck.slides[4].body.find((f) => f.label === "Break-even year")?.value).toBe("not within the horizon");
+    expect(deck.slides[5].body.find((f) => f.label === "Break-even year")?.value).toBe("not within the horizon");
   });
 });

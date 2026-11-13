@@ -102,7 +102,7 @@ describe("v0.6.1 chunk 2 — the deck as the presentation of the worksuite", () 
     const { percentTwoForDisplay, deckMoneyForDisplay } = await import("../src/engine.js");
     const result = computeModel(fixCPortfolio());
     const deck = deckSlides(fixCPortfolio(), result, { startYear: null, entryUnit: "ones" });
-    const deal = deck.slides[6];
+    const deal = deck.slides[7]; // v0.6.22 re-anchor: deal at index 7
     const irrTile = deal.tiles?.find((t) => t.label === "Achieved IRR");
     expect(irrTile?.value).toContain(percentTwoForDisplay(result.achievedIrr ?? 0));
     const npvTile = deal.tiles?.find((t) => t.label === "NPV at WACC");
@@ -116,7 +116,7 @@ describe("v0.6.1 chunk 2 — the deck as the presentation of the worksuite", () 
   it("SOLVER-ELEMENT: no solver element when the target is met (including solvedClamped); the element appears only when goalMet is false", async () => {
     const { deckSlides } = await import("../src/deck.js");
     const met = deckSlides(fixCPortfolio(), computeModel(fixCPortfolio()), { startYear: null, entryUnit: "ones" });
-    expect(met.slides[6].solverScenario).toBeNull();
+    expect(met.slides[7].solverScenario).toBeNull();
     const demo = demoProject();
     const below: ModelInputs = {
       ...demo,
@@ -127,8 +127,8 @@ describe("v0.6.1 chunk 2 — the deck as the presentation of the worksuite", () 
     const belowResult = computeModel(below);
     expect(belowResult.goalMet).toBe(false);
     const notMet = deckSlides(below, belowResult, { startYear: null, entryUnit: "ones" });
-    expect(notMet.slides[6].solverScenario).not.toBeNull();
-    expect(notMet.slides[6].solverScenario?.label).toBe("To reach the target");
+    expect(notMet.slides[7].solverScenario).not.toBeNull();
+    expect(notMet.slides[7].solverScenario?.label).toBe("To reach the target");
   });
 
   it("CLAMP-VERDICT: the solvedClamped target-exceeded case renders no solver element and the verdict is the honest one", async () => {
@@ -139,7 +139,7 @@ describe("v0.6.1 chunk 2 — the deck as the presentation of the worksuite", () 
     expect(result.solvedClamped).toBe(true);
     expect(result.goalMet).toBe(true);
     const deck = deckSlides(clamped, result, { startYear: null, entryUnit: "ones" });
-    expect(deck.slides[6].solverScenario).toBeNull();
+    expect(deck.slides[7].solverScenario).toBeNull();
   });
 
   it("TITLE-TERM: the Investment term metric reads the real horizon, not the dormant repayment block", async () => {

@@ -1433,3 +1433,39 @@
 .app-root section > label { margin-top: var(--space-2); margin-bottom: var(--space-2); }
 [data-testid="presentation"] .peak-label.peak-start { align-self: flex-start; }
 [data-testid="presentation"] .peak-label.peak-end { align-self: flex-end; }
+
+/* ===== v0.6.22 Task B/C — the flow-matching surfaces (the deck chart and the Plan flow surface). ===== */
+.flow-chart .flow-svg { width: 100%; height: auto; display: block; }
+.flow-chart .flow-connector { opacity: 0.55; }
+.flow-chart .flow-labels { display: flex; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-2); }
+.flow-chart .flow-label-col { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.flow-chart .flow-label-col li { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
+.flow-chart .flow-swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; align-self: center; }
+.flow-chart .row-name { overflow-wrap: anywhere; }
+.flow-chart .row-value { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+[data-testid="presentation"] .flow-chart .row-name, [data-testid="presentation"] .flow-chart .row-value { color: #e2e8f0; }
+.app-root .flow-chart .row-name, .app-root .flow-chart .row-value { color: var(--ink); }
+.flow-bridge .flow-bridge-track { position: relative; height: 220px; width: 100%; margin-top: 0.6rem; }
+.flow-bridge .flow-step { position: absolute; border-radius: 3px 3px 0 0; background: var(--accent, #0074ba); }
+[data-testid="presentation"] .flow-bridge .flow-step { background: #38bdf8; }
+.flow-bridge .flow-step-out { background: #fb7185; }
+[data-testid="presentation"] .flow-bridge .flow-step-out { background: #fb7185; }
+.flow-bridge .flow-step-remainder { background: #34d399; }
+[data-testid="presentation"] .flow-bridge .flow-step-remainder { background: #34d399; }
+.flow-bridge .flow-step-bad { background: #e11d48; }
+.flow-bridge .flow-step-value { font-variant-numeric: tabular-nums; }
+
+/* The Plan flow surface (v0.6.22 Task C): the composed reading and the authored editor in one
+   place; the W24 two-column layout at the wide breakpoint, stacking at phone width; the drill
+   rides the editor-scroll wrapper (the W25 parity ruling). */
+.app-root section[data-testid="flow-surface"] .flow-surface-grid { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 80rem) {
+  .app-root section[data-testid="flow-surface"] .flow-surface-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(24rem, 2fr);
+    align-items: start;
+  }
+}
+.app-root .flow-drill { margin-top: var(--space-3); }
+.app-root .flow-refusal { margin: 2px 0; }
+.app-root .flow-pairing-table td, .app-root .flow-pairing-table th { white-space: nowrap; }
+.app-root .flow-pairing-table select { max-width: 16rem; }

@@ -5,7 +5,7 @@ import { deckSlides } from "../deck.js";
 import type { ScenarioTargetChart } from "../deck.js";
 import { deckMoneyForDisplay, feeForDisplay, percentTwoForDisplay } from "../engine.js";
 import { yearHeader } from "../state.js";
-import { CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, LedgerWaterfall, HurdlePlot, ScenarioComparisonBars, GanttChart } from "../charts.js";
+import { CompositionDonut, RecoveryBars, StageReturnsChart, CostWaterfall, LedgerWaterfall, HurdlePlot, ScenarioComparisonBars, GanttChart, FlowBands, FlowBridge } from "../charts.js";
 import type { EntryUnit, CurrencyCode } from "../engine.js";
 
 
@@ -268,6 +268,27 @@ export function Presentation(props: { inputs: ModelInputs; result: ModelResult |
                     deck series; nothing is recomputed here) */}
                 <RecoveryBars series={sl.chart?.data ?? []} peakFor={peakFor} kicker={recoveryKicker} periodNote={`${sl.chart?.kicker ?? ""}. ${sl.chart?.periodNote ?? ""}`.trim()} basis={sl.chart?.basis ?? "annual"} />
                 <button data-action="recovery-monthly" onClick={() => setRecoveryMonthly((v) => !v)}>{recoveryMonthly ? "Show annual" : "Show monthly"}</button>
+              </div>
+            )}
+            {sl.name === "flow" && sl.flow !== undefined && (
+              <div data-testid="deck-chart-slot" data-slide-chart="flow">
+                {/* v0.6.22 Task B: the flow slide renders the deck model's composed flow (composed
+                    once in deck.ts from composeFlow; nothing is recomputed here) — one primary chart,
+                    the two-band composition within the pinned bounds, the bridge beyond them, and
+                    the bracketed ledger of authored pairings beneath. */}
+                <p data-testid="flow-caption" className="deck-disclosure">{sl.flow.caption}</p>
+                {sl.flow.form === "bands" ? <FlowBands flow={sl.flow} /> : <FlowBridge flow={sl.flow} />}
+                {sl.flow.ledger.length > 0 && (
+                  <div data-testid="flow-ledger" className="chart-block ledger">
+                    <p data-testid="chart-kicker" className="chart-kicker">Authored pairings — replacing the default where drawn</p>
+                    {sl.flow.ledger.map((r) => (
+                      <div key={r.id} data-flow-ledger-row={r.id} className="ledger-row ledger-row-capital">
+                        <span data-ledger-label="name" className="ledger-name">{r.sourceLabel} &rarr; {r.useLabel}</span>
+                        <span className="ledger-value">{r.amount} <span className="muted">(allocated {r.allocated})</span></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {sl.name === "coverage" && result !== null && (

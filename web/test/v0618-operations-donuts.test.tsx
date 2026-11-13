@@ -32,8 +32,8 @@ describe("v0.6.18 Task A: the conditional operations slide", () => {
   it("OPS-PRESENT: an operating-bearing project mounts the operations slide after the timeline slot, before the recovery; the numbering adapts", () => {
     const d = deckOf(shorePowerProgram());
     const names = d.slides.map((s) => s.name);
-    expect(names).toEqual(["title", "summary", "investment", "timeline", "operations", "recovery", "coverage", "returns", "deal"]);
-    expect(d.slides.filter((s) => s.name !== "title").map((s) => s.kickerNumber)).toEqual(["01", "02", "03", "04", "05", "06", "07", "08"]);
+    expect(names).toEqual(["title", "summary", "investment", "timeline", "operations", "recovery", "flow", "coverage", "returns", "deal"]); // v0.6.22 re-anchor: the flow slide after recovery
+    expect(d.slides.filter((s) => s.name !== "title").map((s) => s.kickerNumber)).toEqual(["01", "02", "03", "04", "05", "06", "07", "08", "09"]);
     const land = deckOf(landNewbuildProject()).slides.map((s) => s.name);
     expect(land.indexOf("operations")).toBe(land.indexOf("investment") + 2); // the land demo carries a timeline too
   });

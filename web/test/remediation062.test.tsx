@@ -316,10 +316,10 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones", scenarioTargets: [5, 7], scenarioTerms: [20, 25], scenarioBalloons: [0, 100000] });
-    expect(deck.slides.length).toBe(8);
-    const sce = deck.slides[7];
+    expect(deck.slides.length).toBe(9); // v0.6.22 re-anchor: the flow slide
+    const sce = deck.slides[8];
     expect(sce.name).toBe("scenarios");
-    expect(sce.kickerNumber).toBe("07");
+    expect(sce.kickerNumber).toBe("08");
     const cellAtTerm = computeModel({ ...demo, repayment: { ...demo.repayment, termYears: 20 } }).paymentAmount;
     const rangeFig = sce.body.find((f) => f.label === "Payment range across the set terms");
     expect(rangeFig).toBeTruthy();
@@ -340,7 +340,7 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     const { demoProject } = await import("../src/state.js");
     const demo = demoProject();
     const deck = deckSlides(demo, computeModel(demo), { startYear: null, entryUnit: "ones" });
-    expect(deck.slides.length).toBe(7);
+    expect(deck.slides.length).toBe(8); // v0.6.22 re-anchor
     expect(deck.slides.map((s) => s.name)).not.toContain("scenarios");
     expect(deck.provenance?.join(" ")).toContain("no scenarios set");
   });
@@ -351,10 +351,10 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     fireEvent.click(byAction("present"));
     expect(document.querySelectorAll('[data-slide-name="scenarios"]').length).toBe(0);
     expect(document.querySelector('[data-testid="deck-provenance"]')?.textContent).toContain("no scenarios set");
-    expect(document.querySelectorAll("[data-dot]").length).toBe(8); // v0.6.18 re-anchor: the operations slide
+    expect(document.querySelectorAll("[data-dot]").length).toBe(9); // v0.6.18 re-anchor: the operations slide; v0.6.22: the flow slide makes nine
   });
 
-  it("DECK-SCE-1 (app): setting axis values mounts the eighth slide, the kicker, the deck chart, and eight dots (v0.6.7 re-anchor: the port project opened via the file route with null axes)", async () => {
+  it("DECK-SCE-1 (app): setting axis values mounts the ninth slide, the kicker, the deck chart, and the dots (v0.6.7 re-anchor: the port project opened via the file route with null axes)", async () => {
     render(<App />);
     await openPortNoAxes();
     fireEvent.click(byNav("scenarios"));
@@ -363,9 +363,9 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     fireEvent.click(byAction("present"));
     expect(document.querySelectorAll('[data-slide-name="scenarios"]').length).toBe(1);
     const scenariosSlide = document.querySelector('[data-slide-name="scenarios"]') as HTMLElement;
-    expect(scenariosSlide.querySelector('[data-testid="slide-kicker"]')?.textContent).toMatch(/^08 — /); // v0.6.18 re-anchor: the operations slide shifts the scenarios kicker
+    expect(scenariosSlide.querySelector('[data-testid="slide-kicker"]')?.textContent).toMatch(/^09 — /); // v0.6.18 re-anchor: the operations slide shifts the scenarios kicker; v0.6.22: the flow slide shifts it again
     expect(scenariosSlide.querySelector('[data-slide-chart="scenarios"]')).toBeTruthy();
-    expect(document.querySelectorAll("[data-dot]").length).toBe(9); // v0.6.18 re-anchor: the operations slide
+    expect(document.querySelectorAll("[data-dot]").length).toBe(10); // v0.6.18 re-anchor: the operations slide; v0.6.22: the flow slide makes ten
     expect(document.querySelector('[data-testid="deck-provenance"]')?.textContent).toContain("present");
   });
 
@@ -377,8 +377,8 @@ describe("v0.6.2 chunk 2: the deck scenarios summary slide (Round 23 supplement 
     const result = computeModel(demo);
     const without = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
     const withAxes = deckSlides(demo, result, { startYear: null, entryUnit: "ones", scenarioTerms: [20] });
-    expect(withAxes.slides.slice(0, 7).map((s) => s.name)).toEqual(without.slides.map((s) => s.name));
-    expect(withAxes.slides.slice(0, 7).map((s) => s.kickerNumber)).toEqual(without.slides.map((s) => s.kickerNumber));
-    expect(withAxes.slides[7].kickerNumber).toBe("07");
+    expect(withAxes.slides.slice(0, 8).map((s) => s.name)).toEqual(without.slides.map((s) => s.name)); // v0.6.22 re-anchor
+    expect(withAxes.slides.slice(0, 8).map((s) => s.kickerNumber)).toEqual(without.slides.map((s) => s.kickerNumber));
+    expect(withAxes.slides[8].kickerNumber).toBe("08");
   });
 });

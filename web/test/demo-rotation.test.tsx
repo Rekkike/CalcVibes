@@ -276,7 +276,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the port fixture (Rotte
     setEntryUnit("ones");
     fireEvent.click(byAction("present"));
     await waitFor(() => {
-      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(10); // v0.6.18: the operations slide mounts (the program carries operating lines)
+      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(11); // v0.6.18: the operations slide mounts (the program carries operating lines); v0.6.22: the flow slide composes after recovery
     });
     expect(titleMetricValue("Project cost")).toBe("€628 250 000");
     expect(titleMetricValue("Target IRR")).toBe("6.00%");
@@ -523,7 +523,7 @@ describe("v0.6.7 Task D: the realistic demo rotation — the land fixture (Mjøs
     setEntryUnit("thousands");
     fireEvent.click(byAction("present"));
     await waitFor(() => {
-      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(10); // v0.6.18: the land demo carries operating lines, so the operations slide mounts
+      expect(document.querySelectorAll('[data-testid="presentation"] .deck-slide').length).toBe(11); // v0.6.18: the land demo carries operating lines, so the operations slide mounts; v0.6.22: the flow slide
     });
     expect(titleMetricValue("Project cost")).toBe("NOK 599 071 k");
     expect(titleMetricValue("Target IRR")).toBe("8.00%");

@@ -217,7 +217,7 @@ describe("Task D: charts (structural, engine-traceable)", () => {
     expect(model.slides[2].chart).toBeUndefined(); // v0.6.18 Task J.1
     expect(model.slides[3].chart?.kind).toBe("bars");
     const doc = buildDeckPdf(model, "Project Alpha");
-    expect(doc.getNumberOfPages()).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor: the flow slide prints a page
     const bytes = doc.output("arraybuffer");
     expect(bytes.byteLength).toBeGreaterThan(1000);
   });
