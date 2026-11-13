@@ -55,15 +55,15 @@ describe("UNIT-DECK (the template demo at thousands — the authorized re-anchor
     // thousands entry the 475 309 kr payment renders at the entry unit's integer-thousands
     // form (the fee-class exemption covers only |value| < 1000; the boundary pin).
     expect(deck.slides[3].body.find((f) => f.label === "Payment per quarter")!.value) /* v0.6.18 Task H1: the cadence names the period */.toBe(feeForDisplay(result.paymentAmount as number, "SEK", "thousands"));
-    expect(deck.slides[6].tiles?.find((t) => t.label === "Total collected")?.value).toBe(deckMoneyForDisplay(result.totalCollected, "SEK", "thousands"));
+    expect(deck.slides[7].tiles?.find((t) => t.label === "Total collected")?.value).toBe(deckMoneyForDisplay(result.totalCollected, "SEK", "thousands"));
   });
 
   it("the financing variant at thousands", () => {
     const finInputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const finResult = computeModel(finInputs);
     const finDeck = deckSlides(finInputs, finResult, { startYear: null, entryUnit: "thousands" });
-    expect(finDeck.slides[6].title).toBe("The deal — equity view");
-    expect(finDeck.slides[6].verdict).toContain(deckMoneyForDisplay(finResult.financing!.equity.outlay, "SEK", "thousands"));
+    expect(finDeck.slides[7].title).toBe("The deal — equity view");
+    expect(finDeck.slides[7].verdict).toContain(deckMoneyForDisplay(finResult.financing!.equity.outlay, "SEK", "thousands"));
   });
 
   it("the stable variant at thousands", () => {

@@ -7,6 +7,8 @@ import { EngineInputError } from "../../core/src/validate.js";
 import { restoreLegacyFinancing } from "../../core/src/financing.js";
 import { blankCostLine, blankProject, migrateOnLoad, landNewbuildProject, nextCostId, shorePowerProgram, solarParkProject } from "./state.js";
 import type { CostLine } from "../../core/src/types.js";
+import type { FlowAllocationsExt, FlowPairing } from "./state.js";
+import { FlowSection } from "./sections/FlowSection.js";
 import { CostModelSection } from "./sections/CostModelSection.js";
 import { RepaymentSection } from "./sections/RepaymentSection.js";
 import { OverviewSection } from "./sections/OverviewSection.js";
@@ -42,7 +44,7 @@ const DEFAULT_ENTRY_UNIT: EntryUnit = "thousands";
 const snapshotKey = (s: ProjectSnapshot): string => JSON.stringify(s);
 const blankSnapshot = (): ProjectSnapshot => ({ inputs: blankProject(), startYear: null, entryUnit: DEFAULT_ENTRY_UNIT, targets: null, terms: null, balloons: null, grantScales: null });
 
-type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "timeline" | "results" | "scenarios" | "detail";
+type View = "overview" | "costs" | "operating" | "repayment" | "tariff" | "funding" | "financing" | "appraisal" | "timeline" | "flow" | "results" | "scenarios" | "detail";
 
 export function App() {
   const [inputs, setInputs] = useState<ModelInputs>(blankProject);
@@ -178,6 +180,14 @@ export function App() {
   const setProjectLength = (v: number | null) => setInputs((p) => ({ ...p, projectLengthYears: v }));
   // v0.6.21 Task E: the deck slide title overrides ride the project document (additive optional field, declared web-side)
   const setDeckTitles = (t: Record<string, string>) => setInputs((p) => ({ ...p, deckTitles: t }) as ModelInputs);
+  // v0.6.22 Task D: the flow pairings ride the project document the same way (additive optional field,
+  // declared web-side); an empty pairing list removes the field so the document stays minimal.
+  const setFlowPairs = (pairs: FlowPairing[]) => setInputs((p) => {
+    const next = { ...(p as ModelInputs & FlowAllocationsExt) };
+    if (pairs.length === 0) delete next.flow;
+    else next.flow = { pairs };
+    return next as ModelInputs;
+  });
   const setRepayment = (patch: Partial<ModelInputs["repayment"]>) =>
     setInputs((p) => ({ ...p, repayment: { ...p.repayment, ...patch } }));
   const setContracts = (contracts: import("../../core/src/types.js").ContractParams[]) =>
@@ -348,7 +358,7 @@ export function App() {
           <div data-nav-group="plan" className="nav-group">
             <span className="nav-group-label">Plan</span>
             <div className="nav-group-views">
-              {(["timeline"] as View[]).map((v) => (
+              {(["timeline", "flow"] as View[]).map((v) => (
                 <button key={v} data-nav={v} className={view === v ? "active" : ""} onClick={() => setView(v)}>
                   {v[0].toUpperCase() + v.slice(1)}
                 </button>
@@ -430,6 +440,9 @@ export function App() {
         )}
         {view === "timeline" && (
           <TimelineSection inputs={inputs} result={result} setTimeline={setTimeline} startYear={startYear} monthGrid={monthGrid} setMonthGrid={setMonthGrid} />
+        )}
+        {view === "flow" && (
+          <FlowSection inputs={inputs} result={result} startYear={startYear} entryUnit={entryUnit} setFlowPairs={setFlowPairs} />
         )}
         {view === "financing" && (
           <FinancingSection inputs={inputs} result={result} setFacilities={setFacilities} setFacilityOptions={setFacilityOptions} entryUnit={entryUnit} />

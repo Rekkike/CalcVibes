@@ -18,16 +18,17 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
   const deck = deckSlides(demoProject(), result);
 
   it("structural pins: seven slides with the names of record (the summary slide per v0.6.4)", () => {
-    expect(deck.slides.length).toBe(7);
-    expect(deck.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "recovery", "coverage", "returns", "deal"]);
+    // v0.6.22 re-anchor: the flow slide composes after recovery
+    expect(deck.slides.length).toBe(8);
+    expect(deck.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "recovery", "flow", "coverage", "returns", "deal"]);
   });
 
   it("exact title pins (v0.6.4 board-room headlines)", () => {
     expect(deck.slides[1].title).toBe("Executive summary");
     expect(deck.slides[2].title).toBe("The investment");
     expect(deck.slides[3].title).toBe("The recovery — solved payments");
-    expect(deck.slides[5].title).toBe("The returns");
-    expect(deck.slides[6].title).toBe("The deal");
+    expect(deck.slides[6].title).toBe("The returns");
+    expect(deck.slides[7].title).toBe("The deal");
   });
 
   it("slide 0 subtitle chip removed per v0.6.1 2.3; the title carries the project name and the target", () => {
@@ -54,12 +55,12 @@ describe("EX-1 deck content model (base demo, tariff off, financing off, SEK)", 
     const recovery = deck.slides[3].body;
     expect(recovery.find((f) => f.label === "Payment per quarter")!.rawValue).toBe(result.paymentAmount); // v0.6.18 Task H1: the cadence names the period
     expect(recovery.find((f) => f.label === "Total collected (nominal)")!.rawValue).toBe(result.totalCollected);
-    const coverage = deck.slides[4].body;
+    const coverage = deck.slides[5].body; // v0.6.22 re-anchor: the flow slide sits at index 4
     expect(coverage.find((f) => f.label === "Nominal payback")!.rawValue).toBe(result.paybackYears);
-    const returns = deck.slides[5].body;
+    const returns = deck.slides[6].body;
     expect(returns.find((f) => f.label === "Achieved IRR")!.rawValue).toBe(result.achievedIrr);
     expect(returns.find((f) => f.label === "NPV at WACC (discounted)")!.rawValue).toBe(result.npvAtWacc);
-    const dealTiles = deck.slides[6].tiles ?? [];
+    const dealTiles = deck.slides[7].tiles ?? [];
     expect(dealTiles.length).toBe(6);
     expect(dealTiles.find((t) => t.label === "Payback (nominal)")!.rawValue).toBe(result.paybackYears);
   });
@@ -70,9 +71,9 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   const result = computeModel(inputs);
   const deck = deckSlides(inputs, result);
 
-  it("slide 6 title and tile pins (the financing fold extends the grid to nine tiles)", () => {
-    expect(deck.slides[6].title).toBe("The deal — equity view");
-    const tiles = deck.slides[6].tiles ?? [];
+  it("slide 7 title and tile pins (the financing fold extends the grid to nine tiles)", () => {
+    expect(deck.slides[7].title).toBe("The deal — equity view");
+    const tiles = deck.slides[7].tiles ?? [];
     const byLabel = (label: string) => tiles.find((t) => t.label === label);
     expect(tiles.length).toBe(9);
     expect(byLabel("Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", "ones"));
@@ -81,29 +82,29 @@ describe("EX-1 financing-on variant (the FN-1 configuration)", () => {
   });
 
   it("the financing variant keeps its DSCR among the deal disclosures and the equity metrics reach the tiles", () => {
-    const tiles = deck.slides[6].tiles ?? [];
+    const tiles = deck.slides[7].tiles ?? [];
     expect(tiles.find((t) => t.label === "Payback (nominal)")?.value).toBe(deckYearsForDisplay(result.paybackYears as number));
-    expect(deck.slides[6].disclosures.join(" ")).toContain("56 sign changes");
-    expect(deck.slides[6].summaryCharts?.length).toBe(2);
+    expect(deck.slides[7].disclosures.join(" ")).toContain("56 sign changes");
+    expect(deck.slides[7].summaryCharts?.length).toBe(2);
   });
 
   it("the ambiguity disclosure carries the count 56", () => {
-    expect(deck.slides[6].disclosures.join(" ")).toContain("56 sign changes");
+    expect(deck.slides[7].disclosures.join(" ")).toContain("56 sign changes");
   });
 
   it("traceability on the financing variant (the equity figures reach the verdict and the tile grid)", () => {
-    expect(deck.slides[6].title).toBe("The deal — equity view");
-    expect(deck.slides[6].verdict).toContain("20.01%");
-    expect(deck.slides[6].tiles?.find((t) => t.label === "NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", "ones"));
+    expect(deck.slides[7].title).toBe("The deal — equity view");
+    expect(deck.slides[7].verdict).toContain("20.01%");
+    expect(deck.slides[7].tiles?.find((t) => t.label === "NPV at WACC")?.value).toBe(deckMoneyForDisplay(result.npvAtWacc, "SEK", "ones"));
   });
 
   it("share-100 variant: the zero-outlay note replaces the equity IRR figure", () => {
     const inputs100 = { ...demoProject(), financing: fin({ sharePct: 100 }) };
     const result100 = computeModel(inputs100);
     const deck100 = deckSlides(inputs100, result100);
-    expect(deck100.slides[6].title).toBe("The deal — equity view");
-    expect(deck100.slides[6].verdict).toContain("not applicable");
-    expect(deck100.slides[6].tiles?.find((t) => t.label === "Equity IRR")?.value).toBe("not applicable (zero equity outlay)");
+    expect(deck100.slides[7].title).toBe("The deal — equity view");
+    expect(deck100.slides[7].verdict).toContain("not applicable");
+    expect(deck100.slides[7].tiles?.find((t) => t.label === "Equity IRR")?.value).toBe("not applicable (zero equity outlay)");
   });
 });
 
@@ -150,15 +151,15 @@ describe("EX-1 red proofs (input-level perturbations)", () => {
     const r = computeModel(shifted);
     const d = deckSlides(shifted, r);
     expect(d.slides[0].titleMetrics?.find((m) => m.label === "Target IRR")?.value).toBe("13.00%");
-    expect(d.slides[5].body.find((f) => f.label === "Achieved IRR")!.value).toBe("13.00%");
-    expect(d.slides[6].tiles?.find((t) => t.label === "Achieved IRR")?.value).toContain("13.00% target");
+    expect(d.slides[6].body.find((f) => f.label === "Achieved IRR")!.value).toBe("13.00%"); // v0.6.22 re-anchor: returns at index 6
+    expect(d.slides[7].tiles?.find((t) => t.label === "Achieved IRR")?.value).toContain("13.00% target"); // v0.6.22 re-anchor: deal at index 7
   });
 
   it("the debt share 60 -> 65 flips the deal equity IRR tile", () => {
     const inputs = { ...demoProject(), financing: fin({ sharePct: 65 }) };
     const r = computeModel(inputs);
     const d = deckSlides(inputs, r);
-    const eqTile = d.slides[6].tiles?.find((t) => t.label === "Equity IRR");
+    const eqTile = d.slides[7].tiles?.find((t) => t.label === "Equity IRR"); // v0.6.22 re-anchor: deal at index 7
     expect(eqTile?.rawValue).toBe(r.financing!.equity.irr);
     expect(eqTile?.value).not.toBe("20.01%");
   });

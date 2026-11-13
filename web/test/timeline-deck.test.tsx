@@ -84,11 +84,11 @@ describe("v0.6.13 the Gantt deck slide", () => {
     expect(kickers[kickers.length - 1]).toBe(String(kickers.length).padStart(2, "0"));
   });
 
-  it("KICKERS (full deck): the nine non-title slides of the shore-power program with scenarios carry 01 through 09", () => {
+  it("KICKERS (full deck): the ten non-title slides of the shore-power program with scenarios carry 01 through 10", () => { // v0.6.22 re-anchor: the flow slide
     const inp = { ...shorePowerProgram(), timeline: timeline() };
     const d = deckSlides(inp, computeModel(inp), { startYear: null, scenarioTargets: [4, 6], scenarioTerms: [15, 20], scenarioBalloons: [0, 8] });
-    expect(d.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "timeline", "operations", "recovery", "coverage", "returns", "deal", "scenarios"]); // v0.6.18: the conditional operations slide (the program carries operating lines)
-    expect(d.slides.filter((s) => s.name !== "title").map((s) => s.kickerNumber)).toEqual(["01", "02", "03", "04", "05", "06", "07", "08", "09"]);
+    expect(d.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "timeline", "operations", "recovery", "flow", "coverage", "returns", "deal", "scenarios"]); // v0.6.18: the conditional operations slide (the program carries operating lines); v0.6.22: the flow slide
+    expect(d.slides.filter((s) => s.name !== "title").map((s) => s.kickerNumber)).toEqual(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]);
   });
 
   it("PDF: the print route draws the title, the lanes, the bars and the DP-coded gates", () => {

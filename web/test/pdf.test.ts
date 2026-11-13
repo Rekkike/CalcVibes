@@ -11,7 +11,7 @@ describe("EX-4 route B: jsPDF deck builder", () => {
 
   it("consumes the deckSlides model (the seam) and produces exactly seven pages", () => {
     const doc = buildDeckPdf(model, demoProject().projectName);
-    expect(doc.getNumberOfPages()).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor: the flow slide prints a page
   });
 
   it("the output buffer is non-empty (byte length > 1,000)", () => {
@@ -32,16 +32,16 @@ describe("v0.5.1 Task A/C: PDF action, pagination, trace", () => {
   it("every body figure and every deal tile appears in the trace (base demo); page count pinned", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, demoProject().projectName, trace);
-    expect(doc.getNumberOfPages()).toBe(7);
-    expect(trace.drawnFigures.length).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor: the flow slide prints a page
+    expect(trace.drawnFigures.length).toBe(8);
     for (let i = 0; i < 7; i++) {
       for (const fig of model.slides[i].body) {
         expect(trace.drawnFigures[i]).toContain(fig.value);
       }
     }
-    const tiles = model.slides[6].tiles ?? [];
+    const tiles = model.slides[7].tiles ?? []; // v0.6.22 re-anchor: deal at index 7
     expect(tiles.length).toBe(6);
-    const tracedDeal = trace.drawnFigures[6].join("|");
+    const tracedDeal = trace.drawnFigures[7].join("|");
     for (const t of tiles) {
       expect(tracedDeal).toContain(t.value);
       expect(tracedDeal).toContain(t.label.toUpperCase());
@@ -55,37 +55,37 @@ describe("v0.5.1 Task A/C: PDF action, pagination, trace", () => {
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(finModel, finInputs.projectName, trace);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(5);
-    const tiles = finModel.slides[6].tiles ?? [];
+    const tiles = finModel.slides[7].tiles ?? [];
     expect(tiles.length).toBe(9);
-    const traced = trace.drawnFigures[6].join("|");
+    const traced = trace.drawnFigures[7].join("|");
     for (const t of tiles) {
       expect(traced).toContain(t.value);
     }
-    expect(finModel.slides[6].disclosures.length).toBeGreaterThan(0);
+    expect(finModel.slides[7].disclosures.length).toBeGreaterThan(0);
   });
 });
 
 describe("v0.6.9 Task G: the scenarios slide reserves the chart row in one pass", () => {
   it("the base demo (no scenario sets) stays at exactly seven pages", () => {
     const doc = buildDeckPdf(model, demoProject().projectName);
-    expect(doc.getNumberOfPages()).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor: the flow slide prints a page
   });
 
   it("the port deck (millions, all three scenario sets) renders nine slides on exactly nine pages (v0.6.18: the operations slide)", () => {
     const inputs = shorePowerProject();
     const result = computeModel(inputs);
     const portModel = deckSlides(inputs, result, { startYear: null, entryUnit: "millions", scenarioTargets: [4, 6, 8], scenarioTerms: [15, 20, 25], scenarioBalloons: [0, 1000, 2000] });
-    expect(portModel.slides.length).toBe(9);
+    expect(portModel.slides.length).toBe(10); // v0.6.22 re-anchor: the flow slide
     const doc = buildDeckPdf(portModel, inputs.projectName);
-    expect(doc.getNumberOfPages()).toBe(9);
+    expect(doc.getNumberOfPages()).toBe(10);
   });
 
   it("the solar deck (thousands, the target range) renders nine slides on exactly nine pages (v0.6.18: the operations slide)", () => {
     const inputs = solarParkProject();
     const result = computeModel(inputs);
     const solarModel = deckSlides(inputs, result, { startYear: null, entryUnit: "thousands", scenarioTargets: [5, 7, 9] });
-    expect(solarModel.slides.length).toBe(9);
+    expect(solarModel.slides.length).toBe(10);
     const doc = buildDeckPdf(solarModel, inputs.projectName);
-    expect(doc.getNumberOfPages()).toBe(9);
+    expect(doc.getNumberOfPages()).toBe(10);
   });
 });

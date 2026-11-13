@@ -50,7 +50,7 @@ describe("Task R3: FIN-TILES / NO-DEAD-BODY", () => {
     const inputs = { ...demoProject(), financing: { enabled: true, sharePct: 60, debtRatePct: 6, termYears: 7, graceYears: 0, serviceStartYear: null, amortization: "annuity" as const, leveragedSolve: false, perLineSharePct: {} } };
     const result = computeModel(inputs);
     const deck = deckSlides(inputs, result, { startYear: null });
-    const tiles = deck.slides[6].tiles ?? [];
+    const tiles = deck.slides[7].tiles ?? [];
     expect(tiles.length).toBe(9);
     const labels = tiles.map((t) => t.label);
     expect(labels).toEqual([
@@ -82,13 +82,13 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(model, "Project Alpha", trace);
-    const tracedDeal = trace.drawnFigures[6].join("|");
-    const tiles = model.slides[6].tiles ?? [];
+    const tracedDeal = trace.drawnFigures[7].join("|");
+    const tiles = model.slides[7].tiles ?? [];
     expect(tiles.length).toBe(6);
     for (const t of tiles) {
       expect(tracedDeal).toContain(t.value);
     }
-    expect(doc.getNumberOfPages()).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor
   });
 
   it("PDF-SUMMARY-CHARTS: both mini charts are drawn with their labels and the peak", async () => {
@@ -100,9 +100,9 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const model = deckSlides(demoProject(), result, { startYear: null });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(model, "Project Alpha", trace);
-    const tracedDeal = trace.drawnFigures[6].join("|");
-    const hurdle = model.slides[6].summaryCharts?.[0];
-    const bars = model.slides[6].summaryCharts?.[1];
+    const tracedDeal = trace.drawnFigures[7].join("|");
+    const hurdle = model.slides[7].summaryCharts?.[0];
+    const bars = model.slides[7].summaryCharts?.[1];
     expect(hurdle?.kind).toBe("hurdle");
     expect(bars?.kind).toBe("bars");
     expect(bars?.data.length).toBe(result.yearly.length);
@@ -120,7 +120,7 @@ describe("Task R2: PDF-TILES / PDF-SUMMARY-CHARTS / TILE-TRACE", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null });
-    const tiles = deck.slides[6].tiles ?? [];
+    const tiles = deck.slides[7].tiles ?? [];
     const byLabel = (l: string) => tiles.find((t) => t.label === l);
     const unit = "ones";
     expect(byLabel("Total cost")?.value).toBe(deckMoneyForDisplay(result.totalCost, "SEK", unit));

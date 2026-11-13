@@ -17,12 +17,12 @@ describe("Task H3: NO-TAUTOLOGY / PEAK-PDF-FORMAT", () => {
     const result = computeModel(demo);
     const unit = "ones";
     const model = deckSlides(demo, result, { startYear: null });
-    const bars = model.slides[6].summaryCharts?.[1];
+    const bars = model.slides[7].summaryCharts?.[1]; // v0.6.22 re-anchor: the deal slide sits at index 7
     const peak = Math.max(...(bars?.data ?? []).map((d) => d.value));
     const expected = deckMoneyForDisplay(peak, "SEK", unit);
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(model, "Project Alpha", trace);
-    const tracedDeal = trace.drawnFigures[6].join("|");
+    const tracedDeal = trace.drawnFigures[7].join("|"); // v0.6.22 re-anchor
     expect(tracedDeal).toContain(expected);
     expect(tracedDeal).not.toContain(String(peak));
   });

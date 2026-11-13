@@ -15,7 +15,7 @@ describe("v0.6.5 Task A: the formatted sale disclosure (W8)", () => {
     const ml = multiLeaseProject();
     const mlr = computeModel(ml);
     const deck = deckSlides(ml, mlr, { startYear: null, entryUnit: "thousands" });
-    const deal = deck.slides[6];
+    const deal = deck.slides[7]; // v0.6.22 re-anchor: deal at index 7
     const disclosure = deal.disclosures.find((d) => d.includes("Assumes sale"));
     expect(disclosure).toBe("Assumes sale at remaining book value at year 54 for 98 000 tkr");
     // the raw engine number is model data only (tile.rawValue, donut segment values); it never
@@ -42,7 +42,7 @@ describe("v0.6.5 Task A: the formatted sale disclosure (W8)", () => {
       appraisal: { wacc: 8, financeRate: 6, reinvestmentRate: 6, residual: { mode: "amount", amount: 1234567, year: 9 } },
     } as ModelInputs;
     const deck = deckSlides(sp, computeModel(sp), { startYear: null, entryUnit: "thousands" });
-    const disclosure = deck.slides[6].disclosures.find((d) => d.includes("Assumes sale"));
+    const disclosure = deck.slides[7].disclosures.find((d) => d.includes("Assumes sale"));
     expect(disclosure).toBe("Assumes sale at year 9 for 1 235 tkr");
   });
 });
@@ -52,8 +52,8 @@ describe("v0.6.5 Task B: the scenarios target infographic (W11)", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones", scenarioTargets: [5, 8, 10, 12, 15, 25] });
-    expect(deck.slides.length).toBe(8);
-    const sce = deck.slides[7];
+    expect(deck.slides.length).toBe(9); // v0.6.22 re-anchor
+    const sce = deck.slides[8];
     expect(sce.targetChart).toBeDefined();
     const chart = sce.targetChart!;
     expect(chart.mode).toBe("solved");
@@ -75,7 +75,7 @@ describe("v0.6.5 Task B: the scenarios target infographic (W11)", () => {
     const ml = multiLeaseProject();
     const mlr = computeModel(ml);
     const deck = deckSlides(ml, mlr, { startYear: null, entryUnit: "thousands", scenarioTargets: [5, 8, 10, 12, 15, 25] });
-    const chart = deck.slides[7].targetChart!;
+    const chart = deck.slides[8].targetChart!;
     expect(chart.mode).toBe("solved");
     const at5 = chart.points.find((p) => p.target === 5)!;
     const at25 = chart.points.find((p) => p.target === 25)!;
@@ -95,7 +95,7 @@ describe("v0.6.5 Task B: the scenarios target infographic (W11)", () => {
     } as ModelInputs;
     const fr = computeModel(fixed);
     const deck = deckSlides(fixed, fr, { startYear: null, entryUnit: "ones", scenarioTargets: [5, 8, 10, 12, 15, 25] });
-    const chart = deck.slides[7].targetChart!;
+    const chart = deck.slides[8].targetChart!;
     expect(chart.mode).toBe("evaluated");
     expect(chart.points.length).toBe(6);
     for (const p of chart.points) {
@@ -112,13 +112,13 @@ describe("v0.6.5 Task B: the scenarios target infographic (W11)", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const one = deckSlides(demo, result, { startYear: null, entryUnit: "ones", scenarioTargets: [12] });
-    expect(one.slides[7].targetChart).toBeUndefined();
+    expect(one.slides[8].targetChart).toBeUndefined();
     const profile: ModelInputs = {
       ...demo,
       repayment: { ...demo.repayment, collectionsOverrides: { 1: 400000 } },
     } as ModelInputs;
     const profileDeck = deckSlides(profile, computeModel(profile), { startYear: null, entryUnit: "ones", scenarioTargets: [5, 12] });
-    const sce = profileDeck.slides[7];
+    const sce = profileDeck.slides[8];
     expect(sce.targetChart).toBeUndefined();
     expect(sce.disclosures.some((d) => d.includes("(SCE-PROFILE)"))).toBe(true);
   });
@@ -192,16 +192,16 @@ describe("v0.6.5 Task E: the scale-adaptive chart labels (W12)", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
-    expect(deck.slides[4].chart?.crossingX).toBe(66.7);
+    expect(deck.slides[5].chart?.crossingX).toBe(66.7);
     const ml = multiLeaseProject();
     const mlDeck = deckSlides(ml, computeModel(ml), { startYear: null, entryUnit: "thousands" });
-    expect(mlDeck.slides[4].chart?.crossingX).toBe(24.5);
+    expect(mlDeck.slides[5].chart?.crossingX).toBe(24.5);
     const fixed: ModelInputs = {
       ...demo,
       tariff: { mode: "fixed", escalationPerYear: 2, rows: [], fixedAnnualAmount: 100000, manualPrices: null },
     } as ModelInputs;
     const fixedDeck = deckSlides(fixed, computeModel(fixed), { startYear: null, entryUnit: "ones" });
-    expect(fixedDeck.slides[4].chart?.crossingX).toBeNull();
+    expect(fixedDeck.slides[5].chart?.crossingX).toBeNull();
     // the clamp is bounded [15, 85] in the model
     const deckSrc = fs.readFileSync("src/deck.ts", "utf8");
     expect(deckSrc).toContain("Math.min(85, Math.max(15");
@@ -239,15 +239,15 @@ describe("v0.6.5 Task F: the static navigation chrome (W14)", () => {
     expect(prev.className).toContain("stage-nav-button-disabled");
     expect(prev.textContent).toBe("‹");
     expect(next.textContent).toBe("›");
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 10");
-    expect(nav.querySelectorAll("[data-dot]").length).toBe(10); // v0.6.18 re-anchor: the operations slide
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("1 / 11"); // v0.6.22 re-anchor: the flow slide
+    expect(nav.querySelectorAll("[data-dot]").length).toBe(11); // v0.6.18 re-anchor: the operations slide; v0.6.22: the flow slide
     expect(next.getAttribute("aria-disabled")).toBe("false");
-    for (let i = 0; i < 9; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("10 / 10");
+    for (let i = 0; i < 10; i++) fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(nav.querySelector(".stage-nav-counter")?.textContent).toBe("11 / 11");
     expect(next.getAttribute("aria-disabled")).toBe("true");
     expect(next.className).toContain("stage-nav-button-disabled");
     expect(prev.getAttribute("aria-disabled")).toBe("false");
-    expect(document.querySelectorAll('[data-dot="9"].stage-dot-active').length).toBe(1);
+    expect(document.querySelectorAll('[data-dot="10"].stage-dot-active').length).toBe(1);
   });
 
   it("F-SWIPE-SOURCE: the swipe handlers attach with a threshold and the dominant-axis test; the chrome reserves the safe area", () => {
@@ -333,7 +333,7 @@ describe("v0.6.5 Task H: the PDF quality sweep (W10/W16)", () => {
     const result = computeModel(demo);
     const model = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
     const doc = buildDeckPdf(model, "Project Alpha", undefined, "light");
-    expect(doc.getNumberOfPages()).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor
   });
 
   it("H-PRINT-SURFACES: the summary donuts and the scenario target charts join the drawn trace with their formatted figures", () => {
@@ -350,7 +350,7 @@ describe("v0.6.5 Task H: the PDF quality sweep (W10/W16)", () => {
     const axesDeck = deckSlides(demo, result, { startYear: null, entryUnit: "ones", scenarioTargets: [5, 8, 10, 12, 15, 25] });
     const trace2 = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(axesDeck, "Project Alpha", trace2);
-    const sce = trace2.drawnFigures[7].join("|");
+    const sce = trace2.drawnFigures[8].join("|");
     expect(sce).toContain("353 739 kr");
     expect(sce).toContain("762 056 kr");
     const fixed: ModelInputs = {
@@ -360,7 +360,7 @@ describe("v0.6.5 Task H: the PDF quality sweep (W10/W16)", () => {
     const fixedDeck = deckSlides(fixed, computeModel(fixed), { startYear: null, entryUnit: "ones", scenarioTargets: [5, 8, 10, 12, 15, 25] });
     const trace3 = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(fixedDeck, "Project Alpha", trace3);
-    const sce3 = trace3.drawnFigures[7].join("|");
+    const sce3 = trace3.drawnFigures[8].join("|");
     expect(sce3).toContain("break-even at -34.45%");
     expect(sce3).toContain("not met");
   });
@@ -385,6 +385,6 @@ describe("v0.6.5 Task I: the verdict-led closing slide", () => {
     const model = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     buildDeckPdf(model, "Project Alpha", trace);
-    expect(trace.drawnFigures[6][0]).toBe(model.slides[6].verdict);
+    expect(trace.drawnFigures[7][0]).toBe(model.slides[7].verdict); // v0.6.22 re-anchor
   });
 });

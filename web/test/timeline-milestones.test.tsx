@@ -69,7 +69,7 @@ describe("v0.6.13.4 Tasks B and E: the numbered text lines", () => {
     for (const make of [shorePowerProgram, landNewbuildProject]) {
       const inp = make();
       const deck = deckSlides(inp, computeModel(inp), { startYear: null, scenarioTargets: [4, 6, 8], scenarioTerms: [15, 20, 25], scenarioBalloons: [0, 8, 16] });
-      expect(deck.slides).toHaveLength(10);
+      expect(deck.slides).toHaveLength(11); // v0.6.22 re-anchor: the flow slide (v0.6.18: the operations slide made ten)
       const n = inp.timeline!.milestones.length;
       const labels = deck.slides.find((s) => s.name === "timeline")!.body.filter((f) => f.label.startsWith("Milestone")).map((f) => f.label);
       expect(labels).toEqual(Array.from({ length: n }, (_, i) => `Milestone ${i + 1}`));

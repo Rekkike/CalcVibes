@@ -12,7 +12,7 @@ describe("v0.6.4 Part B: the executive summary infographic slide", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
-    expect(deck.slides.length).toBe(7);
+    expect(deck.slides.length).toBe(8); // v0.6.22 re-anchor: the flow slide joins the base set
     expect(deck.slides[0].name).toBe("title");
     expect(deck.slides[1].name).toBe("summary");
     expect(deck.slides[1].title).toBe("Executive summary");
@@ -94,9 +94,10 @@ describe("v0.6.4 Part A: the board-room simplification", () => {
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
     expect(deck.slides[2].title).toBe("The investment");
     expect(deck.slides[3].title).toBe("The recovery — solved payments");
-    expect(deck.slides[4].title).toBe("Coverage");
-    expect(deck.slides[5].title).toBe("The returns");
-    expect(deck.slides[6].title).toBe("The deal");
+    expect(deck.slides[4].title).toBe("Covered on the horizon, 3 short years"); // v0.6.22: the flow slide's action title
+    expect(deck.slides[5].title).toBe("Coverage");
+    expect(deck.slides[6].title).toBe("The returns");
+    expect(deck.slides[7].title).toBe("The deal");
     for (let i = 1; i < deck.slides.length; i++) {
       expect(deck.slides[i].title.length).toBeLessThanOrEqual(40);
     }
@@ -126,21 +127,21 @@ describe("v0.6.4 Part A: the board-room simplification", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
-    expect((deck.slides[6].tiles ?? []).map((t) => t.label)).toEqual(["Total cost", "Total collected", "Net gain", "Achieved IRR", "NPV at WACC", "Payback (nominal)"]);
-    expect(deck.slides[6].verdict).toBe(`Target met — net gain ${deckMoneyForDisplay(result.netGain, "SEK", "ones")}.`);
-    expect(deck.slides[6].insights).toBeUndefined();
+    expect((deck.slides[7].tiles ?? []).map((t) => t.label)).toEqual(["Total cost", "Total collected", "Net gain", "Achieved IRR", "NPV at WACC", "Payback (nominal)"]);
+    expect(deck.slides[7].verdict).toBe(`Target met — net gain ${deckMoneyForDisplay(result.netGain, "SEK", "ones")}.`);
+    expect(deck.slides[7].insights).toBeUndefined();
   });
 
   it("BOARD-RETAINS: the slide set, the provenance disclosure, and the scenarios slide survive the simplification", () => {
     const demo = demoProject();
     const result = computeModel(demo);
     const deck = deckSlides(demo, result, { startYear: null, entryUnit: "ones" });
-    expect(deck.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "recovery", "coverage", "returns", "deal"]);
+    expect(deck.slides.map((s) => s.name)).toEqual(["title", "summary", "investment", "recovery", "flow", "coverage", "returns", "deal"]); // v0.6.22 re-anchor
     expect(deck.provenance?.join(" ")).toContain("no scenarios set");
     const withAxes = deckSlides(demo, result, { startYear: null, entryUnit: "ones", scenarioTerms: [20] });
-    expect(withAxes.slides.length).toBe(8);
-    expect(withAxes.slides[7].name).toBe("scenarios");
-    expect(withAxes.slides[7].title).toBe("The scenarios");
+    expect(withAxes.slides.length).toBe(9);
+    expect(withAxes.slides[8].name).toBe("scenarios");
+    expect(withAxes.slides[8].title).toBe("The scenarios");
   });
 
   it("BOARD-CHART-FIRST: wherever a chart exists it is rendered before the slide's figures", () => {

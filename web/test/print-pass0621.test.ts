@@ -177,7 +177,7 @@ describe("v0.6.21 W33/W34 — the theme mapping, dark default, light paper-and-t
     reset();
     const trace = { drawnTitles: [] as string[], drawnFigures: [] as string[][] };
     const doc = buildDeckPdf(deckSlides(demoProject(), computeModel(demoProject()), { startYear: null }), "Alpha", trace, "light");
-    expect(doc.getNumberOfPages()).toBe(7);
+    expect(doc.getNumberOfPages()).toBe(8); // v0.6.22 re-anchor: the flow slide prints a page
     expect(trace.drawnTitles[0]).toBe("Project Alpha");
     const stageInk = (f: unknown[]) => f[0] === 8 && f[1] === 28 && f[2] === 51;
     expect(rec.fills.some(stageInk)).toBe(false);

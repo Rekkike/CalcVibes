@@ -506,3 +506,134 @@ export function GanttChart(props: { gantt: DeckGantt }) {
     </div>
   );
 }
+
+// v0.6.22 Task B — the flow slide's two renderers. Geometry in SVG on one shared zero-based scale
+// (the deck model composes the percents; nothing financial is recomputed here), labels in HTML,
+// direct labels over legends. The two-band connected composition: the income band on the left, the
+// use band on the right, truthful widths, ribbons only for nonzero flows; a signed (negative) equity
+// band renders in the bad tone.
+export const FLOW_BAND_COLORS = ["#38bdf8", "#34d399", "#e8b84b", "#c4b5fd", "#fb7185", "#22d3ee", "#a3e635", "#f0abfc"];
+
+export function FlowBands(props: { flow: import("./deck.js").DeckFlow }) {
+  const { flow } = props;
+  const W = 800;
+  const top = 24;
+  const plotH = 360;
+  const bandW = 56;
+  const xLeft = 70;
+  const xRight = W - 70 - bandW;
+  const yAt = (pct: number) => top + (pct / 100) * plotH;
+  const hAt = (pct: number) => (pct / 100) * plotH;
+  return (
+    <div data-testid="flow-bands" data-form="bands" className="chart-block flow-chart">
+      <svg viewBox={`0 0 ${W} ${top + plotH + 8}`} className="flow-svg" role="img" aria-label="What the collections pay for">
+        {flow.connectors.map((c) => {
+          const si = flow.incomeBands.findIndex((b) => b.key === c.sourceKey);
+          const color = FLOW_BAND_COLORS[((si % FLOW_BAND_COLORS.length) + FLOW_BAND_COLORS.length) % FLOW_BAND_COLORS.length];
+          const sx1 = xLeft + bandW;
+          const sy1 = yAt(c.sourceTopPct);
+          const sy2 = sy1 + hAt(c.sourceHeightPct);
+          const ux1 = xRight;
+          const uy1 = yAt(c.useTopPct);
+          const uy2 = uy1 + hAt(c.useHeightPct);
+          const mx = (sx1 + ux1) / 2;
+          return (
+            <path
+              key={`${c.sourceKey}->${c.useKey}`}
+              data-flow-connector={`${c.sourceKey}->${c.useKey}`}
+              d={`M ${sx1} ${sy1} C ${mx} ${sy1}, ${mx} ${uy1}, ${ux1} ${uy1} L ${ux1} ${uy2} C ${mx} ${uy2}, ${mx} ${sy2}, ${sx1} ${sy2} Z`}
+              fill={color}
+              className="flow-connector"
+            >
+              <title>{`${c.sourceKey} \u2192 ${c.useKey}: ${c.value}`}</title>
+            </path>
+          );
+        })}
+        {flow.incomeBands.map((b, i) => (
+          <rect
+            key={b.key}
+            data-flow-income-band={b.key}
+            data-band-count={b.count}
+            x={xLeft}
+            y={yAt(b.topPct)}
+            width={bandW}
+            height={Math.max(0.5, hAt(b.heightPct))}
+            fill={FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length]}
+            className="flow-band flow-band-income"
+          >
+            <title>{`${b.label}: ${b.value}`}</title>
+          </rect>
+        ))}
+        {flow.useBands.map((b, i) => (
+          <rect
+            key={b.key}
+            data-flow-use-band={b.key}
+            data-signed={b.signed ? "true" : "false"}
+            x={xRight}
+            y={yAt(b.topPct)}
+            width={bandW}
+            height={Math.max(0.5, hAt(b.heightPct))}
+            className={"flow-band flow-band-use" + (b.signed && b.raw < 0 ? " flow-band-bad" : "")}
+            fill={b.signed && b.raw < 0 ? "#fb7185" : FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length]}
+          >
+            <title>{`${b.label}: ${b.value}`}</title>
+          </rect>
+        ))}
+      </svg>
+      <div className="flow-labels">
+        <ul data-testid="flow-income-labels" className="flow-label-col">
+          {flow.incomeBands.map((b, i) => (
+            <li key={b.key} data-flow-income-label={b.key}>
+              <span className="flow-swatch" style={{ background: FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length] }} />
+              <span className="row-name">{b.label}</span>
+              <span className="row-value">{b.value}</span>
+            </li>
+          ))}
+        </ul>
+        <ul data-testid="flow-use-labels" className="flow-label-col">
+          {flow.useBands.map((b, i) => (
+            <li key={b.key} data-flow-use-label={b.key} data-signed={b.signed ? "true" : "false"}>
+              <span className="flow-swatch" style={{ background: b.signed && b.raw < 0 ? "#fb7185" : FLOW_BAND_COLORS[i % FLOW_BAND_COLORS.length] }} />
+              <span className="row-name">{b.label}</span>
+              <span className={"row-value" + (b.signed && b.raw < 0 ? " tone-bad" : "")}>{b.value}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// v0.6.22 Task B — the sequential bridge, the degradation form of the flow slide: six fixed steps
+// (collections in, debt service out, operating out, reinvestment out, capital out, the remainder),
+// zero-based on the income scale, the signed remainder drawn below the ground in the bad tone when
+// negative. HTML stepped columns on the deck model's composed percents, like the cost waterfall.
+export function FlowBridge(props: { flow: import("./deck.js").DeckFlow }) {
+  const { flow } = props;
+  const steps = flow.bridge;
+  const n = steps.length;
+  const slot = 100 / n;
+  return (
+    <div data-testid="flow-bridge" data-form="bridge" className="chart-block flow-bridge">
+      <div className="waterfall-track flow-bridge-track">
+        {steps.map((s, i) => (
+          <div
+            key={s.id}
+            data-flow-step={s.id}
+            data-flow-kind={s.kind}
+            className={"flow-step flow-step-" + s.kind + (s.kind === "remainder" && s.raw < 0 ? " flow-step-bad" : "")}
+            style={{ bottom: `${s.bottomPct}%`, height: `${Math.max(0.4, s.heightPct)}%`, left: `${i * slot}%`, width: `${0.6 * slot}%` }}
+          />
+        ))}
+      </div>
+      <div data-flow-ground="true" className="waterfall-ground" />
+      <div className="waterfall-names">
+        {steps.map((s, i) => (
+          <span key={s.id} data-flow-step-name={s.id} className="waterfall-name" style={{ width: `${slot}%` }} title={`${s.label} ${s.value}`}>
+            {s.label} <span className={"flow-step-value" + (s.kind === "remainder" && s.raw < 0 ? " tone-bad" : "")}>{s.value}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
