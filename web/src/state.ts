@@ -1065,3 +1065,300 @@ export function composeBookCollections(result: ModelResult): BookCollectionsSpli
     return { year: row.year, fees: row.collections - grants - note, grants, note };
   });
 }
+
+
+// ---------------------------------------------------------------------------------------------
+// v0.6.22 — the flow-matching allocation model (the flow-matching pass, directive v0.6.22). Pure and
+// presentation-only: the engine never reads any of it. Every figure composes from the emitted grids
+// (result.collectionsGrid, result.costGrid, result.bookView, result.financing.dscr); no side
+// calculations. One model composed ONCE here; the app surface, the deck slide and the print route
+// consume it and never recompute it.
+// ---------------------------------------------------------------------------------------------
+
+// The authored overrides ride the project document as an additive optional field, exactly the
+// deckTitles precedent (v0.6.21 Task E): declared web-side because this pass opens no core file; the
+// project file carries it through (the container checks judge only the known keys, so an absent
+// entry parses exactly as before — the back-compatibility pin); FILE_VERSION stays 1.
+export interface FlowPairing { id: string; sourceId: string; useId: string; amount: number }
+export interface FlowAllocationsExt { flow?: { pairs: FlowPairing[] } }
+export const flowOf = (inputs: ModelInputs): FlowPairing[] => (inputs as ModelInputs & FlowAllocationsExt).flow?.pairs ?? [];
+
+// The flow identities: the kind:id keying of the grid rows (the YearlyDetailSection keying),
+// collision-free across hand-edited files. Sources are the collectionsGrid rows; uses are the
+// costGrid rows plus financing:service (the debt-service bucket, from the DSCR rows' service
+// column, only when financing is enabled) and equity:remainder (the signed equity remainder).
+export const flowSourceKey = (kind: string, id: string): string => `${kind}:${id}`;
+export const FLOW_SERVICE_USE = "financing:service";
+export const FLOW_EQUITY_USE = "equity:remainder";
+
+export interface FlowNode { key: string; label: string; kind: string; total: number; // the net horizon total; a row carrying negative years (the note's installments) nets to its true sum
+  // the gross positive flow of the horizon (the per-year positive amounts summed): the band width
+  // and the connector reconciliation compose on this figure, since only positive flow can be allocated
+  gross: number }
+export interface FlowAllocation { sourceKey: string; useKey: string; year: number; amount: number }
+export interface FlowYearRow {
+  year: number;
+  income: number;
+  // the gross positive inflow of the year (negative source years, the note's installments, excluded
+  // from allocation but included in income)
+  grossIncome: number;
+  uses: number;
+  // the signed remainder: income minus uses. Negative in a shortfall year (the later uses of the
+  // default chain stay unallocated); never smoothed, never netted invisibly.
+  remainder: number;
+  allocations: FlowAllocation[];
+}
+export interface FlowConnector { sourceKey: string; useKey: string; amount: number }
+export interface FlowPairingView {
+  id: string;
+  sourceId: string;
+  sourceLabel: string;
+  useId: string;
+  useLabel: string;
+  amount: number;
+  allocated: number;
+  remaining: number;
+}
+export interface FlowRefusal {
+  code: "FLOW-PAIRING-AMOUNT" | "FLOW-PAIRING-SOURCE" | "FLOW-PAIRING-USE" | "FLOW-PAIRING-DUPLICATE" | "FLOW-PAIRING-DEAD";
+  message: string;
+  warning: boolean;
+}
+export interface FlowComposition {
+  // the live source and use identities, in grid order (the uses end with the two synthetic buckets)
+  sources: FlowNode[];
+  uses: FlowNode[];
+  // the default in-year coverage order of use keys: debt service first (when financing is enabled),
+  // then operating (the operating rows, then the derived maintenance), then reinvestment, then the
+  // year's capital rows (the cost: rows); the equity remainder is the signed residual, not ordered.
+  useOrder: string[];
+  years: FlowYearRow[];
+  // the aggregated connectors (the per-year allocations summed per source/use), the slide's flows
+  connectors: FlowConnector[];
+  remainderNet: number;
+  remainderSurplus: number;
+  remainderShortfall: number;
+  shortfallYears: number;
+  pairings: FlowPairingView[];
+  refusals: FlowRefusal[];
+}
+
+const FLOW_SOURCE_KIND_LABELS: Record<string, string> = {
+  payments: "Payment stream",
+  profile: "Collections profile",
+  contract: "Contract",
+  tariff: "Tariff",
+  grant: "Grant",
+  "funding-loan": "Interest-free note",
+  balloon: "Balloon",
+  residual: "Residual",
+};
+const FLOW_USE_KIND_BUCKET: Record<string, string> = {
+  operating: "Operating",
+  maintenance: "Operating",
+  reinvestment: "Reinvestment",
+  cost: "Capital",
+};
+// The use bucket a use key aggregates into on the slide: financing:service and equity:remainder stand
+// alone; the cost-grid kinds map to their bucket label.
+export const flowUseBucketOf = (useKey: string): string => {
+  if (useKey === FLOW_SERVICE_USE) return "Debt service";
+  if (useKey === FLOW_EQUITY_USE) return "Equity remainder";
+  const kind = useKey.slice(0, useKey.indexOf(":"));
+  return FLOW_USE_KIND_BUCKET[kind] ?? kind;
+};
+export const flowSourceKindLabel = (kind: string): string => FLOW_SOURCE_KIND_LABELS[kind] ?? kind;
+
+export function composeFlow(inputs: ModelInputs, result: ModelResult): FlowComposition {
+  const years = result.yearly.length;
+  const sources: FlowNode[] = result.collectionsGrid.map((r) => ({
+    key: flowSourceKey(r.kind, r.id),
+    label: r.name,
+    kind: r.kind,
+    total: r.amounts.reduce((a, v) => a + v, 0),
+    gross: r.amounts.reduce((a, v) => a + Math.max(0, v), 0),
+  }));
+  const useRows: FlowNode[] = result.costGrid.map((r) => ({
+    key: flowSourceKey(r.kind, r.id),
+    label: r.name,
+    kind: r.kind,
+    total: r.amounts.reduce((a, v) => a + v, 0),
+    gross: r.amounts.reduce((a, v) => a + Math.max(0, v), 0),
+  }));
+  const serviceByYear = new Map<number, number>();
+  if (result.financing !== null) {
+    for (const d of result.financing.dscr) serviceByYear.set(d.year, d.service);
+  }
+  const uses: FlowNode[] = [...useRows];
+  if (result.financing !== null) {
+    uses.push({ key: FLOW_SERVICE_USE, label: "Debt service", kind: "financing", total: result.financing.dscr.reduce((a, d) => a + d.service, 0), gross: result.financing.dscr.reduce((a, d) => a + d.service, 0) });
+  }
+  uses.push({ key: FLOW_EQUITY_USE, label: "Equity remainder", kind: "equity", total: 0, gross: 0 });
+  // The default coverage order of record: debt service first (when financing is enabled), then
+  // operating (the operating rows, then the derived maintenance line), then reinvestment, then the
+  // year's capital rows (the cost: rows).
+  const useOrder: string[] = [];
+  if (result.financing !== null) useOrder.push(FLOW_SERVICE_USE);
+  for (const u of useRows) if (u.kind === "operating") useOrder.push(u.key);
+  for (const u of useRows) if (u.kind === "maintenance") useOrder.push(u.key);
+  for (const u of useRows) if (u.kind === "reinvestment") useOrder.push(u.key);
+  for (const u of useRows) if (u.kind === "cost") useOrder.push(u.key);
+
+  const sourceOrder = sources.map((s) => s.key);
+  const useAmountOf = (u: FlowNode, yearIdx: number): number =>
+    u.key === FLOW_SERVICE_USE ? (serviceByYear.get(yearIdx + 1) ?? 0) : (result.costGrid.find((r) => flowSourceKey(r.kind, r.id) === u.key)?.amounts[yearIdx] ?? 0);
+
+  // The authored pairings, validated against the live grids under the collect-all contract.
+  const pairs = flowOf(inputs);
+  const refusals: FlowRefusal[] = [];
+  const liveSources = new Set(sources.map((s) => s.key));
+  const liveUses = new Set(uses.map((u) => u.key));
+  const seenPairs = new Set<string>();
+  const pairState = pairs.map((p) => {
+    let refused = false;
+    if (!Number.isFinite(p.amount) || p.amount <= 0) {
+      refused = true;
+      refusals.push({ code: "FLOW-PAIRING-AMOUNT", warning: false, message: `Flow pairing ${p.id} carries the amount ${String(p.amount)}, which is not a positive finite number: set a positive amount or remove the pairing (FLOW-PAIRING-AMOUNT).` });
+    }
+    if (!liveSources.has(p.sourceId)) {
+      refused = true;
+      refusals.push({ code: "FLOW-PAIRING-SOURCE", warning: false, message: `Flow pairing ${p.id} names the source "${p.sourceId}", which is not a live collections-grid row; the live sources are ${[...liveSources].join(", ") || "none"}: choose one of them or remove the pairing (FLOW-PAIRING-SOURCE).` });
+    }
+    if (!liveUses.has(p.useId)) {
+      refused = true;
+      refusals.push({ code: "FLOW-PAIRING-USE", warning: false, message: `Flow pairing ${p.id} names the use "${p.useId}", which is not a live cost-grid row, the debt-service bucket or the equity remainder; the live uses are ${[...liveUses].join(", ") || "none"}: choose one of them or remove the pairing (FLOW-PAIRING-USE).` });
+    }
+    const dupKey = `${p.sourceId}->${p.useId}`;
+    if (seenPairs.has(dupKey)) {
+      refused = true;
+      refusals.push({ code: "FLOW-PAIRING-DUPLICATE", warning: false, message: `Flow pairing ${p.id} duplicates the pairing of ${p.sourceId} to ${p.useId}, which is already authored: one pairing per source-use pair — remove the duplicate (FLOW-PAIRING-DUPLICATE).` });
+    } else {
+      seenPairs.add(dupKey);
+    }
+    // A refused pairing never allocates: the refusal names it and the default covers the flow.
+    return { p, remaining: !refused && Number.isFinite(p.amount) && p.amount > 0 ? p.amount : 0, valid: !refused && liveSources.has(p.sourceId) && liveUses.has(p.useId) };
+  });
+  for (const st of pairState) {
+    if (!st.valid) continue;
+    const src = sources.find((s) => s.key === st.p.sourceId);
+    if (src !== undefined && src.total <= 0) {
+      refusals.push({ code: "FLOW-PAIRING-DEAD", warning: true, message: `Flow pairing ${st.p.id} draws on the source "${st.p.sourceId}" (${src.label}), which carries no positive flow in any year of the horizon: the pairing never allocates — remove it or re-point it (FLOW-PAIRING-DEAD).` });
+    }
+  }
+
+  const yearRows: FlowYearRow[] = [];
+  const connectorMap = new Map<string, FlowConnector>();
+  const addConnector = (sourceKey: string, useKey: string, amount: number) => {
+    if (amount <= 0) return;
+    const k = `${sourceKey}->${useKey}`;
+    const ex = connectorMap.get(k);
+    if (ex !== undefined) ex.amount += amount;
+    else connectorMap.set(k, { sourceKey, useKey, amount });
+  };
+  let remainderNet = 0;
+  let remainderSurplus = 0;
+  let remainderShortfall = 0;
+  let shortfallYears = 0;
+  for (let y = 1; y <= years; y++) {
+    const idx = y - 1;
+    const avail = new Map<string, number>();
+    let income = 0;
+    let grossIncome = 0;
+    for (const s of sources) {
+      const raw = result.collectionsGrid.find((r) => flowSourceKey(r.kind, r.id) === s.key)?.amounts[idx] ?? 0;
+      // only positive flow can be allocated; the negative years (the note's installments) stay in
+      // the net income and thus in the signed remainder
+      avail.set(s.key, Math.max(0, raw));
+      income += raw;
+      grossIncome += Math.max(0, raw);
+    }
+    const useRemaining = new Map<string, number>();
+    let usesTotal = 0;
+    for (const u of useRows) {
+      const a = useAmountOf(u, idx);
+      useRemaining.set(u.key, a);
+      usesTotal += a;
+    }
+    if (result.financing !== null) {
+      const srv = serviceByYear.get(y) ?? 0;
+      useRemaining.set(FLOW_SERVICE_USE, srv);
+      usesTotal += srv;
+    }
+    const allocations: FlowAllocation[] = [];
+    const alloc = (sourceKey: string, useKey: string, amount: number) => {
+      if (amount <= 0) return;
+      allocations.push({ sourceKey, useKey, year: y, amount });
+      avail.set(sourceKey, (avail.get(sourceKey) ?? 0) - amount);
+      useRemaining.set(useKey, (useRemaining.get(useKey) ?? 0) - amount);
+      addConnector(sourceKey, useKey, amount);
+    };
+    // The authored pairings are satisfied first, in authored order, each capped at its remaining
+    // horizon-level amount and at the year's remaining source flow and use demand; cumulative
+    // across years (a pairing draws on its source across the years until satisfied).
+    for (const st of pairState) {
+      if (!st.valid || st.remaining <= 0) continue;
+      const sAvail = avail.get(st.p.sourceId) ?? 0;
+      const uRem = useRemaining.get(st.p.useId) ?? 0;
+      const take = Math.min(st.remaining, sAvail, uRem);
+      if (take > 0) {
+        alloc(st.p.sourceId, st.p.useId, take);
+        st.remaining -= take;
+      }
+    }
+    // The default in-year coverage: the use order of record, drawing on the sources in grid order.
+    for (const uKey of useOrder) {
+      let rem = useRemaining.get(uKey) ?? 0;
+      for (const sKey of sourceOrder) {
+        if (rem <= 0) break;
+        const a = avail.get(sKey) ?? 0;
+        const take = Math.min(a, rem);
+        if (take > 0) {
+          alloc(sKey, uKey, take);
+          rem -= take;
+        }
+      }
+      useRemaining.set(uKey, rem);
+    }
+    // The leftover source flow of the year is the surplus remainder flowing to equity.
+    for (const sKey of sourceOrder) {
+      const left = avail.get(sKey) ?? 0;
+      if (left > 0) alloc(sKey, FLOW_EQUITY_USE, left);
+    }
+    const remainder = income - usesTotal;
+    remainderNet += remainder;
+    if (remainder > 0) remainderSurplus += remainder;
+    else if (remainder < 0) {
+      remainderShortfall += remainder;
+      shortfallYears += 1;
+    }
+    yearRows.push({ year: y, income, grossIncome, uses: usesTotal, remainder, allocations });
+  }
+  const pairings: FlowPairingView[] = pairState.map((st) => {
+    const src = sources.find((s) => s.key === st.p.sourceId);
+    const use = uses.find((u) => u.key === st.p.useId);
+    const allocated = st.valid && Number.isFinite(st.p.amount) && st.p.amount > 0 ? st.p.amount - st.remaining : 0;
+    return {
+      id: st.p.id,
+      sourceId: st.p.sourceId,
+      sourceLabel: src?.label ?? st.p.sourceId,
+      useId: st.p.useId,
+      useLabel: use?.label ?? st.p.useId,
+      amount: st.p.amount,
+      allocated,
+      remaining: st.remaining,
+    };
+  });
+  return {
+    sources,
+    uses,
+    useOrder,
+    years: yearRows,
+    connectors: [...connectorMap.values()],
+    remainderNet,
+    remainderSurplus,
+    remainderShortfall,
+    shortfallYears,
+    pairings,
+    refusals,
+  };
+}
