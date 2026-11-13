@@ -587,13 +587,13 @@ function drawPrintColumns(doc: jsPDF, T: PdfThemePalette, columns: DeckStepColum
 // directly beside its band (income labels left of the income band, use labels right of the use band),
 // vertically aligned to its segment through the same yAt/hAt mapping. One page per slide is kept; no
 // legend block exists on the paper route.
-const FLOW_PRINT_PLOT_H = 26; // sized so the slide's body figures, disclosures and chart fit one page
+export const FLOW_PRINT_PLOT_H = 26; // sized so the slide's body figures, disclosures and chart fit one page
 export const FLOW_PRINT_LABEL_PT = 6; // the flow print route's established label size
 export const FLOW_PRINT_LABEL_MIN_H = (FLOW_PRINT_LABEL_PT * 25.4) / 72 + 1; // one 6 pt line with the print baseline offset (+1) is admitted when h/2 + 1 + descent <= h
 const FLOW_PRINT_LABEL_COL_W = 40; // the fixed-width label column inside the chart body (20..277 mm)
 const FLOW_PRINT_BAND_INSET = 1;
 const FLOW_PRINT_BAND_MIN_W = 14; // the standing v0.6.22 print band width (floor)
-const FLOW_PRINT_LINE_H = (FLOW_PRINT_LABEL_PT * 25.4 * 1.15) / 72; // jsPDF's line height at 6 pt (lineHeightFactor 1.15)
+export const FLOW_PRINT_LINE_H = (FLOW_PRINT_LABEL_PT * 25.4 * 1.15) / 72; // jsPDF's line height at 6 pt (lineHeightFactor 1.15)
 function drawPrintFlow(doc: jsPDF, T: PdfThemePalette, flow: DeckFlow, y: number, trace?: DeckPdfTrace): number {
   const plotH = FLOW_PRINT_PLOT_H;
   const ptMm = 25.4 / 72;
