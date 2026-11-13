@@ -1435,16 +1435,16 @@
 [data-testid="presentation"] .peak-label.peak-end { align-self: flex-end; }
 
 /* ===== v0.6.22 Task B/C — the flow-matching surfaces (the deck chart and the Plan flow surface). ===== */
-.flow-chart .flow-svg { width: 100%; height: auto; display: block; }
+/* v0.6.22.1 Task A — the direct-label seating: the figure is one centered SVG block (the fixed-width
+   label columns live in the gutters inside the viewBox, the below-figure swatch lists retired); the
+   labels are SVG text seated with their bands. */
+.flow-chart .flow-svg { display: block; width: 100%; max-width: 56rem; height: auto; margin-inline: auto; }
 .flow-chart .flow-connector { opacity: 0.55; }
-.flow-chart .flow-labels { display: flex; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-2); }
-.flow-chart .flow-label-col { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.flow-chart .flow-label-col li { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
-.flow-chart .flow-swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; align-self: center; }
-.flow-chart .row-name { overflow-wrap: anywhere; }
-.flow-chart .row-value { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
-[data-testid="presentation"] .flow-chart .row-name, [data-testid="presentation"] .flow-chart .row-value { color: #e2e8f0; }
-.app-root .flow-chart .row-name, .app-root .flow-chart .row-value { color: var(--ink); }
+.flow-chart .flow-label { fill: var(--ink); font-variant-numeric: tabular-nums; }
+[data-testid="presentation"] .flow-chart .flow-label { fill: #e2e8f0; }
+.app-root .flow-chart .flow-label-bad { fill: var(--bad); }
+[data-testid="presentation"] .flow-chart .flow-label-bad { fill: #fb7185; }
+.app-root .flow-chart .flow-label-inside, [data-testid="presentation"] .flow-chart .flow-label-inside { fill: #081c33; }
 .flow-bridge .flow-bridge-track { position: relative; height: 220px; width: 100%; margin-top: 0.6rem; }
 .flow-bridge .flow-step { position: absolute; border-radius: 3px 3px 0 0; background: var(--accent, #0074ba); }
 [data-testid="presentation"] .flow-bridge .flow-step { background: #38bdf8; }
